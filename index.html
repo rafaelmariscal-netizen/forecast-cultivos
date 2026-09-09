@@ -1,0 +1,2819 @@
+<title>Forecast de Cultivos</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --page-bg:#f7f8f4; --surface:#fcfcfb; --surface-raised:#ffffff;
+    --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+    --border:rgba(11,11,11,0.10); --border-strong:rgba(11,11,11,0.16);
+    --grid-line:#e1e0d9; --baseline:#c3c2b7;
+    --accent:#1d6b4a; --accent-strong:#124f36; --accent-soft:#e3efe8; --accent-soft-2:#cfe6da;
+    --good:#0ca30c; --warning:#b8790a; --serious:#c15a30; --critical:#c23333;
+    --good-soft:#e2f5e1; --warning-soft:#faf0d9; --critical-soft:#fbe4e1;
+    --m-ingreso:#1baf7a; --m-egreso:#eb6834; --m-ebitda:#2a78d6;
+    --crop-1:#2a78d6; --crop-2:#eb6834; --crop-3:#1baf7a; --crop-4:#c98500; --crop-5:#d1548a; --crop-6:#3a8c1c; --crop-7:#4a3aa7;
+    --shadow-1: 0 1px 2px rgba(11,11,11,0.06), 0 1px 1px rgba(11,11,11,0.04);
+    --shadow-2: 0 6px 20px rgba(11,11,11,0.08);
+    --radius: 10px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --page-bg:#0d0d0d; --surface:#1a1a19; --surface-raised:#202220;
+      --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8d86;
+      --border:rgba(255,255,255,0.12); --border-strong:rgba(255,255,255,0.20);
+      --grid-line:#2c2c2a; --baseline:#3d3d3a;
+      --accent:#4bb98a; --accent-strong:#6ccca2; --accent-soft:#173226; --accent-soft-2:#1e4433;
+      --good:#4fd44f; --warning:#e0ab3c; --serious:#e2895f; --critical:#e97070;
+      --good-soft:#123018; --warning-soft:#332812; --critical-soft:#3a1a17;
+      --m-ingreso:#3fcf9a; --m-egreso:#f08a5c; --m-ebitda:#5b9ee8;
+      --crop-1:#5b9ee8; --crop-2:#f08a5c; --crop-3:#3fcf9a; --crop-4:#e0ab3c; --crop-5:#e284ac; --crop-6:#7dc85a; --crop-7:#9085e9;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --page-bg:#0d0d0d; --surface:#1a1a19; --surface-raised:#202220;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#8f8d86;
+    --border:rgba(255,255,255,0.12); --border-strong:rgba(255,255,255,0.20);
+    --grid-line:#2c2c2a; --baseline:#3d3d3a;
+    --accent:#4bb98a; --accent-strong:#6ccca2; --accent-soft:#173226; --accent-soft-2:#1e4433;
+    --good:#4fd44f; --warning:#e0ab3c; --serious:#e2895f; --critical:#e97070;
+    --good-soft:#123018; --warning-soft:#332812; --critical-soft:#3a1a17;
+    --m-ingreso:#3fcf9a; --m-egreso:#f08a5c; --m-ebitda:#5b9ee8;
+    --crop-1:#5b9ee8; --crop-2:#f08a5c; --crop-3:#3fcf9a; --crop-4:#e0ab3c; --crop-5:#e284ac; --crop-6:#7dc85a; --crop-7:#9085e9;
+    color-scheme: dark;
+  }
+
+  *{ box-sizing:border-box; }
+  body{ background:var(--page-bg); color:var(--text-primary); font-family:'Public Sans',system-ui,-apple-system,sans-serif; }
+  h1,h2,h3,.display{ font-family:'Fraunces',Georgia,serif; text-wrap:balance; letter-spacing:-0.01em; }
+  .mono{ font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  button{ font-family:inherit; }
+  input,select,textarea{ font-family:inherit; }
+  ::selection{ background:var(--accent-soft-2); }
+
+  a{ color:var(--accent-strong); }
+
+  .app{ max-width:1400px; margin:0 auto; padding:20px 20px 64px; }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between;
+    padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid var(--border);
+  }
+  .brand{ display:flex; flex-direction:column; gap:2px; }
+  .brand .eyebrow{ font-size:11px; font-weight:700; letter-spacing:0.10em; text-transform:uppercase; color:var(--accent-strong); }
+  .brand h1{ font-size:28px; font-weight:600; margin:0; color:var(--text-primary); }
+  .brand .sub{ font-size:13px; color:var(--text-secondary); max-width:56ch; }
+  .badges{ display:flex; gap:8px; flex-wrap:wrap; }
+  .badge{
+    display:flex; align-items:center; gap:8px; background:var(--surface-raised); border:1px solid var(--border);
+    border-radius:999px; padding:7px 12px 7px 14px; font-size:12px; color:var(--text-secondary); box-shadow:var(--shadow-1);
+  }
+  .badge b{ color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-weight:600; }
+  .badge input{
+    width:64px; border:none; background:transparent; color:var(--text-primary); font-family:'IBM Plex Mono',monospace;
+    font-weight:600; font-size:12px; text-align:right; outline:none;
+  }
+
+  /* ---------- tabs ---------- */
+  .tabnav{ display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); overflow-x:auto; }
+  .tabnav button{
+    appearance:none; background:none; border:none; border-bottom:2px solid transparent; padding:10px 14px;
+    font-size:13.5px; font-weight:600; color:var(--text-secondary); cursor:pointer; white-space:nowrap;
+    display:flex; align-items:center; gap:7px; transition:color .15s ease, border-color .15s ease;
+  }
+  .tabnav button:hover{ color:var(--text-primary); }
+  .tabnav button.active{ color:var(--accent-strong); border-bottom-color:var(--accent); }
+  .tabnav .tag{
+    font-size:10px; font-weight:700; padding:1px 6px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong);
+  }
+
+  /* ---------- layout ---------- */
+  .layout{ display:grid; grid-template-columns:260px 1fr; gap:20px; align-items:start; }
+  @media (max-width:920px){ .layout{ grid-template-columns:1fr; } }
+
+  .panel{
+    background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow-1);
+  }
+  .filters{ padding:16px; display:flex; flex-direction:column; gap:16px; position:sticky; top:16px; }
+  .filters h3{ font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; margin:0; color:var(--text-muted); font-family:'Public Sans'; }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{ font-size:12px; font-weight:600; color:var(--text-secondary); }
+  select, .textinput{
+    width:100%; padding:8px 10px; border-radius:7px; border:1px solid var(--border-strong); background:var(--surface);
+    color:var(--text-primary); font-size:13px;
+  }
+  .chipgrid{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{
+    display:flex; align-items:center; gap:5px; padding:5px 10px 5px 8px; border-radius:999px; border:1px solid var(--border-strong);
+    background:var(--surface); font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; user-select:none;
+  }
+  .chip input{ accent-color:var(--accent); }
+  .chip.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-strong); }
+  .segmented{ display:flex; border:1px solid var(--border-strong); border-radius:8px; overflow:hidden; }
+  .segmented button{
+    flex:1; appearance:none; border:none; background:var(--surface); color:var(--text-secondary); font-size:12.5px; font-weight:700;
+    padding:8px 4px; cursor:pointer; border-left:1px solid var(--border-strong);
+  }
+  .segmented button:first-child{ border-left:none; }
+  .segmented button.on.base{ background:var(--accent); color:#fff; }
+  .segmented button.on.optimista{ background:var(--good); color:#06280a; }
+  .segmented button.on.pesimista{ background:var(--critical); color:#fff; }
+  .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.5; }
+
+  /* ---------- content ---------- */
+  .view{ display:flex; flex-direction:column; gap:20px; }
+  .view[hidden]{ display:none; }
+
+  .kpirow{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  @media (max-width:800px){ .kpirow{ grid-template-columns:repeat(2,1fr); } }
+  .kpi{
+    background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px;
+    box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:6px;
+  }
+  .kpi .label{ font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); }
+  .kpi .value{ font-size:22px; font-weight:600; font-family:'IBM Plex Mono',monospace; }
+  .kpi .delta{ font-size:11.5px; display:flex; align-items:center; gap:5px; font-weight:600; }
+  .pill{ display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+  .pill.good{ background:var(--good-soft); color:var(--good); }
+  .pill.warning{ background:var(--warning-soft); color:var(--warning); }
+  .databanner{ display:flex; align-items:center; gap:10px; background:var(--warning-soft); color:var(--warning); border-radius:10px; padding:10px 14px; font-size:12.5px; font-weight:600; margin-bottom:14px; }
+  .databanner .btn-inline{ font-weight:700; text-decoration:underline; cursor:pointer; background:none; border:none; color:inherit; font-size:inherit; padding:0; font-family:inherit; }
+  .pill.critical{ background:var(--critical-soft); color:var(--critical); }
+
+  .cardgrid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:900px){ .cardgrid{ grid-template-columns:1fr; } }
+  .card{
+    background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius); padding:16px;
+    box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:10px;
+  }
+  .card h4{ margin:0; font-size:13px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .card .cardsub{ font-size:11.5px; color:var(--text-muted); margin-top:-8px; }
+  .chartbox{ position:relative; height:230px; }
+  .chartbox.tall{ height:280px; }
+  .chartbox.wide{ height:190px; }
+
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  th{ text-align:right; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:700; padding:8px 10px; border-bottom:1px solid var(--border); }
+  th:first-child, td:first-child{ text-align:left; }
+  td{ padding:8px 10px; text-align:right; border-bottom:1px solid var(--border); color:var(--text-secondary); font-family:'IBM Plex Mono',monospace; }
+  td:first-child{ font-family:'Public Sans'; color:var(--text-primary); font-weight:600; }
+  tr:last-child td{ border-bottom:none; }
+  tr.now td{ background:var(--accent-soft); }
+  .tablewrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); }
+  .tablewrap table{ min-width:640px; }
+
+  .scenariotable input{
+    width:64px; padding:5px 6px; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface);
+    color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right;
+  }
+  .scenariotable input:disabled{ opacity:.5; }
+  .scenariotable td, .scenariotable th{ text-align:center; }
+  .scenariotable td:first-child{ text-align:left; }
+
+  /* ---------- data tab ---------- */
+  .dataintro{ font-size:13px; color:var(--text-secondary); line-height:1.6; max-width:74ch; }
+  .dataintro code{ background:var(--surface); border:1px solid var(--border); padding:1px 5px; border-radius:4px; font-size:12px; }
+  .loadergrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media (max-width:900px){ .loadergrid{ grid-template-columns:1fr; } }
+  .loadercol{ display:flex; flex-direction:column; gap:12px; }
+  .loadercol > .colhead{ font-size:12px; font-weight:700; color:var(--text-primary); text-transform:uppercase; letter-spacing:.05em; text-align:center; padding-bottom:4px; border-bottom:2px solid var(--border-strong); }
+  .slot{ border:1px solid var(--border); border-radius:9px; padding:10px; display:flex; flex-direction:column; gap:7px; background:var(--surface); }
+  .slot .slothead{ display:flex; justify-content:space-between; align-items:center; font-size:11.5px; font-weight:700; color:var(--text-secondary); }
+  .slot textarea{
+    width:100%; height:64px; resize:vertical; font-family:'IBM Plex Mono',monospace; font-size:10.5px; padding:6px 8px;
+    border-radius:6px; border:1px solid var(--border-strong); background:var(--surface-raised); color:var(--text-primary);
+  }
+  .slot .slotfoot{ display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .slot input[type=file]{ font-size:10.5px; max-width:100%; color:var(--text-muted); }
+  .count{ font-size:10.5px; font-weight:700; color:var(--text-muted); }
+  .count.has{ color:var(--accent-strong); }
+
+  .btn{
+    appearance:none; border:1px solid var(--border-strong); background:var(--surface-raised); color:var(--text-primary);
+    padding:9px 16px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:var(--shadow-1);
+  }
+  .btn:hover{ border-color:var(--border-strong); background:var(--page-bg); }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.primary:hover{ background:var(--accent-strong); }
+  .btn.small{ padding:5px 10px; font-size:11.5px; }
+  .actionrow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+  .statusbox{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .statusitem{ background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+  .statusitem .n{ font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:600; }
+  .statusitem .l{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
+  .errlist{ max-height:120px; overflow-y:auto; font-size:11px; color:var(--critical); font-family:'IBM Plex Mono',monospace; display:flex; flex-direction:column; gap:2px; }
+
+  .legend-inline{ display:flex; flex-wrap:wrap; gap:10px 16px; font-size:11px; color:var(--text-secondary); }
+  .legend-inline .sw{ display:inline-flex; align-items:center; gap:5px; }
+  .legend-inline .dot{ width:9px; height:9px; border-radius:2px; display:inline-block; }
+  .legend-inline .line{ width:14px; height:2px; display:inline-block; }
+  .legend-inline .dashed{ width:14px; height:0; border-top:2px dashed currentColor; display:inline-block; }
+
+  footer.note{ font-size:11.5px; color:var(--text-muted); text-align:center; padding-top:8px; }
+</style>
+
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="eyebrow">Planeación financiera agrícola</span>
+      <h1>Forecast de Cultivos · Temporada <span id="seasonLabelTop"></span></h1>
+      <p class="sub">Proyección rodante a 3 meses de ingreso, egreso, EBITDA y margen para fresa, frambuesa, zarzamora, arándano, espárrago, aguacate y papa.</p>
+    </div>
+    <div class="badges">
+      <div class="badge">📅 Hoy: <b id="badgeToday"></b></div>
+      <div class="badge">💵 TC base MXN/USD: <input type="number" id="tcBase" step="0.01" value="16.90"></div>
+      <div class="badge">🔮 Forecast: <b id="badgeForecastRange"></b></div>
+    </div>
+  </div>
+
+  <div class="tabnav">
+    <button class="tabbtn active" data-tab="forecast">🎯 Forecast por cultivo</button>
+    <button class="tabbtn" data-tab="escenarios">🧭 Escenarios</button>
+    <button class="tabbtn" data-tab="comparativo">🏢 Comparativo de cultivos</button>
+    <button class="tabbtn" data-tab="datos">📥 Datos <span class="tag" id="dataTag">demo</span></button>
+  </div>
+
+  <div class="layout">
+    <aside class="panel filters">
+      <div class="field">
+        <h3>Cultivo enfocado</h3>
+        <select id="focalCrop"></select>
+      </div>
+      <div class="field">
+        <h3>Cultivos incluidos en consolidado</h3>
+        <div class="chipgrid" id="includedChips"></div>
+      </div>
+      <div class="field">
+        <h3>Mes de referencia</h3>
+        <select id="mesFiltro"></select>
+      </div>
+      <div class="field">
+        <h3>Escenario</h3>
+        <div class="segmented" id="escenarioSeg">
+          <button data-sc="pesimista">Pesimista</button>
+          <button data-sc="base" class="on">Base</button>
+          <button data-sc="optimista">Optimista</button>
+        </div>
+      </div>
+      <div class="field">
+        <h3>Método de proyección</h3>
+        <select id="metodoProyeccion">
+          <option value="regresion">📈 Regresión lineal (semanal)</option>
+          <option value="promedio">📋 Promedio histórico</option>
+          <option value="movil">🔄 Promedio móvil (12 semanas)</option>
+        </select>
+      </div>
+      <p class="hint">El forecast corre semana a semana sobre los datos <b>Real</b> y se agrega a nivel mes. El tipo de cambio solo afecta a los cultivos de exportación — papa se vende en mercado nacional.</p>
+    </aside>
+
+    <main>
+      <!-- ===================== TAB: FORECAST ===================== -->
+      <section class="view" id="view-forecast">
+        <div class="databanner" id="ingresoWarnBanner" hidden>
+          ⚠️ Ya se cargó tu <b>Egreso real</b> (presupuesto, real y proyección del equipo). Falta el <b>Ingreso</b> y la <b>Producción</b> — hasta que los cargues, el margen y el EBITDA no son representativos, solo se muestra el egreso.
+          <button class="btn-inline" onclick="document.querySelector('[data-tab=datos]').click()">Ir a cargar datos →</button>
+        </div>
+        <div class="kpirow">
+          <div class="kpi"><span class="label">Ingreso proyectado · 3 meses</span><span class="value" id="kpiIngreso">—</span><span class="delta" id="kpiIngresoDelta"></span></div>
+          <div class="kpi"><span class="label">Egreso proyectado · 3 meses</span><span class="value" id="kpiEgreso">—</span><span class="delta" id="kpiEgresoDelta"></span></div>
+          <div class="kpi"><span class="label">EBITDA proyectado · 3 meses</span><span class="value" id="kpiEbitda">—</span><span class="delta" id="kpiEbitdaDelta"></span></div>
+          <div class="kpi"><span class="label">Margen EBITDA</span><span class="value" id="kpiMargen">—</span><span class="delta" id="kpiMargenPill"></span></div>
+        </div>
+
+        <div class="cardgrid">
+          <div class="card">
+            <h4>EBITDA por mes (MXN)</h4>
+            <div class="chartbox tall"><canvas id="chartEbitda"></canvas></div>
+            <div class="legend-inline" id="legendEbitda"></div>
+          </div>
+          <div class="card">
+            <h4>Margen EBITDA por mes (%)</h4>
+            <div class="chartbox tall"><canvas id="chartMargen"></canvas></div>
+            <div class="legend-inline" id="legendMargen"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Producción proyectada por mes (kg)</h4>
+          <div class="chartbox wide"><canvas id="chartProduccion"></canvas></div>
+        </div>
+
+        <div class="card">
+          <h4>Histórico y forecast mensual — <span id="tableCropLabel"></span></h4>
+          <p class="cardsub">El mes en curso muestra Real acumulado solo de las semanas ya transcurridas; por eso puede lucir bajo frente al Presupuesto del mes completo.</p>
+          <div class="tablewrap">
+            <table id="tablaHistorico"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== TAB: ESCENARIOS ===================== -->
+      <section class="view" id="view-escenarios" hidden>
+        <div class="databanner" id="ingresoWarnBannerEsc" hidden>
+          ⚠️ Falta cargar <b>Ingreso</b> — el EBITDA de esta vista todavía no es representativo, solo refleja el Egreso en negativo.
+        </div>
+        <div class="card">
+          <h4>Supuestos por escenario</h4>
+          <p class="cardsub">Variación aplicada sobre el forecast base (método seleccionado). El tipo de cambio no aplica a papa.</p>
+          <div class="tablewrap">
+            <table class="scenariotable">
+              <thead><tr><th>Escenario</th><th>% Ingreso</th><th>% Egreso</th><th>% Producción</th><th>% Tipo de cambio</th></tr></thead>
+              <tbody id="scenarioBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="cardgrid">
+          <div class="card">
+            <h4>Comparación entre escenarios — EBITDA</h4>
+            <div class="chartbox tall"><canvas id="chartEscenarios"></canvas></div>
+          </div>
+          <div class="card">
+            <h4>Ingreso, egreso y EBITDA por escenario</h4>
+            <div class="tablewrap">
+              <table id="tablaEscenarios"><thead></thead><tbody></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== TAB: COMPARATIVO ===================== -->
+      <section class="view" id="view-comparativo" hidden>
+        <div class="databanner" id="ingresoWarnBannerComp" hidden>
+          ⚠️ Falta cargar <b>Ingreso</b> — el EBITDA y la participación de esta vista todavía no son representativos, solo reflejan el Egreso.
+        </div>
+        <div class="card">
+          <h4>Comparación de los 7 cultivos</h4>
+          <p class="cardsub" id="comparativoSub"></p>
+          <div class="chartbox tall"><canvas id="chartCultivos"></canvas></div>
+        </div>
+        <div class="card">
+          <h4>Participación de cada cultivo en ingresos, egresos y EBITDA</h4>
+          <div class="chartbox wide"><canvas id="chartParticipacion"></canvas></div>
+        </div>
+        <div class="card">
+          <h4>Detalle por cultivo</h4>
+          <div class="tablewrap">
+            <table id="tablaCultivos"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== TAB: DATOS ===================== -->
+      <section class="view" id="view-datos" hidden>
+        <div class="card">
+          <h4>Cargar información desde tu Google Sheet</h4>
+          <p class="dataintro">
+            Esta herramienta no se conecta en vivo a Google Sheets. Exporta o copia cada una de tus 9 hojas
+            (Real, Presupuesto y Proyección — para Egreso, Ingreso y Producción) y pégalas o súbelas abajo, cada una en su casilla.
+            Acepta tal cual el formato de tu hoja de cálculo, con o sin la columna de tipo al inicio
+            (<code>Egreso/Ingreso/Producción, Cultivo, ejercicio, semana, Importe</code> o solo <code>cultivo, ejercicio, semana, importe</code>).
+            <code>ejercicio</code> puede ser el año calendario (ej. <code>2026</code>, con <code>semana</code> como semana ISO de ese año) o la temporada
+            <code>25-26</code> (semana 1-52 desde julio) — se detecta solo. Si el encabezado de la columna de importe dice
+            "acumulado", la herramienta la convierte automáticamente a importe semanal. Un cultivo que no sea uno de los 7
+            (por ejemplo "Empaque") se agrupa como <b>Otros/Overhead</b> y se muestra aparte, sin afectar el EBITDA por cultivo.
+            Puedes pegar directamente desde Excel/Sheets (usa tabulaciones) o subir un archivo <code>.csv</code>.
+          </p>
+          <div class="actionrow">
+            <button class="btn primary" id="btnDemo">✨ Cargar datos de ejemplo</button>
+            <button class="btn" id="btnProcesar">⚙️ Procesar y actualizar tablero</button>
+            <button class="btn" id="btnLimpiar">🗑️ Limpiar todo</button>
+          <button class="btn" id="btnEgresoReal">↺ Recargar datos base</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>9 hojas de datos</h4>
+          <div class="loadergrid" id="loaderGrid"></div>
+        </div>
+
+        <div class="card">
+          <h4>Estado de los datos cargados</h4>
+          <div class="statusbox" id="statusBox"></div>
+          <div id="noteBoxWrap" hidden>
+            <p class="cardsub">Avisos (no son errores, solo informativos):</p>
+            <div class="errlist" id="noteList" style="color:var(--text-muted)"></div>
+          </div>
+          <div id="errBoxWrap" hidden>
+            <p class="cardsub">Filas con problemas (se ignoraron):</p>
+            <div class="errlist" id="errList"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="note">Herramienta de planeación interna · los datos de ejemplo son sintéticos y no representan cifras reales hasta que cargues tu información.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   1. CONFIG
+   ============================================================ */
+const CROPS = ['FRESA','FRAMBUESA','ZARZAMORA','ARANDANO','ESPARRAGO','AGUACATE','PAPA'];
+const DISPLAY = { FRESA:'Fresa', FRAMBUESA:'Frambuesa', ZARZAMORA:'Zarzamora', ARANDANO:'Arándano', ESPARRAGO:'Espárrago', AGUACATE:'Aguacate', PAPA:'Papa' };
+const ICONS = { FRESA:'🍓', FRAMBUESA:'🍒', ZARZAMORA:'🍇', ARANDANO:'🫐', ESPARRAGO:'🌿', AGUACATE:'🥑', PAPA:'🥔' };
+const CROP_COLOR_VAR = { FRESA:'--crop-1', FRAMBUESA:'--crop-2', ZARZAMORA:'--crop-3', ARANDANO:'--crop-4', ESPARRAGO:'--crop-5', AGUACATE:'--crop-6', PAPA:'--crop-7' };
+const CROPS_WITH_TC = new Set(CROPS.filter(c=>c!=='PAPA'));
+const VARIABLES = ['egreso','ingreso','produccion'];
+const TIPOS = ['real','presupuesto','proyeccion'];
+const MES_ABR = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const DAY_MS = 86400000;
+
+const CROP_PROFILES = {
+  FRESA:      { weeklyKg: 9000, priceUsd: 2.9,  priceMxn:null, weeklyEgreso: 343000, growth: 0.05 },
+  FRAMBUESA:  { weeklyKg: 3200, priceUsd: 5.4,  priceMxn:null, weeklyEgreso: 233600, growth: 0.03 },
+  ZARZAMORA:  { weeklyKg: 3400, priceUsd: 5.7,  priceMxn:null, weeklyEgreso: 268600, growth: 0.04 },
+  ARANDANO:   { weeklyKg: 2600, priceUsd: 7.6,  priceMxn:null, weeklyEgreso: 240400, growth: 0.06 },
+  ESPARRAGO:  { weeklyKg: 1400, priceUsd: 4.4,  priceMxn:null, weeklyEgreso: 88500,  growth: 0.02 },
+  AGUACATE:   { weeklyKg: 2100, priceUsd: 1.8,  priceMxn:null, weeklyEgreso: 51100,  growth: 0.03 },
+  PAPA:       { weeklyKg: 26000,priceUsd: null, priceMxn: 9.4, weeklyEgreso: 215000, growth: 0.01 }
+};
+
+/* ============================================================
+   2. DATE / SEASON HELPERS
+   ============================================================ */
+function seasonStartDate(seasonLabel){
+  const startYear = 2000 + parseInt(seasonLabel.split('-')[0],10);
+  return new Date(Date.UTC(startYear,6,1));
+}
+function getSeasonLabel(date){
+  const y = date.getUTCFullYear(), m = date.getUTCMonth();
+  const startYear = m>=6 ? y : y-1;
+  return String(startYear%100).padStart(2,'0')+'-'+String((startYear+1)%100).padStart(2,'0');
+}
+function priorSeason(label){
+  const [a,b] = label.split('-').map(Number);
+  return String((a-1+100)%100).padStart(2,'0')+'-'+String((b-1+100)%100).padStart(2,'0');
+}
+function weekToDate(seasonLabel, week){
+  const start = seasonStartDate(seasonLabel);
+  return new Date(start.getTime() + (week-1)*7*DAY_MS);
+}
+function isoWeekToDate(year, week){
+  // Lunes de la semana ISO `week` del año calendario `year` (ISO-8601: el 4 de enero siempre cae en la semana 1)
+  const jan4 = new Date(Date.UTC(year,0,4));
+  const jan4DayMon0 = (jan4.getUTCDay()+6)%7; // lunes=0
+  const week1Monday = new Date(jan4.getTime() - jan4DayMon0*DAY_MS);
+  return new Date(week1Monday.getTime() + (week-1)*7*DAY_MS);
+}
+function resolveRowDate(ejercicioRaw, semana){
+  // Acepta dos formatos de "ejercicio": temporada "AA-AA" (semana 1-52 desde julio) o año calendario "AAAA" + semana ISO del año
+  const ej = String(ejercicioRaw).trim();
+  if(/^\d{2}-\d{2}$/.test(ej)) return weekToDate(ej, semana);
+  const year = Math.round(parseFloat(ej));
+  if(Number.isFinite(year) && year>1900 && year<2200) return isoWeekToDate(year, semana);
+  return null;
+}
+function monthKeyFromDate(d){ return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'); }
+function monthLabel(mk){
+  const [y,m] = mk.split('-').map(Number);
+  return MES_ABR[m-1]+' '+String(y%100).padStart(2,'0');
+}
+function monthEndDate(mk){
+  const [y,m] = mk.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 0, 23,59,59));
+}
+function seasonMonths(seasonLabel){
+  const start = seasonStartDate(seasonLabel);
+  const out=[];
+  for(let i=0;i<12;i++){ out.push(monthKeyFromDate(new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth()+i, 1)))); }
+  return out;
+}
+function nextMonths(fromDate, n){
+  const out=[];
+  let d = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth()+1, 1));
+  for(let i=0;i<n;i++){ out.push(monthKeyFromDate(d)); d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth()+1, 1)); }
+  return out;
+}
+function fmtDateHuman(d){
+  return d.toLocaleDateString('es-MX', { day:'numeric', month:'long', year:'numeric', timeZone:'UTC' });
+}
+
+const NOW = new Date();
+const NOW_UTC = new Date(Date.UTC(NOW.getFullYear(), NOW.getMonth(), NOW.getDate()));
+const CURRENT_SEASON = getSeasonLabel(NOW_UTC);
+const CURRENT_MONTH_KEY = monthKeyFromDate(NOW_UTC);
+const FORECAST_MONTHS = nextMonths(NOW_UTC,3);
+const SEASON_MONTHS_LIST = seasonMonths(CURRENT_SEASON);
+const CURRENT_WEEK_OF_SEASON = Math.max(1, Math.min(52, Math.floor((NOW_UTC - seasonStartDate(CURRENT_SEASON))/(7*DAY_MS))+1));
+
+/* ============================================================
+   3. FORMATTERS
+   ============================================================ */
+const fmtMXN = v => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(v||0);
+const fmtMXN2 = v => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:2}).format(v||0);
+const fmtKg = v => new Intl.NumberFormat('es-MX',{maximumFractionDigits:0}).format(v||0)+' kg';
+const fmtPct = v => (v>=0?'+':'')+(v||0).toFixed(1)+'%';
+const fmtNum = v => new Intl.NumberFormat('es-MX',{maximumFractionDigits:0}).format(v||0);
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function cropColor(crop){ return cssVar(CROP_COLOR_VAR[crop]); }
+
+/* ============================================================
+   4. STATE
+   ============================================================ */
+const state = {
+  raw: { egreso:[], ingreso:[], produccion:[] },   // flat arrays of {tipo,cultivo,ejercicio,semana,importe,date}
+  monthly: null,                                    // built index
+  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS), mes: 'TOTAL3', escenario:'base', metodo:'regresion' },
+  scenarios: {
+    base:      { ingreso:0, egreso:0, produccion:0, tc:0 },
+    optimista: { ingreso:8, egreso:-5, produccion:5, tc:5 },
+    pesimista: { ingreso:-8, egreso:6, produccion:-6, tc:-5 }
+  },
+  tcBase: 16.90,
+  isDemo: true,
+  errors: [],
+  notes: []
+};
+
+/* ============================================================
+   5. DEMO DATA GENERATOR
+   ============================================================ */
+function seededRandom(seed){
+  let s = seed>>>0;
+  return function(){
+    s = (s + 0x6D2B79F5)>>>0;
+    let t = s;
+    t = Math.imul(t ^ (t>>>15), t | 1);
+    t ^= t + Math.imul(t ^ (t>>>7), t | 61);
+    return ((t ^ (t>>>14))>>>0) / 4294967296;
+  };
+}
+function hashStr(str){ let h=0; for(let i=0;i<str.length;i++){ h = (Math.imul(31,h)+str.charCodeAt(i))|0; } return h; }
+
+function generateDemoRows(){
+  const rows = { egreso:[], ingreso:[], produccion:[] };
+  const priorSeasons = [priorSeason(priorSeason(CURRENT_SEASON)), priorSeason(CURRENT_SEASON)]; // 2 temporadas completas anteriores
+  CROPS.forEach(crop=>{
+    const profile = CROP_PROFILES[crop];
+    const rand = seededRandom(hashStr(crop));
+    const price = profile.priceUsd!=null ? profile.priceUsd : profile.priceMxn;
+    const usesTc = profile.priceUsd!=null;
+
+    const seasonSteps = [
+      { season: priorSeasons[0], weeks:52, step:0 },
+      { season: priorSeasons[1], weeks:52, step:1 },
+      { season: CURRENT_SEASON, weeks: CURRENT_WEEK_OF_SEASON, step:2 }
+    ];
+    seasonSteps.forEach(entry=>{
+      for(let week=1; week<=entry.weeks; week++){
+        const phase = Math.sin(((week-1)/52)*Math.PI*2 - Math.PI/2)*0.5+0.5;
+        const growth = Math.pow(1+profile.growth, entry.step);
+        const kg = profile.weeklyKg*(0.55+0.85*phase)*growth*(0.85+rand()*0.30);
+        const egreso = profile.weeklyEgreso*(0.68+0.5*phase)*growth*(0.90+rand()*0.20);
+        const ingreso = usesTc ? kg*price*state.tcBase*(0.94+rand()*0.12) : kg*price*(0.94+rand()*0.12);
+        const date = weekToDate(entry.season, week);
+        rows.egreso.push({ tipo:'real', cultivo:crop, ejercicio:entry.season, semana:week, importe:Math.round(egreso), date });
+        rows.ingreso.push({ tipo:'real', cultivo:crop, ejercicio:entry.season, semana:week, importe:Math.round(ingreso), date });
+        rows.produccion.push({ tipo:'real', cultivo:crop, ejercicio:entry.season, semana:week, importe:Math.round(kg), date });
+      }
+    });
+
+    // Presupuesto y Proyección manual: temporada actual completa (52 semanas)
+    for(let week=1; week<=52; week++){
+      const phase = Math.sin(((week-1)/52)*Math.PI*2 - Math.PI/2)*0.5+0.5;
+      const growth = Math.pow(1+profile.growth, 2.4);
+      const kgB = profile.weeklyKg*(0.55+0.85*phase)*growth*1.03;
+      const egresoB = profile.weeklyEgreso*(0.68+0.5*phase)*growth*0.98;
+      const ingresoB = usesTc ? kgB*price*state.tcBase : kgB*price;
+      const date = weekToDate(CURRENT_SEASON, week);
+      rows.egreso.push({ tipo:'presupuesto', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(egresoB), date });
+      rows.ingreso.push({ tipo:'presupuesto', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(ingresoB), date });
+      rows.produccion.push({ tipo:'presupuesto', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(kgB), date });
+
+      const kgP = kgB*(0.96+rand()*0.07);
+      const egresoP = egresoB*(0.99+rand()*0.05);
+      const ingresoP = usesTc ? kgP*price*state.tcBase : kgP*price;
+      rows.egreso.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(egresoP), date });
+      rows.ingreso.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(ingresoP), date });
+      rows.produccion.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(kgP), date });
+    }
+  });
+  return rows;
+}
+
+function rowsToCsv(rows, tipo){
+  const filtered = rows.filter(r=>r.tipo===tipo);
+  const lines = ['cultivo,ejercicio,semana,importe'];
+  filtered.forEach(r=> lines.push(`${DISPLAY[r.cultivo]},${r.ejercicio},${r.semana},${r.importe}`));
+  return lines.join('\n');
+}
+
+/* ============================================================
+   6. CSV / PASTE PARSING
+   ============================================================ */
+const OTHER_LABEL = 'OTROS';
+function normalizeCropName(raw){
+  if(raw==null) return null;
+  const s = String(raw).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+  return CROPS.includes(s) ? s : null;
+}
+function parseDelimited(text){
+  return text.split(/\r\n|\n|\r/).map(l=>l.trim()).filter(l=>l.length)
+    .map(l => l.includes('\t') ? l.split('\t') : l.split(','));
+}
+function looksNumeric(v){
+  if(v==null || v==='') return false;
+  const n = parseFloat(String(v).replace(/[^0-9.\-]/g,''));
+  return Number.isFinite(n) && /\d/.test(String(v));
+}
+function detectLayout(row){
+  // Formato simple pegado a mano: cultivo, ejercicio, semana, importe
+  if(row.length>=4 && looksNumeric(row[1]) && looksNumeric(row[2]) && !looksNumeric(row[0])){
+    return { cultivoIdx:0, ejercicioIdx:1, semanaIdx:2, importeIdx:3 };
+  }
+  // Formato nativo exportado de Google Sheets (con columna de tipo al inicio): tipo, cultivo, ejercicio, semana, importe
+  if(row.length>=5 && looksNumeric(row[2]) && looksNumeric(row[3]) && !looksNumeric(row[1])){
+    return { cultivoIdx:1, ejercicioIdx:2, semanaIdx:3, importeIdx:4 };
+  }
+  return null;
+}
+function parseMoney(v){
+  if(v==null) return NaN;
+  let s = String(v).trim();
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
+  if(/^-/.test(s)) neg = true;
+  s = s.replace(/[^0-9.]/g,'');
+  let n = parseFloat(s);
+  if(neg) n = -Math.abs(n);
+  return n;
+}
+function decumulate(records){
+  // Convierte una serie de "importe acumulado" en importe semanal incremental, reiniciando al empezar
+  // cada temporada, y descarta semanas futuras aún no capturadas (el acumulado "cae" cuando todavía no hay dato real).
+  const byCrop = {};
+  records.forEach(r=> (byCrop[r.cultivo] = byCrop[r.cultivo]||[]).push(r));
+  const out = [];
+  Object.values(byCrop).forEach(list=>{
+    list.sort((a,b)=>a.date-b.date);
+    let prevVal = 0, prevSeason = null, truncated = false;
+    list.forEach(r=>{
+      const season = getSeasonLabel(r.date);
+      if(season !== prevSeason){ prevVal = 0; prevSeason = season; truncated = false; }
+      if(truncated) return;
+      if(r.importe < prevVal - 0.5){ truncated = true; return; }
+      const incremental = Math.max(0, r.importe - prevVal);
+      out.push(Object.assign({}, r, { importe: incremental }));
+      prevVal = r.importe;
+    });
+  });
+  return out;
+}
+function parseSlot(text, tipo){
+  const rows = parseDelimited(text||'');
+  const records = [], errors = [], notes = [];
+  if(!rows.length) return { records, errors, notes };
+  let dataStart = 0, cumulative = false;
+  if(!detectLayout(rows[0])){
+    if(/acumulad/i.test(rows[0].join(' '))) cumulative = true;
+    dataStart = 1;
+  }
+  for(let i=dataStart;i<rows.length;i++){
+    const row = rows[i];
+    const rownum = i+1;
+    const layout = detectLayout(row);
+    if(!layout){ errors.push(`Fila ${rownum}: no se reconoció el formato de columnas, se omitió`); continue; }
+    const cultivoRaw = row[layout.cultivoIdx];
+    const ejercicioRaw = row[layout.ejercicioIdx];
+    const semana = parseInt(row[layout.semanaIdx],10);
+    const importe = parseMoney(row[layout.importeIdx]);
+    const date = resolveRowDate(ejercicioRaw, semana);
+    if(!date){ errors.push(`Fila ${rownum}: ejercicio/semana inválido ("${ejercicioRaw}" / "${row[layout.semanaIdx]}")`); continue; }
+    if(!Number.isFinite(importe)){ errors.push(`Fila ${rownum}: importe inválido ("${row[layout.importeIdx]}")`); continue; }
+    let cultivo = normalizeCropName(cultivoRaw);
+    if(!cultivo){
+      const cleaned = String(cultivoRaw||'').trim();
+      if(!cleaned){ errors.push(`Fila ${rownum}: cultivo vacío`); continue; }
+      cultivo = OTHER_LABEL;
+      notes.push(`Fila ${rownum}: "${cleaned}" no es uno de los 7 cultivos — se agrupó como Otros/Overhead (queda fuera del EBITDA por cultivo).`);
+    }
+    records.push({ tipo, cultivo, ejercicio:String(ejercicioRaw).trim(), semana, importe, date });
+  }
+  const finalRecords = cumulative ? decumulate(records) : records;
+  return { records: finalRecords, errors, notes };
+}
+
+/* ============================================================
+   7. AGGREGATION + PROJECTION ENGINE
+   ============================================================ */
+function buildMonthlyIndex(){
+  const idx = {};
+  VARIABLES.forEach(v=>{
+    idx[v] = {};
+    TIPOS.forEach(t=>{ idx[v][t] = {}; CROPS.concat([OTHER_LABEL]).forEach(c=> idx[v][t][c] = {}); });
+    state.raw[v].forEach(r=>{
+      const mk = monthKeyFromDate(r.date);
+      const bucket = idx[v][r.tipo] && idx[v][r.tipo][r.cultivo];
+      if(!bucket) return;
+      bucket[mk] = (bucket[mk]||0) + r.importe;
+    });
+  });
+  return idx;
+}
+
+function realWeeklyFor(variable, crop){
+  return state.raw[variable].filter(r=>r.tipo==='real' && r.cultivo===crop).sort((a,b)=>a.date-b.date);
+}
+
+function computeMethodModel(sortedRecords, method){
+  if(!sortedRecords.length) return ()=>0;
+  const t0 = sortedRecords[0].date.getTime();
+  const toX = d => (d.getTime()-t0)/(7*DAY_MS);
+  if(method==='regresion'){
+    const n = sortedRecords.length;
+    let sumX=0,sumY=0,sumXY=0,sumXX=0;
+    sortedRecords.forEach(r=>{ const x=toX(r.date), y=r.importe; sumX+=x; sumY+=y; sumXY+=x*y; sumXX+=x*x; });
+    const denom = (n*sumXX - sumX*sumX) || 1;
+    const slope = (n*sumXY - sumX*sumY)/denom;
+    const intercept = (sumY - slope*sumX)/n;
+    const avg = sumY/n;
+    // Con pocas semanas de historia (inicio de temporada) una regresión pura puede
+    // extrapolar una pendiente inestable y colapsar a $0 muchas semanas hacia adelante.
+    // Se atenúa el peso de la tendencia cuando hay poca información (n chico), mezclando
+    // con el promedio histórico — a partir de ~12 semanas de datos la proyección es
+    // prácticamente la regresión lineal pura.
+    const trendWeight = Math.min(1, Math.max(0, (n-3)/9));
+    return d => {
+      const raw = Math.max(0, slope*toX(d)+intercept);
+      return Math.max(0, trendWeight*raw + (1-trendWeight)*avg);
+    };
+  }
+  if(method==='movil'){
+    const lastN = sortedRecords.slice(-12);
+    const avg = lastN.reduce((a,r)=>a+r.importe,0)/lastN.length;
+    return ()=>avg;
+  }
+  const avg = sortedRecords.reduce((a,r)=>a+r.importe,0)/sortedRecords.length;
+  return ()=>avg;
+}
+
+const baseForecastCache = {};
+function baseForecastFor(variable, crop, method){
+  const key = variable+'|'+crop+'|'+method;
+  if(baseForecastCache[key]) return baseForecastCache[key];
+  // Algunas hojas traen semanas futuras precargadas en $0 (todavía no ocurren) que, tras
+  // decumular, pueden colarse como filas "reales" con fecha muy adelantada. Se descartan las
+  // filas con fecha posterior a hoy antes de ajustar el modelo y de anclar dónde arranca la
+  // proyección — si no, el ajuste se distorsiona y la proyección puede arrancar después de
+  // esas filas fantasma y quedarse en $0.
+  const series = realWeeklyFor(variable, crop).filter(r=> r.date <= NOW_UTC);
+  const out = Object.fromEntries(FORECAST_MONTHS.map(m=>[m,0]));
+  if(series.length){
+    const model = computeMethodModel(series, method);
+    const lastDate = series[series.length-1].date;
+    const horizonEnd = monthEndDate(FORECAST_MONTHS[FORECAST_MONTHS.length-1]);
+    let cursor = new Date(lastDate.getTime()+7*DAY_MS);
+    while(cursor<=horizonEnd){
+      const mk = monthKeyFromDate(cursor);
+      if(mk in out) out[mk] += Math.max(0, model(cursor));
+      cursor = new Date(cursor.getTime()+7*DAY_MS);
+    }
+  }
+  baseForecastCache[key] = out;
+  return out;
+}
+function clearForecastCache(){ Object.keys(baseForecastCache).forEach(k=>delete baseForecastCache[k]); }
+
+function scenarioForecastFor(variable, crop, method, scenario){
+  const base = baseForecastFor(variable, crop, method);
+  const s = state.scenarios[scenario];
+  const out = {};
+  FORECAST_MONTHS.forEach(mk=>{
+    let v = base[mk];
+    if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
+    else if(variable==='egreso'){ v *= (1+s.egreso/100); }
+    else if(variable==='produccion'){ v *= (1+s.produccion/100); }
+    out[mk] = v;
+  });
+  return out;
+}
+function scenarioForecastConsolidated(variable, method, scenario, crops){
+  const out = Object.fromEntries(FORECAST_MONTHS.map(m=>[m,0]));
+  crops.forEach(c=>{
+    const f = scenarioForecastFor(variable, c, method, scenario);
+    FORECAST_MONTHS.forEach(mk=> out[mk]+=f[mk]);
+  });
+  return out;
+}
+function ebitdaSet(method, scenario, crops){
+  const ingreso = scenarioForecastConsolidated('ingreso', method, scenario, crops);
+  const egreso  = scenarioForecastConsolidated('egreso', method, scenario, crops);
+  const ebitda = {}; FORECAST_MONTHS.forEach(mk=> ebitda[mk]=ingreso[mk]-egreso[mk]);
+  return { ingreso, egreso, ebitda };
+}
+function sum3(obj){ return FORECAST_MONTHS.reduce((a,mk)=>a+(obj[mk]||0),0); }
+
+function historicalMonthly(variable, tipo, crops, monthsList){
+  const out = {};
+  monthsList.forEach(mk=>{
+    out[mk] = crops.reduce((s,c)=> s + (state.monthly[variable][tipo][c][mk]||0), 0);
+  });
+  return out;
+}
+function recentHistoricalMonths(n){
+  const idxNow = SEASON_MONTHS_LIST.indexOf(CURRENT_MONTH_KEY);
+  const start = Math.max(0, idxNow-n+1);
+  return SEASON_MONTHS_LIST.slice(start, idxNow+1);
+}
+
+function currentCropsSelection(){
+  if(state.filters.focalCrop==='CONSOLIDADO') return Array.from(state.filters.included);
+  return [state.filters.focalCrop];
+}
+function includedCropsOrdered(){ return CROPS.filter(c=>state.filters.included.has(c)); }
+
+/* ============================================================
+   8. CHART.JS THEME HELPERS
+   ============================================================ */
+let CH = {};
+function refreshThemeColors(){
+  CH = {
+    text: cssVar('--text-secondary'), muted: cssVar('--text-muted'), primary: cssVar('--text-primary'),
+    grid: cssVar('--grid-line'), baseline: cssVar('--baseline'), surface: cssVar('--surface-raised'),
+    accent: cssVar('--accent'), accentSoft: cssVar('--accent-soft-2'),
+    good: cssVar('--good'), critical: cssVar('--critical'),
+    mIngreso: cssVar('--m-ingreso'), mEgreso: cssVar('--m-egreso'), mEbitda: cssVar('--m-ebitda')
+  };
+  // Si Chart.js no cargó (CDN bloqueado, sin conexión, etc.) no se debe romper el resto del
+  // tablero — KPIs, tablas y filtros siguen funcionando aunque las gráficas no se puedan dibujar.
+  if(typeof Chart!=='undefined' && Chart.defaults){
+    Chart.defaults.font.family = "'Public Sans', system-ui, sans-serif";
+    Chart.defaults.font.size = 11;
+    Chart.defaults.color = CH.text;
+  }
+}
+function chartsAvailable(){ return typeof Chart!=='undefined'; }
+function chartFallback(canvasId, msg){
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const box = canvas.closest('.chartbox') || canvas.parentElement;
+  if(box && !box.querySelector('.chart-fallback-msg')){
+    const p = document.createElement('p');
+    p.className = 'chart-fallback-msg hint';
+    p.style.padding = '20px';
+    p.textContent = msg || 'No se pudo cargar el motor de gráficas (Chart.js). Los KPIs y tablas siguen funcionando; recarga la página o revisa tu conexión.';
+    box.appendChild(p);
+  }
+}
+function baseScales(extra){
+  return Object.assign({
+    x: { grid:{ color:'transparent' }, ticks:{ color:CH.muted } },
+    y: { grid:{ color:CH.grid }, ticks:{ color:CH.muted }, border:{ color:CH.baseline } }
+  }, extra||{});
+}
+function hexA(hex, alpha){
+  if(!hex) return 'rgba(0,0,0,'+alpha+')';
+  hex = hex.trim();
+  if(hex[0]!=='#') return hex;
+  const n = hex.length===4
+    ? [hex[1]+hex[1], hex[2]+hex[2], hex[3]+hex[3]]
+    : [hex.slice(1,3), hex.slice(3,5), hex.slice(5,7)];
+  const [r,g,b] = n.map(h=>parseInt(h,16));
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+const charts = {};
+function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+/* ============================================================
+   9. RENDER — FORECAST TAB
+   ============================================================ */
+function focalLabel(){
+  return state.filters.focalCrop==='CONSOLIDADO'
+    ? `Consolidado (${includedCropsOrdered().length} cultivos)`
+    : `${ICONS[state.filters.focalCrop]} ${DISPLAY[state.filters.focalCrop]}`;
+}
+
+function renderKpis(){
+  const crops = currentCropsSelection();
+  const method = state.filters.metodo, sc = state.filters.escenario;
+  const { ingreso, egreso, ebitda } = ebitdaSet(method, sc, crops);
+  const ingresoTotal = sum3(ingreso), egresoTotal = sum3(egreso), ebitdaTotal = sum3(ebitda);
+  const margen = ingresoTotal>0 ? (ebitdaTotal/ingresoTotal*100) : 0;
+
+  const presu = historicalMonthly('ingreso','presupuesto', crops, FORECAST_MONTHS);
+  const presuE = historicalMonthly('egreso','presupuesto', crops, FORECAST_MONTHS);
+  const presuIngresoTotal = sum3(presu), presuEgresoTotal = sum3(presuE);
+  const presuEbitdaTotal = presuIngresoTotal - presuEgresoTotal;
+
+  const hasIngreso = state.raw.ingreso.length>0;
+  document.getElementById('ingresoWarnBanner').hidden = hasIngreso;
+
+  document.getElementById('kpiIngreso').textContent = hasIngreso ? fmtMXN(ingresoTotal) : '—';
+  document.getElementById('kpiEgreso').textContent = fmtMXN(egresoTotal);
+  document.getElementById('kpiEbitda').textContent = hasIngreso ? fmtMXN(ebitdaTotal) : '—';
+  document.getElementById('kpiMargen').textContent = hasIngreso ? margen.toFixed(1)+'%' : '—';
+
+  function deltaHtml(curr, ref){
+    if(!ref) return '';
+    const d = ((curr-ref)/Math.abs(ref))*100;
+    const good = d>=0;
+    return `<span class="pill ${good?'good':'critical'}">${good?'▲':'▼'} ${Math.abs(d).toFixed(1)}% vs presupuesto</span>`;
+  }
+  document.getElementById('kpiIngresoDelta').innerHTML = hasIngreso ? deltaHtml(ingresoTotal, presuIngresoTotal) : '';
+  document.getElementById('kpiEgresoDelta').innerHTML = deltaHtml(-egresoTotal, -presuEgresoTotal);
+  document.getElementById('kpiEbitdaDelta').innerHTML = hasIngreso ? deltaHtml(ebitdaTotal, presuEbitdaTotal) : '';
+
+  let cls='good', label='Saludable';
+  if(!hasIngreso){ cls='warning'; label='Falta ingreso'; }
+  else if(margen<10){ cls='critical'; label='Crítico'; } else if(margen<25){ cls='warning'; label='Atención'; }
+  document.getElementById('kpiMargenPill').innerHTML = `<span class="pill ${cls}">${label}</span>`;
+}
+
+function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
+  destroyChart(canvasId);
+  if(!chartsAvailable()){ chartFallback(canvasId); return; }
+  const crops = currentCropsSelection();
+  const method = state.filters.metodo;
+  const histMonths = recentHistoricalMonths(6);
+  const allMonths = histMonths.concat(FORECAST_MONTHS);
+
+  const real = valueFn('real', null, histMonths, crops, method);
+  const presupuesto = historicalCombinedForValue(valueFn, crops, allMonths, method);
+  const base = ['base','optimista','pesimista'].reduce((acc,sc)=>{ acc[sc]=valueFn('scenario', sc, FORECAST_MONTHS, crops, method); return acc; },{});
+
+  const central = histMonths.map(mk=>real[mk]).concat(FORECAST_MONTHS.map(mk=>base[state.filters.escenario][mk]));
+  const optimista = allMonths.map(mk=> FORECAST_MONTHS.includes(mk) ? base.optimista[mk] : null);
+  const pesimista = allMonths.map(mk=> FORECAST_MONTHS.includes(mk) ? base.pesimista[mk] : null);
+  const presupuestoArr = allMonths.map(mk=> presupuesto[mk] ?? null);
+
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  charts[canvasId] = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: allMonths.map(monthLabel),
+      datasets:[
+        { label:'Presupuesto', data:presupuestoArr, borderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.25 },
+        { label:'Pesimista', data:pesimista, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.14), pointRadius:0, fill:false, tension:0.25 },
+        { label:'Optimista', data:optimista, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
+        { label: state.filters.escenario[0].toUpperCase()+state.filters.escenario.slice(1)+' (real + forecast)', data: central, borderColor: CH.accent, backgroundColor: CH.accent, borderWidth:2.5, pointRadius:3, pointBackgroundColor:CH.accent, tension:0.25, fill:false }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ display:false },
+        tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, padding:10,
+          callbacks:{ label: c => c.dataset.label+': '+ (c.raw==null?'—':unitFmt(c.raw)) } } },
+      scales: baseScales({ y: { grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=> isPercent? v+'%' : unitFmt(v) } } })
+    }
+  });
+
+  document.getElementById(legendId).innerHTML = `
+    <span class="sw" style="color:${CH.accent}"><span class="line" style="background:${CH.accent}"></span>Real + Forecast (${state.filters.escenario})</span>
+    <span class="sw" style="color:${CH.muted}"><span class="dashed"></span>Presupuesto</span>
+    <span class="sw" style="color:${CH.good}"><span class="dot" style="background:${hexA(CH.good,0.5)}"></span>Optimista</span>
+    <span class="sw" style="color:${CH.critical}"><span class="dot" style="background:${hexA(CH.critical,0.5)}"></span>Pesimista</span>`;
+}
+
+function historicalCombinedForValue(kind, crops, months, method){
+  // Presupuesto reference line spans the whole displayed range (historical + forecast months)
+  if(kind===valueIngreso) return historicalMonthly('ingreso','presupuesto',crops,months);
+  if(kind===valueEgreso) return historicalMonthly('egreso','presupuesto',crops,months);
+  if(kind===valueEbitda){
+    const i = historicalMonthly('ingreso','presupuesto',crops,months);
+    const e = historicalMonthly('egreso','presupuesto',crops,months);
+    const out={}; months.forEach(mk=> out[mk]=(i[mk]||0)-(e[mk]||0)); return out;
+  }
+  if(kind===valueMargen){
+    const i = historicalMonthly('ingreso','presupuesto',crops,months);
+    const e = historicalMonthly('egreso','presupuesto',crops,months);
+    const out={}; months.forEach(mk=> out[mk]= i[mk]>0 ? (i[mk]-e[mk])/i[mk]*100 : 0); return out;
+  }
+  if(kind===valueProduccion) return historicalMonthly('produccion','presupuesto',crops,months);
+  return {};
+}
+
+function valueEbitda(mode, scenario, months, crops, method){
+  if(mode==='real'){
+    const i = historicalMonthly('ingreso','real',crops,months);
+    const e = historicalMonthly('egreso','real',crops,months);
+    const out={}; months.forEach(mk=> out[mk]=(i[mk]||0)-(e[mk]||0)); return out;
+  }
+  const set = ebitdaSet(method, scenario, crops);
+  return set.ebitda;
+}
+function valueMargen(mode, scenario, months, crops, method){
+  if(mode==='real'){
+    const i = historicalMonthly('ingreso','real',crops,months);
+    const e = historicalMonthly('egreso','real',crops,months);
+    const out={}; months.forEach(mk=> out[mk] = i[mk]>0 ? (i[mk]-e[mk])/i[mk]*100 : 0); return out;
+  }
+  const set = ebitdaSet(method, scenario, crops);
+  const out={}; months.forEach(mk=> out[mk] = set.ingreso[mk]>0 ? set.ebitda[mk]/set.ingreso[mk]*100 : 0); return out;
+}
+function valueIngreso(mode, scenario, months, crops, method){
+  if(mode==='real') return historicalMonthly('ingreso','real',crops,months);
+  return scenarioForecastConsolidated('ingreso', method, scenario, crops);
+}
+function valueEgreso(mode, scenario, months, crops, method){
+  if(mode==='real') return historicalMonthly('egreso','real',crops,months);
+  return scenarioForecastConsolidated('egreso', method, scenario, crops);
+}
+function valueProduccion(mode, scenario, months, crops, method){
+  if(mode==='real') return historicalMonthly('produccion','real',crops,months);
+  return scenarioForecastConsolidated('produccion', method, scenario, crops);
+}
+
+function renderProduccionChart(){
+  destroyChart('chartProduccion');
+  if(!chartsAvailable()){ chartFallback('chartProduccion'); return; }
+  const crops = currentCropsSelection();
+  const method = state.filters.metodo;
+  const histMonths = recentHistoricalMonths(6);
+  const allMonths = histMonths.concat(FORECAST_MONTHS);
+  const real = historicalMonthly('produccion','real',crops,histMonths);
+  const baseForecast = scenarioForecastConsolidated('produccion', method, state.filters.escenario, crops);
+  const data = allMonths.map(mk => histMonths.includes(mk) ? real[mk] : baseForecast[mk]);
+  const colors = allMonths.map(mk => histMonths.includes(mk) ? hexA(CH.accent,0.35) : CH.accent);
+  const ctx = document.getElementById('chartProduccion').getContext('2d');
+  charts.chartProduccion = new Chart(ctx, {
+    type:'bar',
+    data:{ labels: allMonths.map(monthLabel), datasets:[{ label:'Producción (kg)', data, backgroundColor:colors, borderRadius:4, maxBarThickness:34 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1,
+        callbacks:{ label:c=> fmtKg(c.raw) } } },
+      scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtNum(v) } } })
+    }
+  });
+}
+
+function renderHistoricoTable(){
+  const crops = currentCropsSelection();
+  const method = state.filters.metodo, sc = state.filters.escenario;
+  document.getElementById('tableCropLabel').textContent = focalLabel();
+  const months = recentHistoricalMonths(6).concat(FORECAST_MONTHS);
+  const real = historicalMonthly('egreso','real',crops,months), realI = historicalMonthly('ingreso','real',crops,months);
+  const presE = historicalMonthly('egreso','presupuesto',crops,months), presI = historicalMonthly('ingreso','presupuesto',crops,months);
+  const proyE = historicalMonthly('egreso','proyeccion',crops,months), proyI = historicalMonthly('ingreso','proyeccion',crops,months);
+  const fcI = scenarioForecastConsolidated('ingreso', method, sc, crops);
+  const fcE = scenarioForecastConsolidated('egreso', method, sc, crops);
+  const hasIngresoReal = state.raw.ingreso.some(r=>r.tipo==='real');
+  const hasIngresoPres = state.raw.ingreso.some(r=>r.tipo==='presupuesto');
+  const hasIngresoProy = state.raw.ingreso.some(r=>r.tipo==='proyeccion');
+
+  const thead = document.getElementById('tablaHistorico').querySelector('thead');
+  const tbody = document.getElementById('tablaHistorico').querySelector('tbody');
+  thead.innerHTML = '<tr><th>Mes</th><th>Ingreso real</th><th>Egreso real</th><th>EBITDA real</th><th>Presupuesto EBITDA</th><th>Proyección equipo</th><th>Forecast ('+sc+')</th></tr>';
+  tbody.innerHTML = '';
+  months.forEach(mk=>{
+    const isForecast = FORECAST_MONTHS.includes(mk);
+    const ebitdaReal = (isForecast || !hasIngresoReal) ? null : (realI[mk]||0)-(real[mk]||0);
+    const ebitdaPres = hasIngresoPres ? (presI[mk]||0)-(presE[mk]||0) : null;
+    const ebitdaProy = hasIngresoProy ? (proyI[mk]||0)-(proyE[mk]||0) : null;
+    const ebitdaFc = (isForecast && hasIngresoReal) ? (fcI[mk]||0)-(fcE[mk]||0) : null;
+    const tr = document.createElement('tr');
+    if(mk===CURRENT_MONTH_KEY) tr.className='now';
+    tr.innerHTML = `<td>${monthLabel(mk)}${isForecast?' 🔮':''}</td>
+      <td>${isForecast?'—':(hasIngresoReal?fmtMXN(realI[mk]||0):'—')}</td>
+      <td>${isForecast?'—':fmtMXN(real[mk]||0)}</td>
+      <td>${ebitdaReal==null?'—':fmtMXN(ebitdaReal)}</td>
+      <td>${ebitdaPres==null?'—':fmtMXN(ebitdaPres)}</td>
+      <td>${ebitdaProy==null?'—':fmtMXN(ebitdaProy)}</td>
+      <td>${ebitdaFc==null?'—':fmtMXN(ebitdaFc)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderForecastTab(){
+  renderKpis();
+  renderLineWithBand('chartEbitda','legendEbitda', valueEbitda, fmtMXN, false);
+  renderLineWithBand('chartMargen','legendMargen', valueMargen, v=>v.toFixed(1)+'%', true);
+  renderProduccionChart();
+  renderHistoricoTable();
+}
+
+/* ============================================================
+   10. RENDER — ESCENARIOS TAB
+   ============================================================ */
+function renderScenarioTable(){
+  const tbody = document.getElementById('scenarioBody');
+  tbody.innerHTML = '';
+  const labels = { base:'Base', optimista:'Optimista', pesimista:'Pesimista' };
+  ['base','optimista','pesimista'].forEach(sc=>{
+    const s = state.scenarios[sc];
+    const disabled = sc==='base' ? 'disabled' : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${labels[sc]}</td>
+      <td><input type="number" step="1" value="${s.ingreso}" data-sc="${sc}" data-k="ingreso" ${disabled}></td>
+      <td><input type="number" step="1" value="${s.egreso}" data-sc="${sc}" data-k="egreso" ${disabled}></td>
+      <td><input type="number" step="1" value="${s.produccion}" data-sc="${sc}" data-k="produccion" ${disabled}></td>
+      <td><input type="number" step="1" value="${s.tc}" data-sc="${sc}" data-k="tc" ${disabled}></td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const sc = inp.dataset.sc, k = inp.dataset.k;
+      state.scenarios[sc][k] = parseFloat(inp.value)||0;
+      renderAll();
+    });
+  });
+}
+
+function renderEscenariosChart(){
+  destroyChart('chartEscenarios');
+  if(!chartsAvailable()){ chartFallback('chartEscenarios'); return; }
+  const crops = currentCropsSelection();
+  const method = state.filters.metodo;
+  const sets = { base:ebitdaSet(method,'base',crops), optimista:ebitdaSet(method,'optimista',crops), pesimista:ebitdaSet(method,'pesimista',crops) };
+  const ctx = document.getElementById('chartEscenarios').getContext('2d');
+  charts.chartEscenarios = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: FORECAST_MONTHS.map(monthLabel),
+      datasets:[
+        { label:'Pesimista', data:FORECAST_MONTHS.map(mk=>sets.pesimista.ebitda[mk]), backgroundColor:hexA(CH.critical,0.75), borderRadius:5, maxBarThickness:26 },
+        { label:'Base', data:FORECAST_MONTHS.map(mk=>sets.base.ebitda[mk]), backgroundColor:CH.accent, borderRadius:5, maxBarThickness:26 },
+        { label:'Optimista', data:FORECAST_MONTHS.map(mk=>sets.optimista.ebitda[mk]), backgroundColor:hexA(CH.good,0.8), borderRadius:5, maxBarThickness:26 }
+      ]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'top', labels:{ boxWidth:10, color:CH.text } },
+        tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+fmtMXN(c.raw) } } },
+      scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtMXN(v) } } })
+    }
+  });
+}
+
+function renderScenarioTableNumbers(){
+  const crops = currentCropsSelection();
+  const method = state.filters.metodo;
+  const sets = { base:ebitdaSet(method,'base',crops), optimista:ebitdaSet(method,'optimista',crops), pesimista:ebitdaSet(method,'pesimista',crops) };
+  const thead = document.getElementById('tablaEscenarios').querySelector('thead');
+  const tbody = document.getElementById('tablaEscenarios').querySelector('tbody');
+  thead.innerHTML = '<tr><th>Escenario</th><th>Ingreso 3m</th><th>Egreso 3m</th><th>EBITDA 3m</th><th>Margen</th></tr>';
+  tbody.innerHTML = '';
+  [['Pesimista','pesimista'],['Base','base'],['Optimista','optimista']].forEach(([label,key])=>{
+    const ing = sum3(sets[key].ingreso), egr = sum3(sets[key].egreso), eb = sum3(sets[key].ebitda);
+    const mg = ing>0 ? eb/ing*100 : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${label}</td><td>${fmtMXN(ing)}</td><td>${fmtMXN(egr)}</td><td>${fmtMXN(eb)}</td><td>${mg.toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderEscenariosTab(){
+  renderScenarioTable();
+  renderEscenariosChart();
+  renderScenarioTableNumbers();
+}
+
+/* ============================================================
+   11. RENDER — COMPARATIVO TAB
+   ============================================================ */
+function periodMonths(){
+  return state.filters.mes==='TOTAL3' ? FORECAST_MONTHS : [state.filters.mes];
+}
+function perCropTotals(){
+  const method = state.filters.metodo, sc = state.filters.escenario;
+  const months = periodMonths();
+  const crops = includedCropsOrdered();
+  return crops.map(crop=>{
+    const ing = scenarioForecastFor('ingreso', crop, method, sc);
+    const egr = scenarioForecastFor('egreso', crop, method, sc);
+    const ingT = months.reduce((a,mk)=>a+(ing[mk]||0),0);
+    const egrT = months.reduce((a,mk)=>a+(egr[mk]||0),0);
+    return { crop, ingreso: ingT, egreso: egrT, ebitda: ingT-egrT };
+  });
+}
+
+function renderComparativoTab(){
+  document.getElementById('comparativoSub').textContent =
+    `Escenario ${state.filters.escenario} · ${state.filters.mes==='TOTAL3' ? 'Total de los 3 meses proyectados' : monthLabel(state.filters.mes)}`;
+  const totals = perCropTotals();
+
+  destroyChart('chartCultivos');
+  if(!chartsAvailable()){ chartFallback('chartCultivos'); }
+  else {
+    const ctx = document.getElementById('chartCultivos').getContext('2d');
+    charts.chartCultivos = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels: totals.map(t=> ICONS[t.crop]+' '+DISPLAY[t.crop]),
+        datasets:[
+          { label:'Ingreso', data: totals.map(t=>t.ingreso), backgroundColor:CH.mIngreso, borderRadius:5, maxBarThickness:22 },
+          { label:'Egreso', data: totals.map(t=>t.egreso), backgroundColor:CH.mEgreso, borderRadius:5, maxBarThickness:22 },
+          { label:'EBITDA', data: totals.map(t=>t.ebitda), backgroundColor:CH.mEbitda, borderRadius:5, maxBarThickness:22 }
+        ]
+      },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:'top', labels:{ boxWidth:10, color:CH.text } },
+          tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+fmtMXN(c.raw) } } },
+        scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtMXN(v) } } })
+      }
+    });
+  }
+
+  destroyChart('chartParticipacion');
+  if(!chartsAvailable()){ chartFallback('chartParticipacion'); }
+  else {
+    const sumIngreso = totals.reduce((a,t)=>a+Math.max(0,t.ingreso),0)||1;
+    const sumEgreso = totals.reduce((a,t)=>a+Math.max(0,t.egreso),0)||1;
+    const sumEbitda = totals.reduce((a,t)=>a+Math.max(0,t.ebitda),0)||1;
+    const ctx2 = document.getElementById('chartParticipacion').getContext('2d');
+    charts.chartParticipacion = new Chart(ctx2, {
+      type:'bar',
+      data:{
+        labels:['Ingresos','Egresos','EBITDA'],
+        datasets: totals.map(t=>({
+          label: ICONS[t.crop]+' '+DISPLAY[t.crop],
+          data:[ Math.max(0,t.ingreso)/sumIngreso*100, Math.max(0,t.egreso)/sumEgreso*100, Math.max(0,t.ebitda)/sumEbitda*100 ],
+          backgroundColor: cropColor(t.crop), borderWidth:0
+        }))
+      },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ position:'top', labels:{ boxWidth:10, color:CH.text, font:{size:10.5} } },
+          tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+c.raw.toFixed(1)+'%' } } },
+        scales:{ x:{ stacked:true, max:100, grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>v+'%' } }, y:{ stacked:true, grid:{color:'transparent'}, ticks:{ color:CH.muted } } }
+      }
+    });
+  }
+
+  const thead = document.getElementById('tablaCultivos').querySelector('thead');
+  const tbody = document.getElementById('tablaCultivos').querySelector('tbody');
+  thead.innerHTML = '<tr><th>Cultivo</th><th>Ingreso</th><th>Egreso</th><th>EBITDA</th><th>Margen</th><th>TC aplica</th></tr>';
+  tbody.innerHTML = '';
+  totals.forEach(t=>{
+    const mg = t.ingreso>0 ? t.ebitda/t.ingreso*100 : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${ICONS[t.crop]} ${DISPLAY[t.crop]}</td><td>${fmtMXN(t.ingreso)}</td><td>${fmtMXN(t.egreso)}</td><td>${fmtMXN(t.ebitda)}</td><td>${mg.toFixed(1)}%</td><td>${CROPS_WITH_TC.has(t.crop)?'Sí':'No (nacional)'}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ============================================================
+   12. RENDER — DATOS TAB
+   ============================================================ */
+const SLOT_DEFS = [
+  { tipo:'real', variable:'egreso' }, { tipo:'real', variable:'ingreso' }, { tipo:'real', variable:'produccion' },
+  { tipo:'presupuesto', variable:'egreso' }, { tipo:'presupuesto', variable:'ingreso' }, { tipo:'presupuesto', variable:'produccion' },
+  { tipo:'proyeccion', variable:'egreso' }, { tipo:'proyeccion', variable:'ingreso' }, { tipo:'proyeccion', variable:'produccion' }
+];
+const TIPO_LABEL = { real:'Real', presupuesto:'Presupuesto', proyeccion:'Proyección equipo' };
+const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción' };
+
+// Datos base de Rafael (Google Sheet / FORECAST.xlsx) — se usan como dato por defecto para que
+// el tablero funcione desde que se abre. Estructura genérica para las 9 combinaciones
+// (Real/Presupuesto/Proyección × Egreso/Ingreso/Producción): las que aún no llegan quedan
+// como cadena vacía. Esto es lo que actualiza la tarea programada cuando se refresca desde
+// el Google Sheet — cada actualización solo tiene que reescribir este bloque.
+const BAKED_DATA = {
+ egreso: {
+  presupuesto: `Egreso	Cultivo	ejercicio	semana	Importe
+Presupuesto	AGUACATE	2026	26	$127,862,028
+Presupuesto	AGUACATE	2026	27	$4,825,763
+Presupuesto	AGUACATE	2026	28	$7,828,323
+Presupuesto	AGUACATE	2026	29	$4,430,800
+Presupuesto	AGUACATE	2026	30	$8,235,926
+Presupuesto	AGUACATE	2026	31	$13,981,949
+Presupuesto	AGUACATE	2026	32	$6,910,839
+Presupuesto	AGUACATE	2026	33	$4,615,669
+Presupuesto	AGUACATE	2026	34	$13,007,232
+Presupuesto	AGUACATE	2026	35	$7,868,033
+Presupuesto	AGUACATE	2026	36	$4,620,205
+Presupuesto	AGUACATE	2026	37	$5,847,720
+Presupuesto	AGUACATE	2026	38	$6,344,731
+Presupuesto	AGUACATE	2026	39	$15,756,974
+Presupuesto	AGUACATE	2026	40	$4,417,364
+Presupuesto	AGUACATE	2026	41	$6,381,682
+Presupuesto	AGUACATE	2026	42	$13,877,667
+Presupuesto	AGUACATE	2026	43	$6,916,299
+Presupuesto	AGUACATE	2026	44	$6,485,248
+Presupuesto	AGUACATE	2026	45	$5,424,868
+Presupuesto	AGUACATE	2026	46	$9,071,775
+Presupuesto	AGUACATE	2026	47	$5,332,842
+Presupuesto	AGUACATE	2026	48	$8,702,377
+Presupuesto	AGUACATE	2026	49	$4,896,749
+Presupuesto	AGUACATE	2026	50	$7,576,366
+Presupuesto	AGUACATE	2026	51	$10,904,882
+Presupuesto	AGUACATE	2026	52	$3,119,361
+Presupuesto	AGUACATE	2027	1	$5,030,370
+Presupuesto	AGUACATE	2027	2	$3,150,809
+Presupuesto	AGUACATE	2027	3	$6,357,663
+Presupuesto	AGUACATE	2027	4	$5,254,558
+Presupuesto	AGUACATE	2027	5	$1,528,695
+Presupuesto	AGUACATE	2027	6	$1,431,215
+Presupuesto	AGUACATE	2027	7	$309,227
+Presupuesto	AGUACATE	2027	8	$101,329
+Presupuesto	AGUACATE	2027	9	$80,248
+Presupuesto	AGUACATE	2027	10	$154,313
+Presupuesto	AGUACATE	2027	11	$67,961
+Presupuesto	AGUACATE	2027	12	$77,207
+Presupuesto	AGUACATE	2027	13	$69,496
+Presupuesto	AGUACATE	2027	14	$142,441
+Presupuesto	AGUACATE	2027	15	$105,133
+Presupuesto	AGUACATE	2027	16	$97,390
+Presupuesto	AGUACATE	2027	17	$86,110
+Presupuesto	AGUACATE	2027	18	$162,571
+Presupuesto	AGUACATE	2027	19	$50,135
+Presupuesto	AGUACATE	2027	20	$98,910
+Presupuesto	AGUACATE	2027	21	$95,393
+Presupuesto	AGUACATE	2027	22	$195,228
+Presupuesto	AGUACATE	2027	23	$94,442
+Presupuesto	AGUACATE	2027	24	$104,978
+Presupuesto	AGUACATE	2027	25	$75,734
+Presupuesto	AGUACATE	2027	26	$10,288
+Presupuesto	ARANDANO	2026	26	$13,778,141
+Presupuesto	ARANDANO	2026	27	$4,122,828
+Presupuesto	ARANDANO	2026	28	$3,249,032
+Presupuesto	ARANDANO	2026	29	$3,129,615
+Presupuesto	ARANDANO	2026	30	$2,338,554
+Presupuesto	ARANDANO	2026	31	$13,456,465
+Presupuesto	ARANDANO	2026	32	$6,084,321
+Presupuesto	ARANDANO	2026	33	$3,916,330
+Presupuesto	ARANDANO	2026	34	$4,632,369
+Presupuesto	ARANDANO	2026	35	$11,473,023
+Presupuesto	ARANDANO	2026	36	$2,669,584
+Presupuesto	ARANDANO	2026	37	$4,133,944
+Presupuesto	ARANDANO	2026	38	$4,573,196
+Presupuesto	ARANDANO	2026	39	$14,176,181
+Presupuesto	ARANDANO	2026	40	$4,039,214
+Presupuesto	ARANDANO	2026	41	$4,429,287
+Presupuesto	ARANDANO	2026	42	$3,480,715
+Presupuesto	ARANDANO	2026	43	$5,212,046
+Presupuesto	ARANDANO	2026	44	$9,988,013
+Presupuesto	ARANDANO	2026	45	$3,652,616
+Presupuesto	ARANDANO	2026	46	$4,715,488
+Presupuesto	ARANDANO	2026	47	$5,481,521
+Presupuesto	ARANDANO	2026	48	$10,632,840
+Presupuesto	ARANDANO	2026	49	$6,265,286
+Presupuesto	ARANDANO	2026	50	$6,411,168
+Presupuesto	ARANDANO	2026	51	$6,129,942
+Presupuesto	ARANDANO	2026	52	$8,311,335
+Presupuesto	ARANDANO	2027	1	$7,054,019
+Presupuesto	ARANDANO	2027	2	$5,776,403
+Presupuesto	ARANDANO	2027	3	$7,598,519
+Presupuesto	ARANDANO	2027	4	$9,378,128
+Presupuesto	ARANDANO	2027	5	$12,142,804
+Presupuesto	ARANDANO	2027	6	$5,667,594
+Presupuesto	ARANDANO	2027	7	$7,184,048
+Presupuesto	ARANDANO	2027	8	$6,912,317
+Presupuesto	ARANDANO	2027	9	$13,280,113
+Presupuesto	ARANDANO	2027	10	$6,242,055
+Presupuesto	ARANDANO	2027	11	$7,639,885
+Presupuesto	ARANDANO	2027	12	$7,360,317
+Presupuesto	ARANDANO	2027	13	$11,038,467
+Presupuesto	ARANDANO	2027	14	$8,639,167
+Presupuesto	ARANDANO	2027	15	$7,435,797
+Presupuesto	ARANDANO	2027	16	$6,670,115
+Presupuesto	ARANDANO	2027	17	$9,830,079
+Presupuesto	ARANDANO	2027	18	$8,160,052
+Presupuesto	ARANDANO	2027	19	$8,990,928
+Presupuesto	ARANDANO	2027	20	$5,231,051
+Presupuesto	ARANDANO	2027	21	$4,466,220
+Presupuesto	ARANDANO	2027	22	$8,358,800
+Presupuesto	ARANDANO	2027	23	$4,293,921
+Presupuesto	ARANDANO	2027	24	$4,502,187
+Presupuesto	ARANDANO	2027	25	$4,522,287
+Presupuesto	ARANDANO	2027	26	$7,005,898
+Presupuesto	ARANDANO	2027	27	$8,783,580
+Presupuesto	ARANDANO	2027	28	$207,331
+Presupuesto	EMPAQUE	2026	26	$1,038,328
+Presupuesto	EMPAQUE	2026	27	$5,707,193
+Presupuesto	EMPAQUE	2026	28	$3,768,403
+Presupuesto	EMPAQUE	2026	29	$3,226,259
+Presupuesto	EMPAQUE	2026	30	$2,545,274
+Presupuesto	EMPAQUE	2026	31	$2,730,073
+Presupuesto	EMPAQUE	2026	32	$3,519,262
+Presupuesto	EMPAQUE	2026	33	$1,737,700
+Presupuesto	EMPAQUE	2026	34	$785,003
+Presupuesto	EMPAQUE	2026	35	$946,315
+Presupuesto	EMPAQUE	2026	36	$3,517,169
+Presupuesto	EMPAQUE	2026	37	$3,837,596
+Presupuesto	EMPAQUE	2026	38	$3,136,129
+Presupuesto	EMPAQUE	2026	39	$2,702,858
+Presupuesto	EMPAQUE	2026	40	$1,997,206
+Presupuesto	EMPAQUE	2026	41	$3,519,366
+Presupuesto	EMPAQUE	2026	42	$2,719,292
+Presupuesto	EMPAQUE	2026	43	$2,690,295
+Presupuesto	EMPAQUE	2026	44	$2,681,816
+Presupuesto	EMPAQUE	2026	45	$3,201,137
+Presupuesto	EMPAQUE	2026	46	$3,165,965
+Presupuesto	EMPAQUE	2026	47	$3,341,406
+Presupuesto	EMPAQUE	2026	48	$1,239,317
+Presupuesto	EMPAQUE	2026	49	$2,895,469
+Presupuesto	EMPAQUE	2026	50	$1,896,713
+Presupuesto	EMPAQUE	2026	51	$1,869,599
+Presupuesto	EMPAQUE	2026	52	$2,512,643
+Presupuesto	EMPAQUE	2027	1	$2,742,636
+Presupuesto	EMPAQUE	2027	2	$2,803,657
+Presupuesto	EMPAQUE	2027	3	$3,483,774
+Presupuesto	EMPAQUE	2027	4	$4,226,283
+Presupuesto	EMPAQUE	2027	5	$3,475,400
+Presupuesto	EMPAQUE	2027	6	$1,627,043
+Presupuesto	EMPAQUE	2027	7	$2,487,215
+Presupuesto	EMPAQUE	2027	8	$2,288,624
+Presupuesto	EMPAQUE	2027	9	$1,323,162
+Presupuesto	EMPAQUE	2027	10	$299,692
+Presupuesto	EMPAQUE	2027	11	$0
+Presupuesto	EMPAQUE	2027	12	$50,552
+Presupuesto	EMPAQUE	2027	13	$0
+Presupuesto	EMPAQUE	2027	14	$50,552
+Presupuesto	EMPAQUE	2027	15	$0
+Presupuesto	EMPAQUE	2027	16	$50,552
+Presupuesto	EMPAQUE	2027	17	$130,499
+Presupuesto	EMPAQUE	2027	18	$1,429,028
+Presupuesto	EMPAQUE	2027	19	$6,267,575
+Presupuesto	EMPAQUE	2027	20	$8,003,944
+Presupuesto	EMPAQUE	2027	21	$6,729,244
+Presupuesto	EMPAQUE	2027	22	$3,675,215
+Presupuesto	EMPAQUE	2027	23	$5,717,970
+Presupuesto	EMPAQUE	2027	24	$5,264,748
+Presupuesto	EMPAQUE	2027	25	$3,815,630
+Presupuesto	EMPAQUE	2027	26	$2,187,861
+Presupuesto	EMPAQUE	2027	27	$1,486,771
+Presupuesto	EMPAQUE	2027	28	$219,680
+Presupuesto	ESPARRAGO	2026	26	$117,557,613
+Presupuesto	ESPARRAGO	2026	27	$6,563,609
+Presupuesto	ESPARRAGO	2026	28	$4,610,483
+Presupuesto	ESPARRAGO	2026	29	$3,897,012
+Presupuesto	ESPARRAGO	2026	30	$5,699,195
+Presupuesto	ESPARRAGO	2026	31	$5,180,928
+Presupuesto	ESPARRAGO	2026	32	$4,224,943
+Presupuesto	ESPARRAGO	2026	33	$5,327,707
+Presupuesto	ESPARRAGO	2026	34	$6,796,396
+Presupuesto	ESPARRAGO	2026	35	$6,407,857
+Presupuesto	ESPARRAGO	2026	36	$6,628,502
+Presupuesto	ESPARRAGO	2026	37	$7,485,769
+Presupuesto	ESPARRAGO	2026	38	$12,541,301
+Presupuesto	ESPARRAGO	2026	39	$19,631,421
+Presupuesto	ESPARRAGO	2026	40	$5,776,158
+Presupuesto	ESPARRAGO	2026	41	$10,838,611
+Presupuesto	ESPARRAGO	2026	42	$13,095,617
+Presupuesto	ESPARRAGO	2026	43	$7,607,868
+Presupuesto	ESPARRAGO	2026	44	$6,029,043
+Presupuesto	ESPARRAGO	2026	45	$6,127,060
+Presupuesto	ESPARRAGO	2026	46	$12,289,682
+Presupuesto	ESPARRAGO	2026	47	$3,595,036
+Presupuesto	ESPARRAGO	2026	48	$4,226,350
+Presupuesto	ESPARRAGO	2026	49	$3,167,729
+Presupuesto	ESPARRAGO	2026	50	$4,266,173
+Presupuesto	ESPARRAGO	2026	51	$3,207,543
+Presupuesto	ESPARRAGO	2026	52	$2,590,538
+Presupuesto	ESPARRAGO	2027	1	$3,456,543
+Presupuesto	ESPARRAGO	2027	2	$2,836,558
+Presupuesto	ESPARRAGO	2027	3	$3,477,032
+Presupuesto	ESPARRAGO	2027	4	$5,127,080
+Presupuesto	ESPARRAGO	2027	5	$3,680,179
+Presupuesto	ESPARRAGO	2027	6	$2,274,183
+Presupuesto	ESPARRAGO	2027	7	$2,452,969
+Presupuesto	ESPARRAGO	2027	8	$1,966,801
+Presupuesto	ESPARRAGO	2027	9	$1,374,552
+Presupuesto	ESPARRAGO	2027	10	$920,974
+Presupuesto	ESPARRAGO	2027	11	$990,900
+Presupuesto	ESPARRAGO	2027	12	$1,110,550
+Presupuesto	ESPARRAGO	2027	13	$733,514
+Presupuesto	ESPARRAGO	2027	14	$1,098,993
+Presupuesto	ESPARRAGO	2027	15	$1,328,698
+Presupuesto	ESPARRAGO	2027	16	$1,646,022
+Presupuesto	ESPARRAGO	2027	17	$1,480,453
+Presupuesto	ESPARRAGO	2027	18	$1,740,332
+Presupuesto	ESPARRAGO	2027	19	$2,853,649
+Presupuesto	ESPARRAGO	2027	20	$5,612,253
+Presupuesto	ESPARRAGO	2027	21	$2,695,954
+Presupuesto	ESPARRAGO	2027	22	$2,507,833
+Presupuesto	ESPARRAGO	2027	23	$2,659,811
+Presupuesto	ESPARRAGO	2027	24	$3,256,405
+Presupuesto	ESPARRAGO	2027	25	$2,374,719
+Presupuesto	ESPARRAGO	2027	26	$2,055,212
+Presupuesto	ESPARRAGO	2027	27	$3,228,804
+Presupuesto	ESPARRAGO	2027	28	$471,244
+Presupuesto	FRAMBUESA	2026	26	$30,685,169
+Presupuesto	FRAMBUESA	2026	27	$7,649,110
+Presupuesto	FRAMBUESA	2026	28	$5,433,957
+Presupuesto	FRAMBUESA	2026	29	$6,097,089
+Presupuesto	FRAMBUESA	2026	30	$5,720,585
+Presupuesto	FRAMBUESA	2026	31	$14,619,838
+Presupuesto	FRAMBUESA	2026	32	$7,998,185
+Presupuesto	FRAMBUESA	2026	33	$5,949,228
+Presupuesto	FRAMBUESA	2026	34	$8,176,210
+Presupuesto	FRAMBUESA	2026	35	$14,646,988
+Presupuesto	FRAMBUESA	2026	36	$7,027,244
+Presupuesto	FRAMBUESA	2026	37	$5,179,545
+Presupuesto	FRAMBUESA	2026	38	$12,875,190
+Presupuesto	FRAMBUESA	2026	39	$12,702,024
+Presupuesto	FRAMBUESA	2026	40	$13,491,827
+Presupuesto	FRAMBUESA	2026	41	$13,394,307
+Presupuesto	FRAMBUESA	2026	42	$13,130,766
+Presupuesto	FRAMBUESA	2026	43	$13,073,584
+Presupuesto	FRAMBUESA	2026	44	$21,634,910
+Presupuesto	FRAMBUESA	2026	45	$14,137,873
+Presupuesto	FRAMBUESA	2026	46	$14,920,257
+Presupuesto	FRAMBUESA	2026	47	$14,910,820
+Presupuesto	FRAMBUESA	2026	48	$21,028,714
+Presupuesto	FRAMBUESA	2026	49	$13,946,878
+Presupuesto	FRAMBUESA	2026	50	$13,097,323
+Presupuesto	FRAMBUESA	2026	51	$13,749,105
+Presupuesto	FRAMBUESA	2026	52	$9,754,513
+Presupuesto	FRAMBUESA	2027	1	$17,274,299
+Presupuesto	FRAMBUESA	2027	2	$9,927,949
+Presupuesto	FRAMBUESA	2027	3	$10,937,058
+Presupuesto	FRAMBUESA	2027	4	$12,166,716
+Presupuesto	FRAMBUESA	2027	5	$17,286,316
+Presupuesto	FRAMBUESA	2027	6	$8,819,333
+Presupuesto	FRAMBUESA	2027	7	$10,341,611
+Presupuesto	FRAMBUESA	2027	8	$11,231,332
+Presupuesto	FRAMBUESA	2027	9	$17,479,521
+Presupuesto	FRAMBUESA	2027	10	$10,313,523
+Presupuesto	FRAMBUESA	2027	11	$11,087,303
+Presupuesto	FRAMBUESA	2027	12	$15,206,614
+Presupuesto	FRAMBUESA	2027	13	$13,532,948
+Presupuesto	FRAMBUESA	2027	14	$19,419,114
+Presupuesto	FRAMBUESA	2027	15	$11,604,424
+Presupuesto	FRAMBUESA	2027	16	$16,922,366
+Presupuesto	FRAMBUESA	2027	17	$12,657,354
+Presupuesto	FRAMBUESA	2027	18	$23,598,462
+Presupuesto	FRAMBUESA	2027	19	$19,120,303
+Presupuesto	FRAMBUESA	2027	20	$16,681,218
+Presupuesto	FRAMBUESA	2027	21	$12,415,799
+Presupuesto	FRAMBUESA	2027	22	$10,037,954
+Presupuesto	FRAMBUESA	2027	23	$12,180,942
+Presupuesto	FRAMBUESA	2027	24	$9,021,216
+Presupuesto	FRAMBUESA	2027	25	$13,677,645
+Presupuesto	FRAMBUESA	2027	26	$3,900,034
+Presupuesto	FRAMBUESA	2027	27	$8,785,167
+Presupuesto	FRESA	2026	26	$59,451,515
+Presupuesto	FRESA	2026	27	$15,365,511
+Presupuesto	FRESA	2026	28	$14,857,604
+Presupuesto	FRESA	2026	29	$6,160,062
+Presupuesto	FRESA	2026	30	$11,448,355
+Presupuesto	FRESA	2026	31	$21,930,986
+Presupuesto	FRESA	2026	32	$12,558,067
+Presupuesto	FRESA	2026	33	$11,169,285
+Presupuesto	FRESA	2026	34	$10,018,785
+Presupuesto	FRESA	2026	35	$25,064,278
+Presupuesto	FRESA	2026	36	$7,778,454
+Presupuesto	FRESA	2026	37	$12,826,224
+Presupuesto	FRESA	2026	38	$12,999,720
+Presupuesto	FRESA	2026	39	$21,881,702
+Presupuesto	FRESA	2026	40	$13,053,498
+Presupuesto	FRESA	2026	41	$18,104,239
+Presupuesto	FRESA	2026	42	$15,378,870
+Presupuesto	FRESA	2026	43	$25,316,053
+Presupuesto	FRESA	2026	44	$20,967,190
+Presupuesto	FRESA	2026	45	$16,589,791
+Presupuesto	FRESA	2026	46	$24,547,684
+Presupuesto	FRESA	2026	47	$18,514,645
+Presupuesto	FRESA	2026	48	$29,276,722
+Presupuesto	FRESA	2026	49	$21,947,751
+Presupuesto	FRESA	2026	50	$24,299,140
+Presupuesto	FRESA	2026	51	$27,084,742
+Presupuesto	FRESA	2026	52	$20,618,643
+Presupuesto	FRESA	2027	1	$26,406,964
+Presupuesto	FRESA	2027	2	$22,747,443
+Presupuesto	FRESA	2027	3	$25,619,207
+Presupuesto	FRESA	2027	4	$35,480,459
+Presupuesto	FRESA	2027	5	$24,191,210
+Presupuesto	FRESA	2027	6	$25,659,091
+Presupuesto	FRESA	2027	7	$22,876,334
+Presupuesto	FRESA	2027	8	$26,063,381
+Presupuesto	FRESA	2027	9	$29,043,272
+Presupuesto	FRESA	2027	10	$22,509,603
+Presupuesto	FRESA	2027	11	$25,115,036
+Presupuesto	FRESA	2027	12	$17,926,320
+Presupuesto	FRESA	2027	13	$25,971,331
+Presupuesto	FRESA	2027	14	$19,948,907
+Presupuesto	FRESA	2027	15	$16,036,275
+Presupuesto	FRESA	2027	16	$10,261,636
+Presupuesto	FRESA	2027	17	$20,837,161
+Presupuesto	FRESA	2027	18	$17,919,793
+Presupuesto	FRESA	2027	19	$14,763,847
+Presupuesto	FRESA	2027	20	$11,350,664
+Presupuesto	FRESA	2027	21	$9,944,716
+Presupuesto	FRESA	2027	22	$17,348,662
+Presupuesto	FRESA	2027	23	$9,458,738
+Presupuesto	FRESA	2027	24	$9,478,781
+Presupuesto	FRESA	2027	25	$9,060,204
+Presupuesto	FRESA	2027	26	$13,124,071
+Presupuesto	FRESA	2027	27	$17,740,916
+Presupuesto	FRESA	2027	28	$664,091
+Presupuesto	PAPA	2026	26	$6,678,225
+Presupuesto	PAPA	2026	27	$3,880,198
+Presupuesto	PAPA	2026	28	$669,407
+Presupuesto	PAPA	2026	29	$648,542
+Presupuesto	PAPA	2026	30	$1,219,775
+Presupuesto	PAPA	2026	31	$1,278,147
+Presupuesto	PAPA	2026	32	$654,501
+Presupuesto	PAPA	2026	33	$428,749
+Presupuesto	PAPA	2026	34	$2,458,335
+Presupuesto	PAPA	2026	35	$1,505,412
+Presupuesto	PAPA	2026	36	$1,113,007
+Presupuesto	PAPA	2026	37	$532,142
+Presupuesto	PAPA	2026	38	$3,635,148
+Presupuesto	PAPA	2026	39	$1,840,430
+Presupuesto	PAPA	2026	40	$1,925,818
+Presupuesto	PAPA	2026	41	$1,921,646
+Presupuesto	PAPA	2026	42	$5,429,092
+Presupuesto	PAPA	2026	43	$3,220,854
+Presupuesto	PAPA	2026	44	$6,819,935
+Presupuesto	PAPA	2026	45	$2,322,040
+Presupuesto	PAPA	2026	46	$1,886,461
+Presupuesto	PAPA	2026	47	$3,521,057
+Presupuesto	PAPA	2026	48	$4,277,828
+Presupuesto	PAPA	2026	49	$2,645,272
+Presupuesto	PAPA	2026	50	$4,041,241
+Presupuesto	PAPA	2026	51	$4,891,228
+Presupuesto	PAPA	2026	52	$2,030,999
+Presupuesto	PAPA	2027	1	$5,005,409
+Presupuesto	PAPA	2027	2	$7,604,884
+Presupuesto	PAPA	2027	3	$6,272,564
+Presupuesto	PAPA	2027	4	$4,124,356
+Presupuesto	PAPA	2027	5	$2,565,030
+Presupuesto	PAPA	2027	6	$1,723,082
+Presupuesto	PAPA	2027	7	$6,403,886
+Presupuesto	PAPA	2027	8	$11,042,709
+Presupuesto	PAPA	2027	9	$3,249,554
+Presupuesto	PAPA	2027	10	$2,295,860
+Presupuesto	PAPA	2027	11	$4,321,292
+Presupuesto	PAPA	2027	12	$4,939,623
+Presupuesto	PAPA	2027	13	$3,025,822
+Presupuesto	PAPA	2027	14	$2,792,140
+Presupuesto	PAPA	2027	15	$3,701,910
+Presupuesto	PAPA	2027	16	$1,739,215
+Presupuesto	PAPA	2027	17	$4,157,271
+Presupuesto	PAPA	2027	18	$5,610,937
+Presupuesto	PAPA	2027	19	$4,196,276
+Presupuesto	PAPA	2027	20	$2,438,551
+Presupuesto	PAPA	2027	21	$2,661,365
+Presupuesto	PAPA	2027	22	$2,683,486
+Presupuesto	PAPA	2027	23	$2,699,326
+Presupuesto	PAPA	2027	24	$2,331,118
+Presupuesto	PAPA	2027	25	$1,828,243
+Presupuesto	PAPA	2027	26	$1,952,418
+Presupuesto	PAPA	2027	27	$3,646,368
+Presupuesto	ZARZAMORA	2026	26	$10,843,444
+Presupuesto	ZARZAMORA	2026	27	$1,510,248
+Presupuesto	ZARZAMORA	2026	28	$1,824,949
+Presupuesto	ZARZAMORA	2026	29	$1,976,531
+Presupuesto	ZARZAMORA	2026	30	$1,595,856
+Presupuesto	ZARZAMORA	2026	31	$5,659,711
+Presupuesto	ZARZAMORA	2026	32	$2,972,766
+Presupuesto	ZARZAMORA	2026	33	$2,599,736
+Presupuesto	ZARZAMORA	2026	34	$2,777,625
+Presupuesto	ZARZAMORA	2026	35	$5,494,329
+Presupuesto	ZARZAMORA	2026	36	$1,738,545
+Presupuesto	ZARZAMORA	2026	37	$2,228,517
+Presupuesto	ZARZAMORA	2026	38	$4,116,320
+Presupuesto	ZARZAMORA	2026	39	$5,206,423
+Presupuesto	ZARZAMORA	2026	40	$4,106,142
+Presupuesto	ZARZAMORA	2026	41	$3,302,943
+Presupuesto	ZARZAMORA	2026	42	$3,408,914
+Presupuesto	ZARZAMORA	2026	43	$3,727,626
+Presupuesto	ZARZAMORA	2026	44	$5,745,236
+Presupuesto	ZARZAMORA	2026	45	$3,618,845
+Presupuesto	ZARZAMORA	2026	46	$3,317,669
+Presupuesto	ZARZAMORA	2026	47	$4,663,784
+Presupuesto	ZARZAMORA	2026	48	$6,630,857
+Presupuesto	ZARZAMORA	2026	49	$4,264,521
+Presupuesto	ZARZAMORA	2026	50	$4,285,456
+Presupuesto	ZARZAMORA	2026	51	$3,331,683
+Presupuesto	ZARZAMORA	2026	52	$3,652,788
+Presupuesto	ZARZAMORA	2027	1	$5,444,262
+Presupuesto	ZARZAMORA	2027	2	$3,519,513
+Presupuesto	ZARZAMORA	2027	3	$3,079,750
+Presupuesto	ZARZAMORA	2027	4	$4,116,128
+Presupuesto	ZARZAMORA	2027	5	$5,798,542
+Presupuesto	ZARZAMORA	2027	6	$3,654,178
+Presupuesto	ZARZAMORA	2027	7	$5,829,580
+Presupuesto	ZARZAMORA	2027	8	$4,750,384
+Presupuesto	ZARZAMORA	2027	9	$6,504,187
+Presupuesto	ZARZAMORA	2027	10	$5,328,276
+Presupuesto	ZARZAMORA	2027	11	$4,233,185
+Presupuesto	ZARZAMORA	2027	12	$4,920,702
+Presupuesto	ZARZAMORA	2027	13	$5,159,221
+Presupuesto	ZARZAMORA	2027	14	$6,423,954
+Presupuesto	ZARZAMORA	2027	15	$4,253,444
+Presupuesto	ZARZAMORA	2027	16	$4,119,640
+Presupuesto	ZARZAMORA	2027	17	$5,618,813
+Presupuesto	ZARZAMORA	2027	18	$5,664,722
+Presupuesto	ZARZAMORA	2027	19	$3,947,836
+Presupuesto	ZARZAMORA	2027	20	$4,954,228
+Presupuesto	ZARZAMORA	2027	21	$3,180,076
+Presupuesto	ZARZAMORA	2027	22	$3,745,752
+Presupuesto	ZARZAMORA	2027	23	$2,982,263
+Presupuesto	ZARZAMORA	2027	24	$2,640,779
+Presupuesto	ZARZAMORA	2027	25	$3,365,892
+Presupuesto	ZARZAMORA	2027	26	$1,348,037
+Presupuesto	ZARZAMORA	2027	27	$2,581,442
+Presupuesto	ZARZAMORA	2027	28	$669`,
+  real: `Egreso	Cultivo	ejercicio	semana	Importe acumulado
+Real	AGUACATE	2026	26	$0
+Real	AGUACATE	2026	27	$195,285,603
+Real	AGUACATE	2026	28	$198,387,549
+Real	AGUACATE	2026	29	$202,079,299
+Real	AGUACATE	2026	30	$213,492,043
+Real	AGUACATE	2026	31	$226,106,233
+Real	AGUACATE	2026	32	$229,843,022
+Real	AGUACATE	2026	33	$235,850,257
+Real	AGUACATE	2026	34	$236,677,977
+Real	AGUACATE	2026	35	$236,677,977
+Real	AGUACATE	2026	36	$0
+Real	AGUACATE	2026	37	$0
+Real	AGUACATE	2026	38	$0
+Real	AGUACATE	2026	39	$0
+Real	AGUACATE	2026	40	$0
+Real	AGUACATE	2026	41	$0
+Real	AGUACATE	2026	42	$0
+Real	AGUACATE	2026	43	$0
+Real	AGUACATE	2026	44	$0
+Real	AGUACATE	2026	45	$0
+Real	AGUACATE	2026	46	$0
+Real	AGUACATE	2026	47	$0
+Real	AGUACATE	2026	48	$0
+Real	AGUACATE	2026	49	$0
+Real	AGUACATE	2026	50	$0
+Real	AGUACATE	2026	51	$0
+Real	AGUACATE	2026	52	$0
+Real	AGUACATE	2027	1	$0
+Real	AGUACATE	2027	2	$0
+Real	AGUACATE	2027	3	$0
+Real	AGUACATE	2027	4	$0
+Real	AGUACATE	2027	5	$0
+Real	AGUACATE	2027	6	$0
+Real	AGUACATE	2027	7	$0
+Real	AGUACATE	2027	8	$0
+Real	AGUACATE	2027	9	$0
+Real	AGUACATE	2027	10	$0
+Real	AGUACATE	2027	11	$0
+Real	AGUACATE	2027	12	$0
+Real	AGUACATE	2027	13	$0
+Real	AGUACATE	2027	14	$0
+Real	AGUACATE	2027	15	$0
+Real	AGUACATE	2027	16	$0
+Real	AGUACATE	2027	17	$0
+Real	AGUACATE	2027	18	$0
+Real	AGUACATE	2027	19	$0
+Real	AGUACATE	2027	20	$0
+Real	AGUACATE	2027	21	$0
+Real	AGUACATE	2027	22	$0
+Real	AGUACATE	2027	23	$0
+Real	AGUACATE	2027	24	$0
+Real	AGUACATE	2027	25	$0
+Real	AGUACATE	2027	26	$0
+Real	ARANDANO	2026	26	$0
+Real	ARANDANO	2026	27	$8,400,652
+Real	ARANDANO	2026	28	$11,944,885
+Real	ARANDANO	2026	29	$16,366,836
+Real	ARANDANO	2026	30	$25,351,433
+Real	ARANDANO	2026	31	$36,284,223
+Real	ARANDANO	2026	32	$38,724,354
+Real	ARANDANO	2026	33	$46,463,932
+Real	ARANDANO	2026	34	$48,595,854
+Real	ARANDANO	2026	35	$48,595,854
+Real	ARANDANO	2026	36	$0
+Real	ARANDANO	2026	37	$0
+Real	ARANDANO	2026	38	$0
+Real	ARANDANO	2026	39	$0
+Real	ARANDANO	2026	40	$0
+Real	ARANDANO	2026	41	$0
+Real	ARANDANO	2026	42	$0
+Real	ARANDANO	2026	43	$0
+Real	ARANDANO	2026	44	$0
+Real	ARANDANO	2026	45	$0
+Real	ARANDANO	2026	46	$0
+Real	ARANDANO	2026	47	$0
+Real	ARANDANO	2026	48	$0
+Real	ARANDANO	2026	49	$0
+Real	ARANDANO	2026	50	$0
+Real	ARANDANO	2026	51	$0
+Real	ARANDANO	2026	52	$0
+Real	ARANDANO	2027	1	$0
+Real	ARANDANO	2027	2	$0
+Real	ARANDANO	2027	3	$0
+Real	ARANDANO	2027	4	$0
+Real	ARANDANO	2027	5	$0
+Real	ARANDANO	2027	6	$0
+Real	ARANDANO	2027	7	$0
+Real	ARANDANO	2027	8	$0
+Real	ARANDANO	2027	9	$0
+Real	ARANDANO	2027	10	$0
+Real	ARANDANO	2027	11	$0
+Real	ARANDANO	2027	12	$0
+Real	ARANDANO	2027	13	$0
+Real	ARANDANO	2027	14	$0
+Real	ARANDANO	2027	15	$0
+Real	ARANDANO	2027	16	$0
+Real	ARANDANO	2027	17	$0
+Real	ARANDANO	2027	18	$0
+Real	ARANDANO	2027	19	$0
+Real	ARANDANO	2027	20	$0
+Real	ARANDANO	2027	21	$0
+Real	ARANDANO	2027	22	$0
+Real	ARANDANO	2027	23	$0
+Real	ARANDANO	2027	24	$0
+Real	ARANDANO	2027	25	$0
+Real	ARANDANO	2027	26	$0
+Real	ARANDANO	2027	27	$0
+Real	ARANDANO	2027	28	$0
+Real	EMPAQUE	2026	26	$0
+Real	EMPAQUE	2026	27	$169,502
+Real	EMPAQUE	2026	28	$867,659
+Real	EMPAQUE	2026	29	$1,284,658
+Real	EMPAQUE	2026	30	$1,577,465
+Real	EMPAQUE	2026	31	$2,684,794
+Real	EMPAQUE	2026	32	$2,893,986
+Real	EMPAQUE	2026	33	$3,186,555
+Real	EMPAQUE	2026	34	$6,533,558
+Real	EMPAQUE	2026	35	$4,968,113
+Real	EMPAQUE	2026	36	$0
+Real	EMPAQUE	2026	37	$0
+Real	EMPAQUE	2026	38	$0
+Real	EMPAQUE	2026	39	$0
+Real	EMPAQUE	2026	40	$0
+Real	EMPAQUE	2026	41	$0
+Real	EMPAQUE	2026	42	$0
+Real	EMPAQUE	2026	43	$0
+Real	EMPAQUE	2026	44	$0
+Real	EMPAQUE	2026	45	$0
+Real	EMPAQUE	2026	46	$0
+Real	EMPAQUE	2026	47	$0
+Real	EMPAQUE	2026	48	$0
+Real	EMPAQUE	2026	49	$0
+Real	EMPAQUE	2026	50	$0
+Real	EMPAQUE	2026	51	$0
+Real	EMPAQUE	2026	52	$0
+Real	EMPAQUE	2027	1	$0
+Real	EMPAQUE	2027	2	$0
+Real	EMPAQUE	2027	3	$0
+Real	EMPAQUE	2027	4	$0
+Real	EMPAQUE	2027	5	$0
+Real	EMPAQUE	2027	6	$0
+Real	EMPAQUE	2027	7	$0
+Real	EMPAQUE	2027	8	$0
+Real	EMPAQUE	2027	9	$0
+Real	EMPAQUE	2027	10	$0
+Real	EMPAQUE	2027	11	$0
+Real	EMPAQUE	2027	12	$0
+Real	EMPAQUE	2027	13	$0
+Real	EMPAQUE	2027	14	$0
+Real	EMPAQUE	2027	15	$0
+Real	EMPAQUE	2027	16	$0
+Real	EMPAQUE	2027	17	$0
+Real	EMPAQUE	2027	18	$0
+Real	EMPAQUE	2027	19	$0
+Real	EMPAQUE	2027	20	$0
+Real	EMPAQUE	2027	21	$0
+Real	EMPAQUE	2027	22	$0
+Real	EMPAQUE	2027	23	$0
+Real	EMPAQUE	2027	24	$0
+Real	EMPAQUE	2027	25	$0
+Real	EMPAQUE	2027	26	$0
+Real	EMPAQUE	2027	27	$0
+Real	EMPAQUE	2027	28	$0
+Real	ESPARRAGO	2026	26	$0
+Real	ESPARRAGO	2026	27	$120,040,414
+Real	ESPARRAGO	2026	28	$124,086,452
+Real	ESPARRAGO	2026	29	$129,481,973
+Real	ESPARRAGO	2026	30	$137,503,242
+Real	ESPARRAGO	2026	31	$145,293,922
+Real	ESPARRAGO	2026	32	$152,781,341
+Real	ESPARRAGO	2026	33	$161,239,405
+Real	ESPARRAGO	2026	34	$163,460,246
+Real	ESPARRAGO	2026	35	$163,460,246
+Real	ESPARRAGO	2026	36	$0
+Real	ESPARRAGO	2026	37	$0
+Real	ESPARRAGO	2026	38	$0
+Real	ESPARRAGO	2026	39	$0
+Real	ESPARRAGO	2026	40	$0
+Real	ESPARRAGO	2026	41	$0
+Real	ESPARRAGO	2026	42	$0
+Real	ESPARRAGO	2026	43	$0
+Real	ESPARRAGO	2026	44	$0
+Real	ESPARRAGO	2026	45	$0
+Real	ESPARRAGO	2026	46	$0
+Real	ESPARRAGO	2026	47	$0
+Real	ESPARRAGO	2026	48	$0
+Real	ESPARRAGO	2026	49	$0
+Real	ESPARRAGO	2026	50	$0
+Real	ESPARRAGO	2026	51	$0
+Real	ESPARRAGO	2026	52	$0
+Real	ESPARRAGO	2027	1	$0
+Real	ESPARRAGO	2027	2	$0
+Real	ESPARRAGO	2027	3	$0
+Real	ESPARRAGO	2027	4	$0
+Real	ESPARRAGO	2027	5	$0
+Real	ESPARRAGO	2027	6	$0
+Real	ESPARRAGO	2027	7	$0
+Real	ESPARRAGO	2027	8	$0
+Real	ESPARRAGO	2027	9	$0
+Real	ESPARRAGO	2027	10	$0
+Real	ESPARRAGO	2027	11	$0
+Real	ESPARRAGO	2027	12	$0
+Real	ESPARRAGO	2027	13	$0
+Real	ESPARRAGO	2027	14	$0
+Real	ESPARRAGO	2027	15	$0
+Real	ESPARRAGO	2027	16	$0
+Real	ESPARRAGO	2027	17	$0
+Real	ESPARRAGO	2027	18	$0
+Real	ESPARRAGO	2027	19	$0
+Real	ESPARRAGO	2027	20	$0
+Real	ESPARRAGO	2027	21	$0
+Real	ESPARRAGO	2027	22	$0
+Real	ESPARRAGO	2027	23	$0
+Real	ESPARRAGO	2027	24	$0
+Real	ESPARRAGO	2027	25	$0
+Real	ESPARRAGO	2027	26	$0
+Real	ESPARRAGO	2027	27	$0
+Real	ESPARRAGO	2027	28	$0
+Real	FRAMBUESA	2026	26	$0
+Real	FRAMBUESA	2026	27	$37,767,980
+Real	FRAMBUESA	2026	28	$44,487,250
+Real	FRAMBUESA	2026	29	$50,914,435
+Real	FRAMBUESA	2026	30	$63,743,691
+Real	FRAMBUESA	2026	31	$74,537,956
+Real	FRAMBUESA	2026	32	$79,676,008
+Real	FRAMBUESA	2026	33	$91,231,055
+Real	FRAMBUESA	2026	34	$96,164,780
+Real	FRAMBUESA	2026	35	$96,164,780
+Real	FRAMBUESA	2026	36	$0
+Real	FRAMBUESA	2026	37	$0
+Real	FRAMBUESA	2026	38	$0
+Real	FRAMBUESA	2026	39	$0
+Real	FRAMBUESA	2026	40	$0
+Real	FRAMBUESA	2026	41	$0
+Real	FRAMBUESA	2026	42	$0
+Real	FRAMBUESA	2026	43	$0
+Real	FRAMBUESA	2026	44	$0
+Real	FRAMBUESA	2026	45	$0
+Real	FRAMBUESA	2026	46	$0
+Real	FRAMBUESA	2026	47	$0
+Real	FRAMBUESA	2026	48	$0
+Real	FRAMBUESA	2026	49	$0
+Real	FRAMBUESA	2026	50	$0
+Real	FRAMBUESA	2026	51	$0
+Real	FRAMBUESA	2026	52	$0
+Real	FRAMBUESA	2027	1	$0
+Real	FRAMBUESA	2027	2	$0
+Real	FRAMBUESA	2027	3	$0
+Real	FRAMBUESA	2027	4	$0
+Real	FRAMBUESA	2027	5	$0
+Real	FRAMBUESA	2027	6	$0
+Real	FRAMBUESA	2027	7	$0
+Real	FRAMBUESA	2027	8	$0
+Real	FRAMBUESA	2027	9	$0
+Real	FRAMBUESA	2027	10	$0
+Real	FRAMBUESA	2027	11	$0
+Real	FRAMBUESA	2027	12	$0
+Real	FRAMBUESA	2027	13	$0
+Real	FRAMBUESA	2027	14	$0
+Real	FRAMBUESA	2027	15	$0
+Real	FRAMBUESA	2027	16	$0
+Real	FRAMBUESA	2027	17	$0
+Real	FRAMBUESA	2027	18	$0
+Real	FRAMBUESA	2027	19	$0
+Real	FRAMBUESA	2027	20	$0
+Real	FRAMBUESA	2027	21	$0
+Real	FRAMBUESA	2027	22	$0
+Real	FRAMBUESA	2027	23	$0
+Real	FRAMBUESA	2027	24	$0
+Real	FRAMBUESA	2027	25	$0
+Real	FRAMBUESA	2027	26	$0
+Real	FRAMBUESA	2027	27	$0
+Real	FRESA	2026	26	$0
+Real	FRESA	2026	27	$73,705,561
+Real	FRESA	2026	28	$83,357,290
+Real	FRESA	2026	29	$90,790,459
+Real	FRESA	2026	30	$115,108,529
+Real	FRESA	2026	31	$128,912,770
+Real	FRESA	2026	32	$140,145,564
+Real	FRESA	2026	33	$159,602,256
+Real	FRESA	2026	34	$168,669,119
+Real	FRESA	2026	35	$168,669,119
+Real	FRESA	2026	36	$0
+Real	FRESA	2026	37	$0
+Real	FRESA	2026	38	$0
+Real	FRESA	2026	39	$0
+Real	FRESA	2026	40	$0
+Real	FRESA	2026	41	$0
+Real	FRESA	2026	42	$0
+Real	FRESA	2026	43	$0
+Real	FRESA	2026	44	$0
+Real	FRESA	2026	45	$0
+Real	FRESA	2026	46	$0
+Real	FRESA	2026	47	$0
+Real	FRESA	2026	48	$0
+Real	FRESA	2026	49	$0
+Real	FRESA	2026	50	$0
+Real	FRESA	2026	51	$0
+Real	FRESA	2026	52	$0
+Real	FRESA	2027	1	$0
+Real	FRESA	2027	2	$0
+Real	FRESA	2027	3	$0
+Real	FRESA	2027	4	$0
+Real	FRESA	2027	5	$0
+Real	FRESA	2027	6	$0
+Real	FRESA	2027	7	$0
+Real	FRESA	2027	8	$0
+Real	FRESA	2027	9	$0
+Real	FRESA	2027	10	$0
+Real	FRESA	2027	11	$0
+Real	FRESA	2027	12	$0
+Real	FRESA	2027	13	$0
+Real	FRESA	2027	14	$0
+Real	FRESA	2027	15	$0
+Real	FRESA	2027	16	$0
+Real	FRESA	2027	17	$0
+Real	FRESA	2027	18	$0
+Real	FRESA	2027	19	$0
+Real	FRESA	2027	20	$0
+Real	FRESA	2027	21	$0
+Real	FRESA	2027	22	$0
+Real	FRESA	2027	23	$0
+Real	FRESA	2027	24	$0
+Real	FRESA	2027	25	$0
+Real	FRESA	2027	26	$0
+Real	FRESA	2027	27	$0
+Real	FRESA	2027	28	$0
+Real	PAPA	2026	26	$0
+Real	PAPA	2026	27	$12,850,722
+Real	PAPA	2026	28	$15,542,932
+Real	PAPA	2026	29	$16,914,450
+Real	PAPA	2026	30	$20,630,867
+Real	PAPA	2026	31	$22,279,068
+Real	PAPA	2026	32	$21,669,112
+Real	PAPA	2026	33	$23,651,991
+Real	PAPA	2026	34	$24,481,804
+Real	PAPA	2026	35	$24,481,804
+Real	PAPA	2026	36	$0
+Real	PAPA	2026	37	$0
+Real	PAPA	2026	38	$0
+Real	PAPA	2026	39	$0
+Real	PAPA	2026	40	$0
+Real	PAPA	2026	41	$0
+Real	PAPA	2026	42	$0
+Real	PAPA	2026	43	$0
+Real	PAPA	2026	44	$0
+Real	PAPA	2026	45	$0
+Real	PAPA	2026	46	$0
+Real	PAPA	2026	47	$0
+Real	PAPA	2026	48	$0
+Real	PAPA	2026	49	$0
+Real	PAPA	2026	50	$0
+Real	PAPA	2026	51	$0
+Real	PAPA	2026	52	$0
+Real	PAPA	2027	1	$0
+Real	PAPA	2027	2	$0
+Real	PAPA	2027	3	$0
+Real	PAPA	2027	4	$0
+Real	PAPA	2027	5	$0
+Real	PAPA	2027	6	$0
+Real	PAPA	2027	7	$0
+Real	PAPA	2027	8	$0
+Real	PAPA	2027	9	$0
+Real	PAPA	2027	10	$0
+Real	PAPA	2027	11	$0
+Real	PAPA	2027	12	$0
+Real	PAPA	2027	13	$0
+Real	PAPA	2027	14	$0
+Real	PAPA	2027	15	$0
+Real	PAPA	2027	16	$0
+Real	PAPA	2027	17	$0
+Real	PAPA	2027	18	$0
+Real	PAPA	2027	19	$0
+Real	PAPA	2027	20	$0
+Real	PAPA	2027	21	$0
+Real	PAPA	2027	22	$0
+Real	PAPA	2027	23	$0
+Real	PAPA	2027	24	$0
+Real	PAPA	2027	25	$0
+Real	PAPA	2027	26	$0
+Real	PAPA	2027	27	$0
+Real	ZARZAMORA	2026	26	$0
+Real	ZARZAMORA	2026	27	$11,346,037
+Real	ZARZAMORA	2026	28	$13,751,738
+Real	ZARZAMORA	2026	29	$17,226,386
+Real	ZARZAMORA	2026	30	$23,097,593
+Real	ZARZAMORA	2026	31	$28,780,496
+Real	ZARZAMORA	2026	32	$30,834,366
+Real	ZARZAMORA	2026	33	$35,476,936
+Real	ZARZAMORA	2026	34	$36,529,912
+Real	ZARZAMORA	2026	35	$36,529,912
+Real	ZARZAMORA	2026	36	$0
+Real	ZARZAMORA	2026	37	$0
+Real	ZARZAMORA	2026	38	$0
+Real	ZARZAMORA	2026	39	$0
+Real	ZARZAMORA	2026	40	$0
+Real	ZARZAMORA	2026	41	$0
+Real	ZARZAMORA	2026	42	$0
+Real	ZARZAMORA	2026	43	$0
+Real	ZARZAMORA	2026	44	$0
+Real	ZARZAMORA	2026	45	$0
+Real	ZARZAMORA	2026	46	$0
+Real	ZARZAMORA	2026	47	$0
+Real	ZARZAMORA	2026	48	$0
+Real	ZARZAMORA	2026	49	$0
+Real	ZARZAMORA	2026	50	$0
+Real	ZARZAMORA	2026	51	$0
+Real	ZARZAMORA	2026	52	$0
+Real	ZARZAMORA	2027	1	$0
+Real	ZARZAMORA	2027	2	$0
+Real	ZARZAMORA	2027	3	$0
+Real	ZARZAMORA	2027	4	$0
+Real	ZARZAMORA	2027	5	$0
+Real	ZARZAMORA	2027	6	$0
+Real	ZARZAMORA	2027	7	$0
+Real	ZARZAMORA	2027	8	$0
+Real	ZARZAMORA	2027	9	$0
+Real	ZARZAMORA	2027	10	$0
+Real	ZARZAMORA	2027	11	$0
+Real	ZARZAMORA	2027	12	$0
+Real	ZARZAMORA	2027	13	$0
+Real	ZARZAMORA	2027	14	$0
+Real	ZARZAMORA	2027	15	$0
+Real	ZARZAMORA	2027	16	$0
+Real	ZARZAMORA	2027	17	$0
+Real	ZARZAMORA	2027	18	$0
+Real	ZARZAMORA	2027	19	$0
+Real	ZARZAMORA	2027	20	$0
+Real	ZARZAMORA	2027	21	$0
+Real	ZARZAMORA	2027	22	$0
+Real	ZARZAMORA	2027	23	$0
+Real	ZARZAMORA	2027	24	$0
+Real	ZARZAMORA	2027	25	$0
+Real	ZARZAMORA	2027	26	$0
+Real	ZARZAMORA	2027	27	$0
+Real	ZARZAMORA	2027	28	$0`,
+  proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe acumulado
+Proyección	AGUACATE	2026	26	$0
+Proyección	AGUACATE	2026	27	$195,285,603
+Proyección	AGUACATE	2026	28	$198,387,549
+Proyección	AGUACATE	2026	29	$202,079,299
+Proyección	AGUACATE	2026	30	$213,492,043
+Proyección	AGUACATE	2026	31	$226,106,233
+Proyección	AGUACATE	2026	32	$229,843,022
+Proyección	AGUACATE	2026	33	$235,850,257
+Proyección	AGUACATE	2026	34	$236,677,977
+Proyección	AGUACATE	2026	35	$236,677,977
+Proyección	AGUACATE	2026	36	$239,044,757
+Proyección	AGUACATE	2026	37	$243,825,652
+Proyección	AGUACATE	2026	38	$248,702,165
+Proyección	AGUACATE	2026	39	$251,189,187
+Proyección	AGUACATE	2026	40	$256,212,970
+Proyección	AGUACATE	2026	41	$261,337,230
+Proyección	AGUACATE	2026	42	$266,563,974
+Proyección	AGUACATE	2026	43	$279,892,173
+Proyección	AGUACATE	2026	44	$291,087,860
+Proyección	AGUACATE	2026	45	0
+Proyección	AGUACATE	2026	46	0
+Proyección	AGUACATE	2026	47	0
+Proyección	AGUACATE	2026	48	0
+Proyección	AGUACATE	2026	49	0
+Proyección	AGUACATE	2026	50	0
+Proyección	AGUACATE	2026	51	0
+Proyección	AGUACATE	2026	52	0
+Proyección	AGUACATE	2027	1	0
+Proyección	AGUACATE	2027	2	0
+Proyección	AGUACATE	2027	3	0
+Proyección	AGUACATE	2027	4	0
+Proyección	AGUACATE	2027	5	0
+Proyección	AGUACATE	2027	6	0
+Proyección	AGUACATE	2027	7	0
+Proyección	AGUACATE	2027	8	0
+Proyección	AGUACATE	2027	9	0
+Proyección	AGUACATE	2027	10	0
+Proyección	AGUACATE	2027	11	0
+Proyección	AGUACATE	2027	12	0
+Proyección	AGUACATE	2027	13	0
+Proyección	AGUACATE	2027	14	0
+Proyección	AGUACATE	2027	15	0
+Proyección	AGUACATE	2027	16	0
+Proyección	AGUACATE	2027	17	0
+Proyección	AGUACATE	2027	18	0
+Proyección	AGUACATE	2027	19	0
+Proyección	AGUACATE	2027	20	0
+Proyección	AGUACATE	2027	21	0
+Proyección	AGUACATE	2027	22	0
+Proyección	AGUACATE	2027	23	0
+Proyección	AGUACATE	2027	24	0
+Proyección	AGUACATE	2027	25	0
+Proyección	AGUACATE	2027	26	0
+Proyección	ARANDANO	2026	26	$0
+Proyección	ARANDANO	2026	27	$8,400,652
+Proyección	ARANDANO	2026	28	$11,944,885
+Proyección	ARANDANO	2026	29	$16,366,836
+Proyección	ARANDANO	2026	30	$25,351,433
+Proyección	ARANDANO	2026	31	$36,284,223
+Proyección	ARANDANO	2026	32	$38,724,354
+Proyección	ARANDANO	2026	33	$46,463,932
+Proyección	ARANDANO	2026	34	$48,595,854
+Proyección	ARANDANO	2026	35	$48,595,854
+Proyección	ARANDANO	2026	36	$51,511,605
+Proyección	ARANDANO	2026	37	$54,602,302
+Proyección	ARANDANO	2026	38	$56,240,371
+Proyección	ARANDANO	2026	39	$61,302,004
+Proyección	ARANDANO	2026	40	$63,754,084
+Proyección	ARANDANO	2026	41	$65,666,707
+Proyección	ARANDANO	2026	42	$67,636,708
+Proyección	ARANDANO	2026	43	$73,047,644
+Proyección	ARANDANO	2026	44	$75,969,550
+Proyección	ARANDANO	2026	45	0
+Proyección	ARANDANO	2026	46	0
+Proyección	ARANDANO	2026	47	0
+Proyección	ARANDANO	2026	48	0
+Proyección	ARANDANO	2026	49	0
+Proyección	ARANDANO	2026	50	0
+Proyección	ARANDANO	2026	51	0
+Proyección	ARANDANO	2026	52	0
+Proyección	ARANDANO	2027	1	0
+Proyección	ARANDANO	2027	2	0
+Proyección	ARANDANO	2027	3	0
+Proyección	ARANDANO	2027	4	0
+Proyección	ARANDANO	2027	5	0
+Proyección	ARANDANO	2027	6	0
+Proyección	ARANDANO	2027	7	0
+Proyección	ARANDANO	2027	8	0
+Proyección	ARANDANO	2027	9	0
+Proyección	ARANDANO	2027	10	0
+Proyección	ARANDANO	2027	11	0
+Proyección	ARANDANO	2027	12	0
+Proyección	ARANDANO	2027	13	0
+Proyección	ARANDANO	2027	14	0
+Proyección	ARANDANO	2027	15	0
+Proyección	ARANDANO	2027	16	0
+Proyección	ARANDANO	2027	17	0
+Proyección	ARANDANO	2027	18	0
+Proyección	ARANDANO	2027	19	0
+Proyección	ARANDANO	2027	20	0
+Proyección	ARANDANO	2027	21	0
+Proyección	ARANDANO	2027	22	0
+Proyección	ARANDANO	2027	23	0
+Proyección	ARANDANO	2027	24	0
+Proyección	ARANDANO	2027	25	0
+Proyección	ARANDANO	2027	26	0
+Proyección	ARANDANO	2027	27	0
+Proyección	ARANDANO	2027	28	$0
+Proyección	EMPAQUE	2026	26	$0
+Proyección	EMPAQUE	2026	27	$169,502
+Proyección	EMPAQUE	2026	28	$867,659
+Proyección	EMPAQUE	2026	29	$1,284,658
+Proyección	EMPAQUE	2026	30	$1,577,465
+Proyección	EMPAQUE	2026	31	$2,684,794
+Proyección	EMPAQUE	2026	32	$2,893,986
+Proyección	EMPAQUE	2026	33	$3,186,555
+Proyección	EMPAQUE	2026	34	$6,533,558
+Proyección	EMPAQUE	2026	35	$4,968,113
+Proyección	EMPAQUE	2026	36	$5,613,968
+Proyección	EMPAQUE	2026	37	$6,792,901
+Proyección	EMPAQUE	2026	38	$7,404,262
+Proyección	EMPAQUE	2026	39	$7,774,475
+Proyección	EMPAQUE	2026	40	$9,951,328
+Proyección	EMPAQUE	2026	41	$10,349,381
+Proyección	EMPAQUE	2026	42	$11,798,295
+Proyección	EMPAQUE	2026	43	$10,028,550
+Proyección	EMPAQUE	2026	44	$13,037,116
+Proyección	EMPAQUE	2026	45	0
+Proyección	EMPAQUE	2026	46	0
+Proyección	EMPAQUE	2026	47	0
+Proyección	EMPAQUE	2026	48	0
+Proyección	EMPAQUE	2026	49	0
+Proyección	EMPAQUE	2026	50	0
+Proyección	EMPAQUE	2026	51	0
+Proyección	EMPAQUE	2026	52	0
+Proyección	EMPAQUE	2027	1	0
+Proyección	EMPAQUE	2027	2	0
+Proyección	EMPAQUE	2027	3	0
+Proyección	EMPAQUE	2027	4	0
+Proyección	EMPAQUE	2027	5	0
+Proyección	EMPAQUE	2027	6	0
+Proyección	EMPAQUE	2027	7	0
+Proyección	EMPAQUE	2027	8	0
+Proyección	EMPAQUE	2027	9	0
+Proyección	EMPAQUE	2027	10	0
+Proyección	EMPAQUE	2027	11	0
+Proyección	EMPAQUE	2027	12	0
+Proyección	EMPAQUE	2027	13	0
+Proyección	EMPAQUE	2027	14	0
+Proyección	EMPAQUE	2027	15	0
+Proyección	EMPAQUE	2027	16	0
+Proyección	EMPAQUE	2027	17	0
+Proyección	EMPAQUE	2027	18	0
+Proyección	EMPAQUE	2027	19	0
+Proyección	EMPAQUE	2027	20	0
+Proyección	EMPAQUE	2027	21	0
+Proyección	EMPAQUE	2027	22	0
+Proyección	EMPAQUE	2027	23	0
+Proyección	EMPAQUE	2027	24	0
+Proyección	EMPAQUE	2027	25	0
+Proyección	EMPAQUE	2027	26	0
+Proyección	EMPAQUE	2027	27	0
+Proyección	EMPAQUE	2027	28	$0
+Proyección	ESPARRAGO	2026	26	$0
+Proyección	ESPARRAGO	2026	27	$120,040,414
+Proyección	ESPARRAGO	2026	28	$124,086,452
+Proyección	ESPARRAGO	2026	29	$129,481,973
+Proyección	ESPARRAGO	2026	30	$137,503,242
+Proyección	ESPARRAGO	2026	31	$145,293,922
+Proyección	ESPARRAGO	2026	32	$152,781,341
+Proyección	ESPARRAGO	2026	33	$161,239,405
+Proyección	ESPARRAGO	2026	34	$163,460,246
+Proyección	ESPARRAGO	2026	35	$163,460,246
+Proyección	ESPARRAGO	2026	36	$169,998,656
+Proyección	ESPARRAGO	2026	37	$175,098,616
+Proyección	ESPARRAGO	2026	38	$185,604,532
+Proyección	ESPARRAGO	2026	39	$193,028,714
+Proyección	ESPARRAGO	2026	40	$200,749,862
+Proyección	ESPARRAGO	2026	41	$206,772,358
+Proyección	ESPARRAGO	2026	42	$215,043,252
+Proyección	ESPARRAGO	2026	43	$223,644,983
+Proyección	ESPARRAGO	2026	44	$228,117,882
+Proyección	ESPARRAGO	2026	45	0
+Proyección	ESPARRAGO	2026	46	0
+Proyección	ESPARRAGO	2026	47	0
+Proyección	ESPARRAGO	2026	48	0
+Proyección	ESPARRAGO	2026	49	0
+Proyección	ESPARRAGO	2026	50	0
+Proyección	ESPARRAGO	2026	51	0
+Proyección	ESPARRAGO	2026	52	0
+Proyección	ESPARRAGO	2027	1	0
+Proyección	ESPARRAGO	2027	2	0
+Proyección	ESPARRAGO	2027	3	0
+Proyección	ESPARRAGO	2027	4	0
+Proyección	ESPARRAGO	2027	5	0
+Proyección	ESPARRAGO	2027	6	0
+Proyección	ESPARRAGO	2027	7	0
+Proyección	ESPARRAGO	2027	8	0
+Proyección	ESPARRAGO	2027	9	0
+Proyección	ESPARRAGO	2027	10	0
+Proyección	ESPARRAGO	2027	11	0
+Proyección	ESPARRAGO	2027	12	0
+Proyección	ESPARRAGO	2027	13	0
+Proyección	ESPARRAGO	2027	14	0
+Proyección	ESPARRAGO	2027	15	0
+Proyección	ESPARRAGO	2027	16	0
+Proyección	ESPARRAGO	2027	17	0
+Proyección	ESPARRAGO	2027	18	0
+Proyección	ESPARRAGO	2027	19	0
+Proyección	ESPARRAGO	2027	20	0
+Proyección	ESPARRAGO	2027	21	0
+Proyección	ESPARRAGO	2027	22	0
+Proyección	ESPARRAGO	2027	23	0
+Proyección	ESPARRAGO	2027	24	0
+Proyección	ESPARRAGO	2027	25	0
+Proyección	ESPARRAGO	2027	26	0
+Proyección	ESPARRAGO	2027	27	0
+Proyección	ESPARRAGO	2027	28	$0
+Proyección	FRAMBUESA	2026	26	$0
+Proyección	FRAMBUESA	2026	27	$37,767,980
+Proyección	FRAMBUESA	2026	28	$44,487,250
+Proyección	FRAMBUESA	2026	29	$50,914,435
+Proyección	FRAMBUESA	2026	30	$63,743,691
+Proyección	FRAMBUESA	2026	31	$74,537,956
+Proyección	FRAMBUESA	2026	32	$79,676,008
+Proyección	FRAMBUESA	2026	33	$91,231,055
+Proyección	FRAMBUESA	2026	34	$96,164,780
+Proyección	FRAMBUESA	2026	35	$96,164,780
+Proyección	FRAMBUESA	2026	36	$108,666,201
+Proyección	FRAMBUESA	2026	37	$116,272,835
+Proyección	FRAMBUESA	2026	38	$129,062,847
+Proyección	FRAMBUESA	2026	39	$143,259,761
+Proyección	FRAMBUESA	2026	40	$161,883,529
+Proyección	FRAMBUESA	2026	41	$181,309,553
+Proyección	FRAMBUESA	2026	42	$195,814,317
+Proyección	FRAMBUESA	2026	43	$213,437,606
+Proyección	FRAMBUESA	2026	44	$234,781,366
+Proyección	FRAMBUESA	2026	45	0
+Proyección	FRAMBUESA	2026	46	0
+Proyección	FRAMBUESA	2026	47	0
+Proyección	FRAMBUESA	2026	48	0
+Proyección	FRAMBUESA	2026	49	0
+Proyección	FRAMBUESA	2026	50	0
+Proyección	FRAMBUESA	2026	51	0
+Proyección	FRAMBUESA	2026	52	0
+Proyección	FRAMBUESA	2027	1	0
+Proyección	FRAMBUESA	2027	2	0
+Proyección	FRAMBUESA	2027	3	0
+Proyección	FRAMBUESA	2027	4	0
+Proyección	FRAMBUESA	2027	5	0
+Proyección	FRAMBUESA	2027	6	0
+Proyección	FRAMBUESA	2027	7	0
+Proyección	FRAMBUESA	2027	8	0
+Proyección	FRAMBUESA	2027	9	0
+Proyección	FRAMBUESA	2027	10	0
+Proyección	FRAMBUESA	2027	11	0
+Proyección	FRAMBUESA	2027	12	0
+Proyección	FRAMBUESA	2027	13	0
+Proyección	FRAMBUESA	2027	14	0
+Proyección	FRAMBUESA	2027	15	0
+Proyección	FRAMBUESA	2027	16	0
+Proyección	FRAMBUESA	2027	17	0
+Proyección	FRAMBUESA	2027	18	0
+Proyección	FRAMBUESA	2027	19	0
+Proyección	FRAMBUESA	2027	20	0
+Proyección	FRAMBUESA	2027	21	0
+Proyección	FRAMBUESA	2027	22	0
+Proyección	FRAMBUESA	2027	23	0
+Proyección	FRAMBUESA	2027	24	0
+Proyección	FRAMBUESA	2027	25	0
+Proyección	FRAMBUESA	2027	26	0
+Proyección	FRAMBUESA	2027	27	0
+Proyección	FRESA	2026	26	$0
+Proyección	FRESA	2026	27	$73,705,561
+Proyección	FRESA	2026	28	$83,357,290
+Proyección	FRESA	2026	29	$90,790,459
+Proyección	FRESA	2026	30	$115,108,529
+Proyección	FRESA	2026	31	$128,912,770
+Proyección	FRESA	2026	32	$140,145,564
+Proyección	FRESA	2026	33	$159,602,256
+Proyección	FRESA	2026	34	$168,669,119
+Proyección	FRESA	2026	35	$168,669,119
+Proyección	FRESA	2026	36	$177,102,575
+Proyección	FRESA	2026	37	$187,728,729
+Proyección	FRESA	2026	38	$195,237,879
+Proyección	FRESA	2026	39	$204,999,773
+Proyección	FRESA	2026	40	$213,199,763
+Proyección	FRESA	2026	41	$221,727,754
+Proyección	FRESA	2026	42	$230,596,864
+Proyección	FRESA	2026	43	$239,820,739
+Proyección	FRESA	2026	44	$280,590,264
+Proyección	FRESA	2026	45	0
+Proyección	FRESA	2026	46	0
+Proyección	FRESA	2026	47	0
+Proyección	FRESA	2026	48	0
+Proyección	FRESA	2026	49	0
+Proyección	FRESA	2026	50	0
+Proyección	FRESA	2026	51	0
+Proyección	FRESA	2026	52	0
+Proyección	FRESA	2027	1	0
+Proyección	FRESA	2027	2	0
+Proyección	FRESA	2027	3	0
+Proyección	FRESA	2027	4	0
+Proyección	FRESA	2027	5	0
+Proyección	FRESA	2027	6	0
+Proyección	FRESA	2027	7	0
+Proyección	FRESA	2027	8	0
+Proyección	FRESA	2027	9	0
+Proyección	FRESA	2027	10	0
+Proyección	FRESA	2027	11	0
+Proyección	FRESA	2027	12	0
+Proyección	FRESA	2027	13	0
+Proyección	FRESA	2027	14	0
+Proyección	FRESA	2027	15	0
+Proyección	FRESA	2027	16	0
+Proyección	FRESA	2027	17	0
+Proyección	FRESA	2027	18	0
+Proyección	FRESA	2027	19	0
+Proyección	FRESA	2027	20	0
+Proyección	FRESA	2027	21	0
+Proyección	FRESA	2027	22	0
+Proyección	FRESA	2027	23	0
+Proyección	FRESA	2027	24	0
+Proyección	FRESA	2027	25	0
+Proyección	FRESA	2027	26	0
+Proyección	FRESA	2027	27	0
+Proyección	FRESA	2027	28	$0
+Proyección	PAPA	2026	26	$0
+Proyección	PAPA	2026	27	$12,850,722
+Proyección	PAPA	2026	28	$15,542,932
+Proyección	PAPA	2026	29	$16,914,450
+Proyección	PAPA	2026	30	$20,630,867
+Proyección	PAPA	2026	31	$22,279,068
+Proyección	PAPA	2026	32	$21,669,112
+Proyección	PAPA	2026	33	$23,651,991
+Proyección	PAPA	2026	34	$24,481,804
+Proyección	PAPA	2026	35	$24,481,804
+Proyección	PAPA	2026	36	$25,461,076
+Proyección	PAPA	2026	37	$26,988,741
+Proyección	PAPA	2026	38	$29,957,502
+Proyección	PAPA	2026	39	$31,155,802
+Proyección	PAPA	2026	40	$32,713,592
+Proyección	PAPA	2026	41	$34,676,408
+Proyección	PAPA	2026	42	$36,410,228
+Proyección	PAPA	2026	43	$40,415,353
+Proyección	PAPA	2026	44	$43,648,582
+Proyección	PAPA	2026	45	0
+Proyección	PAPA	2026	46	0
+Proyección	PAPA	2026	47	0
+Proyección	PAPA	2026	48	0
+Proyección	PAPA	2026	49	0
+Proyección	PAPA	2026	50	0
+Proyección	PAPA	2026	51	0
+Proyección	PAPA	2026	52	0
+Proyección	PAPA	2027	1	0
+Proyección	PAPA	2027	2	0
+Proyección	PAPA	2027	3	0
+Proyección	PAPA	2027	4	0
+Proyección	PAPA	2027	5	0
+Proyección	PAPA	2027	6	0
+Proyección	PAPA	2027	7	0
+Proyección	PAPA	2027	8	0
+Proyección	PAPA	2027	9	0
+Proyección	PAPA	2027	10	0
+Proyección	PAPA	2027	11	0
+Proyección	PAPA	2027	12	0
+Proyección	PAPA	2027	13	0
+Proyección	PAPA	2027	14	0
+Proyección	PAPA	2027	15	0
+Proyección	PAPA	2027	16	0
+Proyección	PAPA	2027	17	0
+Proyección	PAPA	2027	18	0
+Proyección	PAPA	2027	19	0
+Proyección	PAPA	2027	20	0
+Proyección	PAPA	2027	21	0
+Proyección	PAPA	2027	22	0
+Proyección	PAPA	2027	23	0
+Proyección	PAPA	2027	24	0
+Proyección	PAPA	2027	25	0
+Proyección	PAPA	2027	26	0
+Proyección	PAPA	2027	27	0
+Proyección	ZARZAMORA	2026	26	$0
+Proyección	ZARZAMORA	2026	27	$11,346,037
+Proyección	ZARZAMORA	2026	28	$13,751,738
+Proyección	ZARZAMORA	2026	29	$17,226,386
+Proyección	ZARZAMORA	2026	30	$23,097,593
+Proyección	ZARZAMORA	2026	31	$28,780,496
+Proyección	ZARZAMORA	2026	32	$30,834,366
+Proyección	ZARZAMORA	2026	33	$35,476,936
+Proyección	ZARZAMORA	2026	34	$36,529,912
+Proyección	ZARZAMORA	2026	35	$36,529,912
+Proyección	ZARZAMORA	2026	36	$40,182,903
+Proyección	ZARZAMORA	2026	37	$44,201,194
+Proyección	ZARZAMORA	2026	38	$48,621,313
+Proyección	ZARZAMORA	2026	39	$53,483,444
+Proyección	ZARZAMORA	2026	40	$58,296,954
+Proyección	ZARZAMORA	2026	41	$61,794,771
+Proyección	ZARZAMORA	2026	42	$64,884,510
+Proyección	ZARZAMORA	2026	43	$68,777,581
+Proyección	ZARZAMORA	2026	44	$73,592,011
+Proyección	ZARZAMORA	2026	45	0
+Proyección	ZARZAMORA	2026	46	0
+Proyección	ZARZAMORA	2026	47	0
+Proyección	ZARZAMORA	2026	48	0
+Proyección	ZARZAMORA	2026	49	0
+Proyección	ZARZAMORA	2026	50	0
+Proyección	ZARZAMORA	2026	51	0
+Proyección	ZARZAMORA	2026	52	0
+Proyección	ZARZAMORA	2027	1	0
+Proyección	ZARZAMORA	2027	2	0
+Proyección	ZARZAMORA	2027	3	0
+Proyección	ZARZAMORA	2027	4	0
+Proyección	ZARZAMORA	2027	5	0
+Proyección	ZARZAMORA	2027	6	0
+Proyección	ZARZAMORA	2027	7	0
+Proyección	ZARZAMORA	2027	8	0
+Proyección	ZARZAMORA	2027	9	0
+Proyección	ZARZAMORA	2027	10	0
+Proyección	ZARZAMORA	2027	11	0
+Proyección	ZARZAMORA	2027	12	0
+Proyección	ZARZAMORA	2027	13	0
+Proyección	ZARZAMORA	2027	14	0
+Proyección	ZARZAMORA	2027	15	0
+Proyección	ZARZAMORA	2027	16	0
+Proyección	ZARZAMORA	2027	17	0
+Proyección	ZARZAMORA	2027	18	0
+Proyección	ZARZAMORA	2027	19	0
+Proyección	ZARZAMORA	2027	20	0
+Proyección	ZARZAMORA	2027	21	0
+Proyección	ZARZAMORA	2027	22	0
+Proyección	ZARZAMORA	2027	23	0
+Proyección	ZARZAMORA	2027	24	0
+Proyección	ZARZAMORA	2027	25	0
+Proyección	ZARZAMORA	2027	26	0
+Proyección	ZARZAMORA	2027	27	0
+Proyección	ZARZAMORA	2027	28	$0`
+ },
+ ingreso: { real:'', presupuesto:'', proyeccion:'' },
+ produccion: { real:'', presupuesto:'', proyeccion:'' }
+};
+
+function slotId(tipo,variable){ return `slot_${tipo}_${variable}`; }
+
+function buildLoaderGrid(){
+  const grid = document.getElementById('loaderGrid');
+  grid.innerHTML = '';
+  VARIABLES.forEach(variable=>{
+    const col = document.createElement('div'); col.className = 'loadercol';
+    col.innerHTML = `<div class="colhead">${VAR_LABEL[variable]}</div>`;
+    TIPOS.forEach(tipo=>{
+      const id = slotId(tipo,variable);
+      const slot = document.createElement('div'); slot.className='slot';
+      slot.innerHTML = `
+        <div class="slothead"><span>${TIPO_LABEL[tipo]}</span><span class="count" id="${id}_count">0 filas</span></div>
+        <textarea id="${id}_text" placeholder="cultivo,ejercicio,semana,importe"></textarea>
+        <div class="slotfoot"><input type="file" accept=".csv,.tsv,.txt" id="${id}_file"></div>`;
+      col.appendChild(slot);
+    });
+    grid.appendChild(col);
+  });
+  SLOT_DEFS.forEach(({tipo,variable})=>{
+    const id = slotId(tipo,variable);
+    document.getElementById(id+'_file').addEventListener('change', e=>{
+      const f = e.target.files[0]; if(!f) return;
+      const reader = new FileReader();
+      reader.onload = ()=> { document.getElementById(id+'_text').value = reader.result; };
+      reader.readAsText(f);
+    });
+  });
+}
+
+function loadDemoIntoSlots(){
+  const rows = generateDemoRows();
+  SLOT_DEFS.forEach(({tipo,variable})=>{
+    const id = slotId(tipo,variable);
+    document.getElementById(id+'_text').value = rowsToCsv(rows[variable], tipo);
+  });
+  state.isDemo = true;
+  document.getElementById('dataTag').textContent = 'demo';
+  processAllSlots();
+}
+
+function loadBakedDefaults(){
+  // Carga los datos base (BAKED_DATA) en las 9 casillas — las combinaciones que aún no
+  // llegaron del Google Sheet quedan vacías. Esto es lo que corre solo al abrir la
+  // herramienta, y lo que reescribe la tarea programada cada vez que se refresca.
+  VARIABLES.forEach(variable=>{
+    TIPOS.forEach(tipo=>{
+      document.getElementById(slotId(tipo,variable)+'_text').value = (BAKED_DATA[variable] && BAKED_DATA[variable][tipo]) || '';
+    });
+  });
+  state.isDemo = false;
+  const loadedVars = VARIABLES.filter(v=> TIPOS.some(t=> (BAKED_DATA[v] && BAKED_DATA[v][t])));
+  const missingVars = VARIABLES.filter(v=> !loadedVars.includes(v));
+  const tag = loadedVars.length
+    ? loadedVars.map(v=>VAR_LABEL[v]).join(' + ') + (missingVars.length ? ' · falta '+missingVars.map(v=>VAR_LABEL[v].toLowerCase()).join('/') : '')
+    : 'vacío';
+  document.getElementById('dataTag').textContent = tag;
+  processAllSlots();
+}
+
+function processAllSlots(){
+  const newRaw = { egreso:[], ingreso:[], produccion:[] };
+  const errors = [], notes = [];
+  SLOT_DEFS.forEach(({tipo,variable})=>{
+    const id = slotId(tipo,variable);
+    const text = document.getElementById(id+'_text').value;
+    const { records, errors: errs, notes: nts } = parseSlot(text, tipo);
+    newRaw[variable] = newRaw[variable].concat(records);
+    errs.forEach(e=> errors.push(`[${VAR_LABEL[variable]} · ${TIPO_LABEL[tipo]}] ${e}`));
+    (nts||[]).forEach(n=> notes.push(`[${VAR_LABEL[variable]} · ${TIPO_LABEL[tipo]}] ${n}`));
+    document.getElementById(id+'_count').textContent = records.length+' filas';
+    document.getElementById(id+'_count').classList.toggle('has', records.length>0);
+  });
+  state.raw = newRaw;
+  state.errors = errors;
+  state.notes = notes;
+  clearForecastCache();
+  state.monthly = buildMonthlyIndex();
+  renderStatus();
+  renderAll();
+}
+
+function clearAllSlots(){
+  SLOT_DEFS.forEach(({tipo,variable})=>{
+    const id = slotId(tipo,variable);
+    document.getElementById(id+'_text').value='';
+    document.getElementById(id+'_count').textContent='0 filas';
+    document.getElementById(id+'_count').classList.remove('has');
+  });
+  state.raw = { egreso:[], ingreso:[], produccion:[] };
+  state.errors = [];
+  state.notes = [];
+  state.isDemo = false;
+  document.getElementById('dataTag').textContent = 'vacío';
+  clearForecastCache();
+  state.monthly = buildMonthlyIndex();
+  renderStatus();
+  renderAll();
+}
+
+function renderStatus(){
+  const box = document.getElementById('statusBox');
+  const totalRows = VARIABLES.reduce((a,v)=>a+state.raw[v].length,0);
+  const cropsSeen = new Set();
+  VARIABLES.forEach(v=>state.raw[v].forEach(r=>{ if(CROPS.includes(r.cultivo)) cropsSeen.add(r.cultivo); }));
+  const seasonsSeen = new Set(); VARIABLES.forEach(v=>state.raw[v].forEach(r=>seasonsSeen.add(getSeasonLabel(r.date))));
+  const otrosTotal = VARIABLES.reduce((sum,v)=> sum + state.raw[v].filter(r=>r.cultivo===OTHER_LABEL && r.tipo==='real').reduce((a,r)=>a+r.importe,0), 0);
+  box.innerHTML = `
+    <div class="statusitem"><div class="n">${fmtNum(totalRows)}</div><div class="l">Filas cargadas</div></div>
+    <div class="statusitem"><div class="n">${cropsSeen.size}/7</div><div class="l">Cultivos detectados</div></div>
+    <div class="statusitem"><div class="n">${seasonsSeen.size}</div><div class="l">Temporadas detectadas</div></div>
+    <div class="statusitem"><div class="n">${state.errors.length}</div><div class="l">Filas con error</div></div>
+    <div class="statusitem"><div class="n">${fmtMXN(otrosTotal)}</div><div class="l">Otros/Overhead (real, no asignado a cultivo)</div></div>`;
+  const noteWrap = document.getElementById('noteBoxWrap');
+  const noteList = document.getElementById('noteList');
+  if(state.notes && state.notes.length){
+    noteWrap.hidden = false;
+    const uniq = Array.from(new Set(state.notes)).slice(0,50);
+    noteList.innerHTML = uniq.map(e=>`<div>${e}</div>`).join('') + (state.notes.length>50?`<div>… y ${state.notes.length-50} avisos más</div>`:'');
+  } else { noteWrap.hidden = true; }
+  const wrap = document.getElementById('errBoxWrap');
+  const list = document.getElementById('errList');
+  if(state.errors.length){
+    wrap.hidden = false;
+    list.innerHTML = state.errors.slice(0,200).map(e=>`<div>${e}</div>`).join('');
+  } else { wrap.hidden = true; }
+}
+
+/* ============================================================
+   13. FILTER UI + WIRING
+   ============================================================ */
+function buildFilterUI(){
+  const focal = document.getElementById('focalCrop');
+  focal.innerHTML = '<option value="CONSOLIDADO">🧺 Consolidado (todos)</option>' +
+    CROPS.map(c=>`<option value="${c}">${ICONS[c]} ${DISPLAY[c]}</option>`).join('');
+  focal.value = state.filters.focalCrop;
+  focal.addEventListener('change', ()=>{ state.filters.focalCrop = focal.value; renderAll(); });
+
+  const chipwrap = document.getElementById('includedChips');
+  chipwrap.innerHTML = CROPS.map(c=>`
+    <label class="chip on" data-crop="${c}"><input type="checkbox" checked value="${c}">${ICONS[c]} ${DISPLAY[c]}</label>`).join('');
+  chipwrap.querySelectorAll('.chip').forEach(chip=>{
+    const cb = chip.querySelector('input');
+    cb.addEventListener('change', ()=>{
+      const c = cb.value;
+      if(cb.checked){ state.filters.included.add(c); chip.classList.add('on'); }
+      else { state.filters.included.delete(c); chip.classList.remove('on'); }
+      renderAll();
+    });
+  });
+
+  const mes = document.getElementById('mesFiltro');
+  mes.innerHTML = '<option value="TOTAL3">Total próximos 3 meses</option>' + FORECAST_MONTHS.map(mk=>`<option value="${mk}">${monthLabel(mk)}</option>`).join('');
+  mes.addEventListener('change', ()=>{ state.filters.mes = mes.value; renderAll(); });
+
+  document.getElementById('escenarioSeg').querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.filters.escenario = btn.dataset.sc;
+      document.querySelectorAll('#escenarioSeg button').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on', btn.dataset.sc);
+      renderAll();
+    });
+  });
+
+  document.getElementById('metodoProyeccion').addEventListener('change', e=>{
+    state.filters.metodo = e.target.value; clearForecastCache(); renderAll();
+  });
+
+  document.getElementById('tcBase').addEventListener('change', e=>{
+    state.tcBase = parseFloat(e.target.value)||16.9;
+  });
+}
+
+function buildTabs(){
+  document.querySelectorAll('.tabbtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.view').forEach(v=>v.hidden = true);
+      document.getElementById('view-'+btn.dataset.tab).hidden = false;
+      renderAll();
+    });
+  });
+}
+
+/* ============================================================
+   14. MASTER RENDER
+   ============================================================ */
+function hasIngresoData(){ return state.raw.ingreso.length>0; }
+
+function syncIngresoBanners(){
+  const hide = hasIngresoData();
+  ['ingresoWarnBanner','ingresoWarnBannerEsc','ingresoWarnBannerComp'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.hidden = hide;
+  });
+}
+
+function renderAll(){
+  refreshThemeColors();
+  syncIngresoBanners();
+  const activeTab = document.querySelector('.tabbtn.active').dataset.tab;
+  if(activeTab==='forecast') renderForecastTab();
+  else if(activeTab==='escenarios') renderEscenariosTab();
+  else if(activeTab==='comparativo') renderComparativoTab();
+}
+
+function init(){
+  document.getElementById('seasonLabelTop').textContent = CURRENT_SEASON;
+  document.getElementById('badgeToday').textContent = fmtDateHuman(NOW_UTC);
+  document.getElementById('badgeForecastRange').textContent = monthLabel(FORECAST_MONTHS[0])+' – '+monthLabel(FORECAST_MONTHS[2]);
+
+  buildFilterUI();
+  buildTabs();
+  buildLoaderGrid();
+
+  document.getElementById('btnDemo').addEventListener('click', loadDemoIntoSlots);
+  document.getElementById('btnProcesar').addEventListener('click', ()=>{ state.isDemo=false; document.getElementById('dataTag').textContent='tus datos'; processAllSlots(); });
+  document.getElementById('btnLimpiar').addEventListener('click', clearAllSlots);
+  document.getElementById('btnEgresoReal').addEventListener('click', loadBakedDefaults);
+
+  loadBakedDefaults();
+
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
