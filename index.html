@@ -299,16 +299,23 @@
           </div>
         </div>
 
-        <div class="card">
-          <h4>Egreso, Ingreso y Producción por mes</h4>
-          <p class="cardsub">Egreso e Ingreso en el eje izquierdo (MXN), Producción en el eje derecho (kg).</p>
-          <div class="chartbox wide"><canvas id="chartFlujo"></canvas></div>
-          <div class="legend-inline" id="legendFlujo"></div>
+        <div class="cardgrid">
+          <div class="card">
+            <h4>Ingreso por mes (MXN)</h4>
+            <div class="chartbox tall"><canvas id="chartIngreso"></canvas></div>
+            <div class="legend-inline" id="legendIngreso"></div>
+          </div>
+          <div class="card">
+            <h4>Egreso por mes (MXN)</h4>
+            <div class="chartbox tall"><canvas id="chartEgreso"></canvas></div>
+            <div class="legend-inline" id="legendEgreso"></div>
+          </div>
         </div>
 
         <div class="card">
-          <h4>Producción proyectada por mes (kg)</h4>
+          <h4>Producción por mes (kg)</h4>
           <div class="chartbox wide"><canvas id="chartProduccion"></canvas></div>
+          <div class="legend-inline" id="legendProduccion"></div>
         </div>
 
         <div class="card">
@@ -1070,78 +1077,9 @@ function valueProduccion(mode, scenario, months, crops, method){
   return scenarioForecastConsolidated('produccion', method, scenario, crops, months);
 }
 
-function renderProduccionChart(){
-  destroyChart('chartProduccion');
-  if(!chartsAvailable()){ chartFallback('chartProduccion'); return; }
-  const crops = currentCropsSelection();
-  const method = state.filters.metodo;
-  const histMonths = recentHistoricalMonths(6);
-  const allMonths = histMonths.concat(FORECAST_MONTHS);
-  const real = realOrProjectedMonthly('produccion', crops, method, state.filters.escenario, histMonths);
-  const baseForecast = scenarioForecastConsolidated('produccion', method, state.filters.escenario, crops, FORECAST_MONTHS);
-  const data = allMonths.map(mk => histMonths.includes(mk) ? real[mk] : baseForecast[mk]);
-  const colors = allMonths.map(mk => histMonths.includes(mk) ? hexA(CH.accent,0.35) : CH.accent);
-  const ctx = document.getElementById('chartProduccion').getContext('2d');
-  charts.chartProduccion = new Chart(ctx, {
-    type:'bar',
-    data:{ labels: allMonths.map(monthLabel), datasets:[{ label:'Producción (kg)', data, backgroundColor:colors, borderRadius:4, maxBarThickness:34 }] },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1,
-        callbacks:{ label:c=> fmtKg(c.raw) } } },
-      scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtNum(v) } } })
-    }
-  });
-}
-
-function renderFlujoChart(){
-  destroyChart('chartFlujo');
-  if(!chartsAvailable()){ chartFallback('chartFlujo'); return; }
-  const crops = currentCropsSelection();
-  const method = state.filters.metodo, sc = state.filters.escenario;
-  const histMonths = recentHistoricalMonths(6);
-  const allMonths = histMonths.concat(FORECAST_MONTHS);
-
-  const ingreso = valueIngreso('real', sc, allMonths, crops, method);
-  const egreso = valueEgreso('real', sc, allMonths, crops, method);
-  const produccion = valueProduccion('real', sc, allMonths, crops, method);
-  const ingresoFc = valueIngreso('scenario', sc, FORECAST_MONTHS, crops, method);
-  const egresoFc = valueEgreso('scenario', sc, FORECAST_MONTHS, crops, method);
-  const produccionFc = valueProduccion('scenario', sc, FORECAST_MONTHS, crops, method);
-
-  const ingresoData = allMonths.map(mk=> histMonths.includes(mk) ? (ingreso[mk]||0) : (ingresoFc[mk]||0));
-  const egresoData = allMonths.map(mk=> histMonths.includes(mk) ? (egreso[mk]||0) : (egresoFc[mk]||0));
-  const produccionData = allMonths.map(mk=> histMonths.includes(mk) ? (produccion[mk]||0) : (produccionFc[mk]||0));
-
-  const ctx = document.getElementById('chartFlujo').getContext('2d');
-  charts.chartFlujo = new Chart(ctx, {
-    type:'line',
-    data:{
-      labels: allMonths.map(monthLabel),
-      datasets:[
-        { label:'Ingreso (MXN)', data: ingresoData, borderColor: CH.mIngreso, backgroundColor: CH.mIngreso, borderWidth:2.5, pointRadius:3, tension:0.25, yAxisID:'y', fill:false },
-        { label:'Egreso (MXN)', data: egresoData, borderColor: CH.mEgreso, backgroundColor: CH.mEgreso, borderWidth:2.5, pointRadius:3, tension:0.25, yAxisID:'y', fill:false },
-        { label:'Producción (kg)', data: produccionData, borderColor: CH.accent, backgroundColor: hexA(CH.accent,0.12), borderDash:[5,4], borderWidth:2, pointRadius:2, tension:0.25, yAxisID:'y1', fill:false }
-      ]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      interaction:{ mode:'index', intersect:false },
-      plugins:{ legend:{ display:false },
-        tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, padding:10,
-          callbacks:{ label: c => c.dataset.label+': '+ (c.raw==null?'—':(c.dataset.yAxisID==='y1'? fmtKg(c.raw) : fmtMXN(c.raw))) } } },
-      scales:{
-        x: { grid:{ color:'transparent' }, ticks:{ color:CH.muted } },
-        y: { position:'left', grid:{ color:CH.grid }, ticks:{ color:CH.muted, callback:v=>fmtMXN(v) }, border:{ color:CH.baseline } },
-        y1:{ position:'right', grid:{ display:false }, ticks:{ color:CH.muted, callback:v=>fmtNum(v) } }
-      }
-    }
-  });
-
-  document.getElementById('legendFlujo').innerHTML = `
-    <span class="sw" style="color:${CH.mIngreso}"><span class="line" style="background:${CH.mIngreso}"></span>Ingreso (MXN)</span>
-    <span class="sw" style="color:${CH.mEgreso}"><span class="line" style="background:${CH.mEgreso}"></span>Egreso (MXN)</span>
-    <span class="sw" style="color:${CH.accent}"><span class="dashed"></span>Producción (kg, eje derecho)</span>`;
-}
+// Ingreso, Egreso y Producción se dibujan cada una en su propia gráfica, con el mismo estilo
+// (línea real+forecast, Presupuesto punteado, banda Optimista/Pesimista) que EBITDA y Margen —
+// reutilizando exactamente renderLineWithBand, que ya sabe hacer eso para cualquier valueFn.
 
 function renderHistoricoTable(){
   const crops = currentCropsSelection();
@@ -1190,8 +1128,9 @@ function renderForecastTab(){
   renderKpis();
   renderLineWithBand('chartEbitda','legendEbitda', valueEbitda, fmtMXN, false);
   renderLineWithBand('chartMargen','legendMargen', valueMargen, v=>v.toFixed(1)+'%', true);
-  renderFlujoChart();
-  renderProduccionChart();
+  renderLineWithBand('chartIngreso','legendIngreso', valueIngreso, fmtMXN, false);
+  renderLineWithBand('chartEgreso','legendEgreso', valueEgreso, fmtMXN, false);
+  renderLineWithBand('chartProduccion','legendProduccion', valueProduccion, fmtKg, false);
   renderHistoricoTable();
 }
 
