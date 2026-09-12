@@ -247,6 +247,7 @@
       <div class="field">
         <h3>Cultivos incluidos en consolidado</h3>
         <div class="chipgrid" id="includedChips"></div>
+        <p class="hint">📦 Empaque no es un cultivo (no tiene tipo de cambio ni aparece en "Comparativo de cultivos"), pero su egreso real sí existe en la base de datos — al incluirlo aquí se suma al Ingreso/Egreso/EBITDA consolidado.</p>
       </div>
       <div class="field">
         <h3>Mes de referencia</h3>
@@ -299,6 +300,13 @@
         </div>
 
         <div class="card">
+          <h4>Egreso, Ingreso y Producción por mes</h4>
+          <p class="cardsub">Egreso e Ingreso en el eje izquierdo (MXN), Producción en el eje derecho (kg).</p>
+          <div class="chartbox wide"><canvas id="chartFlujo"></canvas></div>
+          <div class="legend-inline" id="legendFlujo"></div>
+        </div>
+
+        <div class="card">
           <h4>Producción proyectada por mes (kg)</h4>
           <div class="chartbox wide"><canvas id="chartProduccion"></canvas></div>
         </div>
@@ -309,6 +317,7 @@
           <div class="tablewrap">
             <table id="tablaHistorico"><thead></thead><tbody></tbody></table>
           </div>
+          <p class="cardsub hint" id="tablaEstimadoNote" hidden>* Mes sin datos reales capturados todavía — se muestra estimado con el método de proyección seleccionado. Se reemplaza solo por el dato real en cuanto tu Sheet lo tenga.</p>
         </div>
       </section>
 
@@ -419,10 +428,14 @@
    1. CONFIG
    ============================================================ */
 const CROPS = ['FRESA','FRAMBUESA','ZARZAMORA','ARANDANO','ESPARRAGO','AGUACATE','PAPA'];
-const DISPLAY = { FRESA:'Fresa', FRAMBUESA:'Frambuesa', ZARZAMORA:'Zarzamora', ARANDANO:'Arándano', ESPARRAGO:'Espárrago', AGUACATE:'Aguacate', PAPA:'Papa' };
-const ICONS = { FRESA:'🍓', FRAMBUESA:'🍒', ZARZAMORA:'🍇', ARANDANO:'🫐', ESPARRAGO:'🌿', AGUACATE:'🥑', PAPA:'🥔' };
+const DISPLAY = { FRESA:'Fresa', FRAMBUESA:'Frambuesa', ZARZAMORA:'Zarzamora', ARANDANO:'Arándano', ESPARRAGO:'Espárrago', AGUACATE:'Aguacate', PAPA:'Papa', OTROS:'Empaque' };
+const ICONS = { FRESA:'🍓', FRAMBUESA:'🍒', ZARZAMORA:'🍇', ARANDANO:'🫐', ESPARRAGO:'🌿', AGUACATE:'🥑', PAPA:'🥔', OTROS:'📦' };
 const CROP_COLOR_VAR = { FRESA:'--crop-1', FRAMBUESA:'--crop-2', ZARZAMORA:'--crop-3', ARANDANO:'--crop-4', ESPARRAGO:'--crop-5', AGUACATE:'--crop-6', PAPA:'--crop-7' };
 const CROPS_WITH_TC = new Set(CROPS.filter(c=>c!=='PAPA'));
+// "Empaque" (y cualquier otro renglón que no sea uno de los 7 cultivos) se agrupa bajo OTHER_LABEL
+// ('OTROS'). Es seleccionable en el filtro de "Cultivos incluidos en consolidado" para que su
+// egreso entre o salga del EBITDA/KPIs consolidados, pero nunca aparece en las vistas que son
+// específicamente "los 7 cultivos" (Comparativo / Participación) ni tiene tipo de cambio.
 const VARIABLES = ['egreso','ingreso','produccion'];
 const TIPOS = ['real','presupuesto','proyeccion'];
 const MES_ABR = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -524,7 +537,9 @@ function cropColor(crop){ return cssVar(CROP_COLOR_VAR[crop]); }
 const state = {
   raw: { egreso:[], ingreso:[], produccion:[] },   // flat arrays of {tipo,cultivo,ejercicio,semana,importe,date}
   monthly: null,                                    // built index
-  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS), mes: 'TOTAL3', escenario:'base', metodo:'regresion' },
+  // 'OTROS' (Empaque) se incluye por default: es egreso real que ya viene en la base de datos y
+  // debe contar en el EBITDA/KPIs consolidados salvo que el usuario lo desmarque.
+  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat(['OTROS'])), mes: 'TOTAL3', escenario:'base', metodo:'regresion' },
   scenarios: {
     base:      { ingreso:0, egreso:0, produccion:0, tc:0 },
     optimista: { ingreso:8, egreso:-5, produccion:5, tc:5 },
@@ -758,6 +773,18 @@ function computeMethodModel(sortedRecords, method){
   return ()=>avg;
 }
 
+// Meses que el motor de proyección puede llegar a necesitar: toda la temporada en curso (hasta el
+// mes actual) + los 3 meses de forecast. Antes solo se calculaba para FORECAST_MONTHS (los meses
+// que empiezan DESPUÉS del mes actual), así que un mes ya en curso pero sin datos "Real" capturados
+// todavía (p.ej. septiembre recién arrancando) caía en un hueco: no era "Real" (no hay filas) ni
+// era "forecast" (no es uno de los FORECAST_MONTHS) — y se mostraba como $0 en vez de calcularse.
+// Con PROJECTION_MONTHS el modelo cubre también esos meses en curso.
+const PROJECTION_MONTHS = Array.from(new Set(recentHistoricalMonths(12).concat(FORECAST_MONTHS)));
+
+function monthHasReal(variable, crops, mk){
+  return state.raw[variable].some(r=> r.tipo==='real' && crops.includes(r.cultivo) && monthKeyFromDate(r.date)===mk);
+}
+
 const baseForecastCache = {};
 function baseForecastFor(variable, crop, method){
   const key = variable+'|'+crop+'|'+method;
@@ -768,7 +795,7 @@ function baseForecastFor(variable, crop, method){
   // proyección — si no, el ajuste se distorsiona y la proyección puede arrancar después de
   // esas filas fantasma y quedarse en $0.
   const series = realWeeklyFor(variable, crop).filter(r=> r.date <= NOW_UTC);
-  const out = Object.fromEntries(FORECAST_MONTHS.map(m=>[m,0]));
+  const out = Object.fromEntries(PROJECTION_MONTHS.map(m=>[m,0]));
   if(series.length){
     const model = computeMethodModel(series, method);
     const lastDate = series[series.length-1].date;
@@ -789,7 +816,7 @@ function scenarioForecastFor(variable, crop, method, scenario){
   const base = baseForecastFor(variable, crop, method);
   const s = state.scenarios[scenario];
   const out = {};
-  FORECAST_MONTHS.forEach(mk=>{
+  Object.keys(base).forEach(mk=>{
     let v = base[mk];
     if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
     else if(variable==='egreso'){ v *= (1+s.egreso/100); }
@@ -798,11 +825,12 @@ function scenarioForecastFor(variable, crop, method, scenario){
   });
   return out;
 }
-function scenarioForecastConsolidated(variable, method, scenario, crops){
-  const out = Object.fromEntries(FORECAST_MONTHS.map(m=>[m,0]));
+function scenarioForecastConsolidated(variable, method, scenario, crops, monthsList){
+  monthsList = monthsList || FORECAST_MONTHS;
+  const out = Object.fromEntries(monthsList.map(m=>[m,0]));
   crops.forEach(c=>{
     const f = scenarioForecastFor(variable, c, method, scenario);
-    FORECAST_MONTHS.forEach(mk=> out[mk]+=f[mk]);
+    monthsList.forEach(mk=> out[mk]+=(f[mk]||0));
   });
   return out;
 }
@@ -818,6 +846,22 @@ function historicalMonthly(variable, tipo, crops, monthsList){
   const out = {};
   monthsList.forEach(mk=>{
     out[mk] = crops.reduce((s,c)=> s + (state.monthly[variable][tipo][c][mk]||0), 0);
+  });
+  return out;
+}
+// Para el tramo "histórico" de las gráficas/tabla: usa el importe Real capturado cuando el mes ya
+// tiene filas Real; si el mes no tiene ninguna fila Real todavía (el mes en curso casi siempre, a
+// veces el anterior si el Sheet va con retraso), en vez de mostrar $0 se calcula con el mismo
+// método de proyección seleccionado (regresión/promedio/móvil) bajo el escenario activo — así ya
+// "se calcula" en vez de quedar en blanco, y en cuanto llegue el dato Real real de esa hoja lo
+// reemplaza automáticamente.
+function realOrProjectedMonthly(variable, crops, method, scenario, monthsList){
+  const real = historicalMonthly(variable, 'real', crops, monthsList);
+  const out = {};
+  monthsList.forEach(mk=>{
+    out[mk] = monthHasReal(variable, crops, mk)
+      ? (real[mk]||0)
+      : (scenarioForecastConsolidated(variable, method, scenario, crops, [mk])[mk] || 0);
   });
   return out;
 }
@@ -997,8 +1041,8 @@ function historicalCombinedForValue(kind, crops, months, method){
 
 function valueEbitda(mode, scenario, months, crops, method){
   if(mode==='real'){
-    const i = historicalMonthly('ingreso','real',crops,months);
-    const e = historicalMonthly('egreso','real',crops,months);
+    const i = valueIngreso('real', scenario, months, crops, method);
+    const e = valueEgreso('real', scenario, months, crops, method);
     const out={}; months.forEach(mk=> out[mk]=(i[mk]||0)-(e[mk]||0)); return out;
   }
   const set = ebitdaSet(method, scenario, crops);
@@ -1006,24 +1050,24 @@ function valueEbitda(mode, scenario, months, crops, method){
 }
 function valueMargen(mode, scenario, months, crops, method){
   if(mode==='real'){
-    const i = historicalMonthly('ingreso','real',crops,months);
-    const e = historicalMonthly('egreso','real',crops,months);
+    const i = valueIngreso('real', scenario, months, crops, method);
+    const e = valueEgreso('real', scenario, months, crops, method);
     const out={}; months.forEach(mk=> out[mk] = i[mk]>0 ? (i[mk]-e[mk])/i[mk]*100 : 0); return out;
   }
   const set = ebitdaSet(method, scenario, crops);
   const out={}; months.forEach(mk=> out[mk] = set.ingreso[mk]>0 ? set.ebitda[mk]/set.ingreso[mk]*100 : 0); return out;
 }
 function valueIngreso(mode, scenario, months, crops, method){
-  if(mode==='real') return historicalMonthly('ingreso','real',crops,months);
-  return scenarioForecastConsolidated('ingreso', method, scenario, crops);
+  if(mode==='real') return realOrProjectedMonthly('ingreso', crops, method, scenario||state.filters.escenario, months);
+  return scenarioForecastConsolidated('ingreso', method, scenario, crops, months);
 }
 function valueEgreso(mode, scenario, months, crops, method){
-  if(mode==='real') return historicalMonthly('egreso','real',crops,months);
-  return scenarioForecastConsolidated('egreso', method, scenario, crops);
+  if(mode==='real') return realOrProjectedMonthly('egreso', crops, method, scenario||state.filters.escenario, months);
+  return scenarioForecastConsolidated('egreso', method, scenario, crops, months);
 }
 function valueProduccion(mode, scenario, months, crops, method){
-  if(mode==='real') return historicalMonthly('produccion','real',crops,months);
-  return scenarioForecastConsolidated('produccion', method, scenario, crops);
+  if(mode==='real') return realOrProjectedMonthly('produccion', crops, method, scenario||state.filters.escenario, months);
+  return scenarioForecastConsolidated('produccion', method, scenario, crops, months);
 }
 
 function renderProduccionChart(){
@@ -1033,8 +1077,8 @@ function renderProduccionChart(){
   const method = state.filters.metodo;
   const histMonths = recentHistoricalMonths(6);
   const allMonths = histMonths.concat(FORECAST_MONTHS);
-  const real = historicalMonthly('produccion','real',crops,histMonths);
-  const baseForecast = scenarioForecastConsolidated('produccion', method, state.filters.escenario, crops);
+  const real = realOrProjectedMonthly('produccion', crops, method, state.filters.escenario, histMonths);
+  const baseForecast = scenarioForecastConsolidated('produccion', method, state.filters.escenario, crops, FORECAST_MONTHS);
   const data = allMonths.map(mk => histMonths.includes(mk) ? real[mk] : baseForecast[mk]);
   const colors = allMonths.map(mk => histMonths.includes(mk) ? hexA(CH.accent,0.35) : CH.accent);
   const ctx = document.getElementById('chartProduccion').getContext('2d');
@@ -1049,16 +1093,67 @@ function renderProduccionChart(){
   });
 }
 
+function renderFlujoChart(){
+  destroyChart('chartFlujo');
+  if(!chartsAvailable()){ chartFallback('chartFlujo'); return; }
+  const crops = currentCropsSelection();
+  const method = state.filters.metodo, sc = state.filters.escenario;
+  const histMonths = recentHistoricalMonths(6);
+  const allMonths = histMonths.concat(FORECAST_MONTHS);
+
+  const ingreso = valueIngreso('real', sc, allMonths, crops, method);
+  const egreso = valueEgreso('real', sc, allMonths, crops, method);
+  const produccion = valueProduccion('real', sc, allMonths, crops, method);
+  const ingresoFc = valueIngreso('scenario', sc, FORECAST_MONTHS, crops, method);
+  const egresoFc = valueEgreso('scenario', sc, FORECAST_MONTHS, crops, method);
+  const produccionFc = valueProduccion('scenario', sc, FORECAST_MONTHS, crops, method);
+
+  const ingresoData = allMonths.map(mk=> histMonths.includes(mk) ? (ingreso[mk]||0) : (ingresoFc[mk]||0));
+  const egresoData = allMonths.map(mk=> histMonths.includes(mk) ? (egreso[mk]||0) : (egresoFc[mk]||0));
+  const produccionData = allMonths.map(mk=> histMonths.includes(mk) ? (produccion[mk]||0) : (produccionFc[mk]||0));
+
+  const ctx = document.getElementById('chartFlujo').getContext('2d');
+  charts.chartFlujo = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: allMonths.map(monthLabel),
+      datasets:[
+        { label:'Ingreso (MXN)', data: ingresoData, borderColor: CH.mIngreso, backgroundColor: CH.mIngreso, borderWidth:2.5, pointRadius:3, tension:0.25, yAxisID:'y', fill:false },
+        { label:'Egreso (MXN)', data: egresoData, borderColor: CH.mEgreso, backgroundColor: CH.mEgreso, borderWidth:2.5, pointRadius:3, tension:0.25, yAxisID:'y', fill:false },
+        { label:'Producción (kg)', data: produccionData, borderColor: CH.accent, backgroundColor: hexA(CH.accent,0.12), borderDash:[5,4], borderWidth:2, pointRadius:2, tension:0.25, yAxisID:'y1', fill:false }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ display:false },
+        tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, padding:10,
+          callbacks:{ label: c => c.dataset.label+': '+ (c.raw==null?'—':(c.dataset.yAxisID==='y1'? fmtKg(c.raw) : fmtMXN(c.raw))) } } },
+      scales:{
+        x: { grid:{ color:'transparent' }, ticks:{ color:CH.muted } },
+        y: { position:'left', grid:{ color:CH.grid }, ticks:{ color:CH.muted, callback:v=>fmtMXN(v) }, border:{ color:CH.baseline } },
+        y1:{ position:'right', grid:{ display:false }, ticks:{ color:CH.muted, callback:v=>fmtNum(v) } }
+      }
+    }
+  });
+
+  document.getElementById('legendFlujo').innerHTML = `
+    <span class="sw" style="color:${CH.mIngreso}"><span class="line" style="background:${CH.mIngreso}"></span>Ingreso (MXN)</span>
+    <span class="sw" style="color:${CH.mEgreso}"><span class="line" style="background:${CH.mEgreso}"></span>Egreso (MXN)</span>
+    <span class="sw" style="color:${CH.accent}"><span class="dashed"></span>Producción (kg, eje derecho)</span>`;
+}
+
 function renderHistoricoTable(){
   const crops = currentCropsSelection();
   const method = state.filters.metodo, sc = state.filters.escenario;
   document.getElementById('tableCropLabel').textContent = focalLabel();
   const months = recentHistoricalMonths(6).concat(FORECAST_MONTHS);
-  const real = historicalMonthly('egreso','real',crops,months), realI = historicalMonthly('ingreso','real',crops,months);
+  const realE = realOrProjectedMonthly('egreso', crops, method, sc, months);
+  const realI = realOrProjectedMonthly('ingreso', crops, method, sc, months);
   const presE = historicalMonthly('egreso','presupuesto',crops,months), presI = historicalMonthly('ingreso','presupuesto',crops,months);
   const proyE = historicalMonthly('egreso','proyeccion',crops,months), proyI = historicalMonthly('ingreso','proyeccion',crops,months);
-  const fcI = scenarioForecastConsolidated('ingreso', method, sc, crops);
-  const fcE = scenarioForecastConsolidated('egreso', method, sc, crops);
+  const fcI = scenarioForecastConsolidated('ingreso', method, sc, crops, FORECAST_MONTHS);
+  const fcE = scenarioForecastConsolidated('egreso', method, sc, crops, FORECAST_MONTHS);
   const hasIngresoReal = state.raw.ingreso.some(r=>r.tipo==='real');
   const hasIngresoPres = state.raw.ingreso.some(r=>r.tipo==='presupuesto');
   const hasIngresoProy = state.raw.ingreso.some(r=>r.tipo==='proyeccion');
@@ -1067,29 +1162,35 @@ function renderHistoricoTable(){
   const tbody = document.getElementById('tablaHistorico').querySelector('tbody');
   thead.innerHTML = '<tr><th>Mes</th><th>Ingreso real</th><th>Egreso real</th><th>EBITDA real</th><th>Presupuesto EBITDA</th><th>Proyección equipo</th><th>Forecast ('+sc+')</th></tr>';
   tbody.innerHTML = '';
+  let anyEstimated = false;
   months.forEach(mk=>{
     const isForecast = FORECAST_MONTHS.includes(mk);
-    const ebitdaReal = (isForecast || !hasIngresoReal) ? null : (realI[mk]||0)-(real[mk]||0);
+    const iEstimated = !isForecast && !monthHasReal('ingreso', crops, mk);
+    const eEstimated = !isForecast && !monthHasReal('egreso', crops, mk);
+    if(iEstimated || eEstimated) anyEstimated = true;
+    const ebitdaReal = (isForecast || !hasIngresoReal) ? null : (realI[mk]||0)-(realE[mk]||0);
     const ebitdaPres = hasIngresoPres ? (presI[mk]||0)-(presE[mk]||0) : null;
     const ebitdaProy = hasIngresoProy ? (proyI[mk]||0)-(proyE[mk]||0) : null;
     const ebitdaFc = (isForecast && hasIngresoReal) ? (fcI[mk]||0)-(fcE[mk]||0) : null;
     const tr = document.createElement('tr');
     if(mk===CURRENT_MONTH_KEY) tr.className='now';
     tr.innerHTML = `<td>${monthLabel(mk)}${isForecast?' 🔮':''}</td>
-      <td>${isForecast?'—':(hasIngresoReal?fmtMXN(realI[mk]||0):'—')}</td>
-      <td>${isForecast?'—':fmtMXN(real[mk]||0)}</td>
+      <td>${isForecast?'—':(hasIngresoReal?fmtMXN(realI[mk]||0)+(iEstimated?' *':''):'—')}</td>
+      <td>${isForecast?'—':fmtMXN(realE[mk]||0)+(eEstimated?' *':'')}</td>
       <td>${ebitdaReal==null?'—':fmtMXN(ebitdaReal)}</td>
       <td>${ebitdaPres==null?'—':fmtMXN(ebitdaPres)}</td>
       <td>${ebitdaProy==null?'—':fmtMXN(ebitdaProy)}</td>
       <td>${ebitdaFc==null?'—':fmtMXN(ebitdaFc)}</td>`;
     tbody.appendChild(tr);
   });
+  document.getElementById('tablaEstimadoNote').hidden = !anyEstimated;
 }
 
 function renderForecastTab(){
   renderKpis();
   renderLineWithBand('chartEbitda','legendEbitda', valueEbitda, fmtMXN, false);
   renderLineWithBand('chartMargen','legendMargen', valueMargen, v=>v.toFixed(1)+'%', true);
+  renderFlujoChart();
   renderProduccionChart();
   renderHistoricoTable();
 }
@@ -1270,443 +1371,6 @@ const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción'
 // el Google Sheet — cada actualización solo tiene que reescribir este bloque.
 const BAKED_DATA = {
  egreso: {
-  real: `Egreso	Cultivo	ejercicio	semana	Importe acumulado
-Real	AGUACATE	2026	26	$0
-Real	AGUACATE	2026	27	$195,285,603
-Real	AGUACATE	2026	28	$198,387,549
-Real	AGUACATE	2026	29	$202,079,299
-Real	AGUACATE	2026	30	$213,492,043
-Real	AGUACATE	2026	31	$226,106,233
-Real	AGUACATE	2026	32	$229,843,022
-Real	AGUACATE	2026	33	$235,850,257
-Real	AGUACATE	2026	34	$236,677,977
-Real	AGUACATE	2026	35	$236,677,977
-Real	AGUACATE	2026	36	$0
-Real	AGUACATE	2026	37	$0
-Real	AGUACATE	2026	38	$0
-Real	AGUACATE	2026	39	$0
-Real	AGUACATE	2026	40	$0
-Real	AGUACATE	2026	41	$0
-Real	AGUACATE	2026	42	$0
-Real	AGUACATE	2026	43	$0
-Real	AGUACATE	2026	44	$0
-Real	AGUACATE	2026	45	$0
-Real	AGUACATE	2026	46	$0
-Real	AGUACATE	2026	47	$0
-Real	AGUACATE	2026	48	$0
-Real	AGUACATE	2026	49	$0
-Real	AGUACATE	2026	50	$0
-Real	AGUACATE	2026	51	$0
-Real	AGUACATE	2026	52	$0
-Real	AGUACATE	2027	1	$0
-Real	AGUACATE	2027	2	$0
-Real	AGUACATE	2027	3	$0
-Real	AGUACATE	2027	4	$0
-Real	AGUACATE	2027	5	$0
-Real	AGUACATE	2027	6	$0
-Real	AGUACATE	2027	7	$0
-Real	AGUACATE	2027	8	$0
-Real	AGUACATE	2027	9	$0
-Real	AGUACATE	2027	10	$0
-Real	AGUACATE	2027	11	$0
-Real	AGUACATE	2027	12	$0
-Real	AGUACATE	2027	13	$0
-Real	AGUACATE	2027	14	$0
-Real	AGUACATE	2027	15	$0
-Real	AGUACATE	2027	16	$0
-Real	AGUACATE	2027	17	$0
-Real	AGUACATE	2027	18	$0
-Real	AGUACATE	2027	19	$0
-Real	AGUACATE	2027	20	$0
-Real	AGUACATE	2027	21	$0
-Real	AGUACATE	2027	22	$0
-Real	AGUACATE	2027	23	$0
-Real	AGUACATE	2027	24	$0
-Real	AGUACATE	2027	25	$0
-Real	AGUACATE	2027	26	$0
-Real	ARANDANO	2026	26	$0
-Real	ARANDANO	2026	27	$8,400,652
-Real	ARANDANO	2026	28	$11,944,885
-Real	ARANDANO	2026	29	$16,366,836
-Real	ARANDANO	2026	30	$25,351,433
-Real	ARANDANO	2026	31	$36,284,223
-Real	ARANDANO	2026	32	$38,724,354
-Real	ARANDANO	2026	33	$46,463,932
-Real	ARANDANO	2026	34	$48,595,854
-Real	ARANDANO	2026	35	$48,595,854
-Real	ARANDANO	2026	36	$0
-Real	ARANDANO	2026	37	$0
-Real	ARANDANO	2026	38	$0
-Real	ARANDANO	2026	39	$0
-Real	ARANDANO	2026	40	$0
-Real	ARANDANO	2026	41	$0
-Real	ARANDANO	2026	42	$0
-Real	ARANDANO	2026	43	$0
-Real	ARANDANO	2026	44	$0
-Real	ARANDANO	2026	45	$0
-Real	ARANDANO	2026	46	$0
-Real	ARANDANO	2026	47	$0
-Real	ARANDANO	2026	48	$0
-Real	ARANDANO	2026	49	$0
-Real	ARANDANO	2026	50	$0
-Real	ARANDANO	2026	51	$0
-Real	ARANDANO	2026	52	$0
-Real	ARANDANO	2027	1	$0
-Real	ARANDANO	2027	2	$0
-Real	ARANDANO	2027	3	$0
-Real	ARANDANO	2027	4	$0
-Real	ARANDANO	2027	5	$0
-Real	ARANDANO	2027	6	$0
-Real	ARANDANO	2027	7	$0
-Real	ARANDANO	2027	8	$0
-Real	ARANDANO	2027	9	$0
-Real	ARANDANO	2027	10	$0
-Real	ARANDANO	2027	11	$0
-Real	ARANDANO	2027	12	$0
-Real	ARANDANO	2027	13	$0
-Real	ARANDANO	2027	14	$0
-Real	ARANDANO	2027	15	$0
-Real	ARANDANO	2027	16	$0
-Real	ARANDANO	2027	17	$0
-Real	ARANDANO	2027	18	$0
-Real	ARANDANO	2027	19	$0
-Real	ARANDANO	2027	20	$0
-Real	ARANDANO	2027	21	$0
-Real	ARANDANO	2027	22	$0
-Real	ARANDANO	2027	23	$0
-Real	ARANDANO	2027	24	$0
-Real	ARANDANO	2027	25	$0
-Real	ARANDANO	2027	26	$0
-Real	ARANDANO	2027	27	$0
-Real	ARANDANO	2027	28	$0
-Real	EMPAQUE	2026	26	$0
-Real	EMPAQUE	2026	27	$169,502
-Real	EMPAQUE	2026	28	$867,659
-Real	EMPAQUE	2026	29	$1,284,658
-Real	EMPAQUE	2026	30	$1,577,465
-Real	EMPAQUE	2026	31	$2,684,794
-Real	EMPAQUE	2026	32	$2,893,986
-Real	EMPAQUE	2026	33	$3,186,555
-Real	EMPAQUE	2026	34	$6,533,558
-Real	EMPAQUE	2026	35	$4,968,113
-Real	EMPAQUE	2026	36	$0
-Real	EMPAQUE	2026	37	$0
-Real	EMPAQUE	2026	38	$0
-Real	EMPAQUE	2026	39	$0
-Real	EMPAQUE	2026	40	$0
-Real	EMPAQUE	2026	41	$0
-Real	EMPAQUE	2026	42	$0
-Real	EMPAQUE	2026	43	$0
-Real	EMPAQUE	2026	44	$0
-Real	EMPAQUE	2026	45	$0
-Real	EMPAQUE	2026	46	$0
-Real	EMPAQUE	2026	47	$0
-Real	EMPAQUE	2026	48	$0
-Real	EMPAQUE	2026	49	$0
-Real	EMPAQUE	2026	50	$0
-Real	EMPAQUE	2026	51	$0
-Real	EMPAQUE	2026	52	$0
-Real	EMPAQUE	2027	1	$0
-Real	EMPAQUE	2027	2	$0
-Real	EMPAQUE	2027	3	$0
-Real	EMPAQUE	2027	4	$0
-Real	EMPAQUE	2027	5	$0
-Real	EMPAQUE	2027	6	$0
-Real	EMPAQUE	2027	7	$0
-Real	EMPAQUE	2027	8	$0
-Real	EMPAQUE	2027	9	$0
-Real	EMPAQUE	2027	10	$0
-Real	EMPAQUE	2027	11	$0
-Real	EMPAQUE	2027	12	$0
-Real	EMPAQUE	2027	13	$0
-Real	EMPAQUE	2027	14	$0
-Real	EMPAQUE	2027	15	$0
-Real	EMPAQUE	2027	16	$0
-Real	EMPAQUE	2027	17	$0
-Real	EMPAQUE	2027	18	$0
-Real	EMPAQUE	2027	19	$0
-Real	EMPAQUE	2027	20	$0
-Real	EMPAQUE	2027	21	$0
-Real	EMPAQUE	2027	22	$0
-Real	EMPAQUE	2027	23	$0
-Real	EMPAQUE	2027	24	$0
-Real	EMPAQUE	2027	25	$0
-Real	EMPAQUE	2027	26	$0
-Real	EMPAQUE	2027	27	$0
-Real	EMPAQUE	2027	28	$0
-Real	ESPARRAGO	2026	26	$0
-Real	ESPARRAGO	2026	27	$120,040,414
-Real	ESPARRAGO	2026	28	$124,086,452
-Real	ESPARRAGO	2026	29	$129,481,973
-Real	ESPARRAGO	2026	30	$137,503,242
-Real	ESPARRAGO	2026	31	$145,293,922
-Real	ESPARRAGO	2026	32	$152,781,341
-Real	ESPARRAGO	2026	33	$161,239,405
-Real	ESPARRAGO	2026	34	$163,460,246
-Real	ESPARRAGO	2026	35	$163,460,246
-Real	ESPARRAGO	2026	36	$0
-Real	ESPARRAGO	2026	37	$0
-Real	ESPARRAGO	2026	38	$0
-Real	ESPARRAGO	2026	39	$0
-Real	ESPARRAGO	2026	40	$0
-Real	ESPARRAGO	2026	41	$0
-Real	ESPARRAGO	2026	42	$0
-Real	ESPARRAGO	2026	43	$0
-Real	ESPARRAGO	2026	44	$0
-Real	ESPARRAGO	2026	45	$0
-Real	ESPARRAGO	2026	46	$0
-Real	ESPARRAGO	2026	47	$0
-Real	ESPARRAGO	2026	48	$0
-Real	ESPARRAGO	2026	49	$0
-Real	ESPARRAGO	2026	50	$0
-Real	ESPARRAGO	2026	51	$0
-Real	ESPARRAGO	2026	52	$0
-Real	ESPARRAGO	2027	1	$0
-Real	ESPARRAGO	2027	2	$0
-Real	ESPARRAGO	2027	3	$0
-Real	ESPARRAGO	2027	4	$0
-Real	ESPARRAGO	2027	5	$0
-Real	ESPARRAGO	2027	6	$0
-Real	ESPARRAGO	2027	7	$0
-Real	ESPARRAGO	2027	8	$0
-Real	ESPARRAGO	2027	9	$0
-Real	ESPARRAGO	2027	10	$0
-Real	ESPARRAGO	2027	11	$0
-Real	ESPARRAGO	2027	12	$0
-Real	ESPARRAGO	2027	13	$0
-Real	ESPARRAGO	2027	14	$0
-Real	ESPARRAGO	2027	15	$0
-Real	ESPARRAGO	2027	16	$0
-Real	ESPARRAGO	2027	17	$0
-Real	ESPARRAGO	2027	18	$0
-Real	ESPARRAGO	2027	19	$0
-Real	ESPARRAGO	2027	20	$0
-Real	ESPARRAGO	2027	21	$0
-Real	ESPARRAGO	2027	22	$0
-Real	ESPARRAGO	2027	23	$0
-Real	ESPARRAGO	2027	24	$0
-Real	ESPARRAGO	2027	25	$0
-Real	ESPARRAGO	2027	26	$0
-Real	ESPARRAGO	2027	27	$0
-Real	ESPARRAGO	2027	28	$0
-Real	FRAMBUESA	2026	26	$0
-Real	FRAMBUESA	2026	27	$37,767,980
-Real	FRAMBUESA	2026	28	$44,487,250
-Real	FRAMBUESA	2026	29	$50,914,435
-Real	FRAMBUESA	2026	30	$63,743,691
-Real	FRAMBUESA	2026	31	$74,537,956
-Real	FRAMBUESA	2026	32	$79,676,008
-Real	FRAMBUESA	2026	33	$91,231,055
-Real	FRAMBUESA	2026	34	$96,164,780
-Real	FRAMBUESA	2026	35	$96,164,780
-Real	FRAMBUESA	2026	36	$0
-Real	FRAMBUESA	2026	37	$0
-Real	FRAMBUESA	2026	38	$0
-Real	FRAMBUESA	2026	39	$0
-Real	FRAMBUESA	2026	40	$0
-Real	FRAMBUESA	2026	41	$0
-Real	FRAMBUESA	2026	42	$0
-Real	FRAMBUESA	2026	43	$0
-Real	FRAMBUESA	2026	44	$0
-Real	FRAMBUESA	2026	45	$0
-Real	FRAMBUESA	2026	46	$0
-Real	FRAMBUESA	2026	47	$0
-Real	FRAMBUESA	2026	48	$0
-Real	FRAMBUESA	2026	49	$0
-Real	FRAMBUESA	2026	50	$0
-Real	FRAMBUESA	2026	51	$0
-Real	FRAMBUESA	2026	52	$0
-Real	FRAMBUESA	2027	1	$0
-Real	FRAMBUESA	2027	2	$0
-Real	FRAMBUESA	2027	3	$0
-Real	FRAMBUESA	2027	4	$0
-Real	FRAMBUESA	2027	5	$0
-Real	FRAMBUESA	2027	6	$0
-Real	FRAMBUESA	2027	7	$0
-Real	FRAMBUESA	2027	8	$0
-Real	FRAMBUESA	2027	9	$0
-Real	FRAMBUESA	2027	10	$0
-Real	FRAMBUESA	2027	11	$0
-Real	FRAMBUESA	2027	12	$0
-Real	FRAMBUESA	2027	13	$0
-Real	FRAMBUESA	2027	14	$0
-Real	FRAMBUESA	2027	15	$0
-Real	FRAMBUESA	2027	16	$0
-Real	FRAMBUESA	2027	17	$0
-Real	FRAMBUESA	2027	18	$0
-Real	FRAMBUESA	2027	19	$0
-Real	FRAMBUESA	2027	20	$0
-Real	FRAMBUESA	2027	21	$0
-Real	FRAMBUESA	2027	22	$0
-Real	FRAMBUESA	2027	23	$0
-Real	FRAMBUESA	2027	24	$0
-Real	FRAMBUESA	2027	25	$0
-Real	FRAMBUESA	2027	26	$0
-Real	FRAMBUESA	2027	27	$0
-Real	FRESA	2026	26	$0
-Real	FRESA	2026	27	$73,705,561
-Real	FRESA	2026	28	$83,357,290
-Real	FRESA	2026	29	$90,790,459
-Real	FRESA	2026	30	$115,108,529
-Real	FRESA	2026	31	$128,912,770
-Real	FRESA	2026	32	$140,145,564
-Real	FRESA	2026	33	$159,602,256
-Real	FRESA	2026	34	$168,669,119
-Real	FRESA	2026	35	$168,669,119
-Real	FRESA	2026	36	$0
-Real	FRESA	2026	37	$0
-Real	FRESA	2026	38	$0
-Real	FRESA	2026	39	$0
-Real	FRESA	2026	40	$0
-Real	FRESA	2026	41	$0
-Real	FRESA	2026	42	$0
-Real	FRESA	2026	43	$0
-Real	FRESA	2026	44	$0
-Real	FRESA	2026	45	$0
-Real	FRESA	2026	46	$0
-Real	FRESA	2026	47	$0
-Real	FRESA	2026	48	$0
-Real	FRESA	2026	49	$0
-Real	FRESA	2026	50	$0
-Real	FRESA	2026	51	$0
-Real	FRESA	2026	52	$0
-Real	FRESA	2027	1	$0
-Real	FRESA	2027	2	$0
-Real	FRESA	2027	3	$0
-Real	FRESA	2027	4	$0
-Real	FRESA	2027	5	$0
-Real	FRESA	2027	6	$0
-Real	FRESA	2027	7	$0
-Real	FRESA	2027	8	$0
-Real	FRESA	2027	9	$0
-Real	FRESA	2027	10	$0
-Real	FRESA	2027	11	$0
-Real	FRESA	2027	12	$0
-Real	FRESA	2027	13	$0
-Real	FRESA	2027	14	$0
-Real	FRESA	2027	15	$0
-Real	FRESA	2027	16	$0
-Real	FRESA	2027	17	$0
-Real	FRESA	2027	18	$0
-Real	FRESA	2027	19	$0
-Real	FRESA	2027	20	$0
-Real	FRESA	2027	21	$0
-Real	FRESA	2027	22	$0
-Real	FRESA	2027	23	$0
-Real	FRESA	2027	24	$0
-Real	FRESA	2027	25	$0
-Real	FRESA	2027	26	$0
-Real	FRESA	2027	27	$0
-Real	FRESA	2027	28	$0
-Real	PAPA	2026	26	$0
-Real	PAPA	2026	27	$12,850,722
-Real	PAPA	2026	28	$15,542,932
-Real	PAPA	2026	29	$16,914,450
-Real	PAPA	2026	30	$20,630,867
-Real	PAPA	2026	31	$22,279,068
-Real	PAPA	2026	32	$21,669,112
-Real	PAPA	2026	33	$23,651,991
-Real	PAPA	2026	34	$24,481,804
-Real	PAPA	2026	35	$24,481,804
-Real	PAPA	2026	36	$0
-Real	PAPA	2026	37	$0
-Real	PAPA	2026	38	$0
-Real	PAPA	2026	39	$0
-Real	PAPA	2026	40	$0
-Real	PAPA	2026	41	$0
-Real	PAPA	2026	42	$0
-Real	PAPA	2026	43	$0
-Real	PAPA	2026	44	$0
-Real	PAPA	2026	45	$0
-Real	PAPA	2026	46	$0
-Real	PAPA	2026	47	$0
-Real	PAPA	2026	48	$0
-Real	PAPA	2026	49	$0
-Real	PAPA	2026	50	$0
-Real	PAPA	2026	51	$0
-Real	PAPA	2026	52	$0
-Real	PAPA	2027	1	$0
-Real	PAPA	2027	2	$0
-Real	PAPA	2027	3	$0
-Real	PAPA	2027	4	$0
-Real	PAPA	2027	5	$0
-Real	PAPA	2027	6	$0
-Real	PAPA	2027	7	$0
-Real	PAPA	2027	8	$0
-Real	PAPA	2027	9	$0
-Real	PAPA	2027	10	$0
-Real	PAPA	2027	11	$0
-Real	PAPA	2027	12	$0
-Real	PAPA	2027	13	$0
-Real	PAPA	2027	14	$0
-Real	PAPA	2027	15	$0
-Real	PAPA	2027	16	$0
-Real	PAPA	2027	17	$0
-Real	PAPA	2027	18	$0
-Real	PAPA	2027	19	$0
-Real	PAPA	2027	20	$0
-Real	PAPA	2027	21	$0
-Real	PAPA	2027	22	$0
-Real	PAPA	2027	23	$0
-Real	PAPA	2027	24	$0
-Real	PAPA	2027	25	$0
-Real	PAPA	2027	26	$0
-Real	PAPA	2027	27	$0
-Real	ZARZAMORA	2026	26	$0
-Real	ZARZAMORA	2026	27	$11,346,037
-Real	ZARZAMORA	2026	28	$13,751,738
-Real	ZARZAMORA	2026	29	$17,226,386
-Real	ZARZAMORA	2026	30	$23,097,593
-Real	ZARZAMORA	2026	31	$28,780,496
-Real	ZARZAMORA	2026	32	$30,834,366
-Real	ZARZAMORA	2026	33	$35,476,936
-Real	ZARZAMORA	2026	34	$36,529,912
-Real	ZARZAMORA	2026	35	$36,529,912
-Real	ZARZAMORA	2026	36	$0
-Real	ZARZAMORA	2026	37	$0
-Real	ZARZAMORA	2026	38	$0
-Real	ZARZAMORA	2026	39	$0
-Real	ZARZAMORA	2026	40	$0
-Real	ZARZAMORA	2026	41	$0
-Real	ZARZAMORA	2026	42	$0
-Real	ZARZAMORA	2026	43	$0
-Real	ZARZAMORA	2026	44	$0
-Real	ZARZAMORA	2026	45	$0
-Real	ZARZAMORA	2026	46	$0
-Real	ZARZAMORA	2026	47	$0
-Real	ZARZAMORA	2026	48	$0
-Real	ZARZAMORA	2026	49	$0
-Real	ZARZAMORA	2026	50	$0
-Real	ZARZAMORA	2026	51	$0
-Real	ZARZAMORA	2026	52	$0
-Real	ZARZAMORA	2027	1	$0
-Real	ZARZAMORA	2027	2	$0
-Real	ZARZAMORA	2027	3	$0
-Real	ZARZAMORA	2027	4	$0
-Real	ZARZAMORA	2027	5	$0
-Real	ZARZAMORA	2027	6	$0
-Real	ZARZAMORA	2027	7	$0
-Real	ZARZAMORA	2027	8	$0
-Real	ZARZAMORA	2027	9	$0
-Real	ZARZAMORA	2027	10	$0
-Real	ZARZAMORA	2027	11	$0
-Real	ZARZAMORA	2027	12	$0
-Real	ZARZAMORA	2027	13	$0
-Real	ZARZAMORA	2027	14	$0
-Real	ZARZAMORA	2027	15	$0
-Real	ZARZAMORA	2027	16	$0
-Real	ZARZAMORA	2027	17	$0
-Real	ZARZAMORA	2027	18	$0
-Real	ZARZAMORA	2027	19	$0
-Real	ZARZAMORA	2027	20	$0
-Real	ZARZAMORA	2027	21	$0
-Real	ZARZAMORA	2027	22	$0
-Real	ZARZAMORA	2027	23	$0
-Real	ZARZAMORA	2027	24	$0
-Real	ZARZAMORA	2027	25	$0
-Real	ZARZAMORA	2027	26	$0
-Real	ZARZAMORA	2027	27	$0
-Real	ZARZAMORA	2027	28	$0`,
   presupuesto: `Egreso	Cultivo	ejercicio	semana	Importe
 Presupuesto	AGUACATE	2026	26	$127,862,028
 Presupuesto	AGUACATE	2026	27	$4,825,763
@@ -2144,6 +1808,443 @@ Presupuesto	ZARZAMORA	2027	25	$3,365,892
 Presupuesto	ZARZAMORA	2027	26	$1,348,037
 Presupuesto	ZARZAMORA	2027	27	$2,581,442
 Presupuesto	ZARZAMORA	2027	28	$669`,
+  real: `Egreso	Cultivo	ejercicio	semana	Importe acumulado
+Real	AGUACATE	2026	26	$0
+Real	AGUACATE	2026	27	$195,285,603
+Real	AGUACATE	2026	28	$198,387,549
+Real	AGUACATE	2026	29	$202,079,299
+Real	AGUACATE	2026	30	$213,492,043
+Real	AGUACATE	2026	31	$226,106,233
+Real	AGUACATE	2026	32	$229,843,022
+Real	AGUACATE	2026	33	$235,850,257
+Real	AGUACATE	2026	34	$236,677,977
+Real	AGUACATE	2026	35	$236,677,977
+Real	AGUACATE	2026	36	$0
+Real	AGUACATE	2026	37	$0
+Real	AGUACATE	2026	38	$0
+Real	AGUACATE	2026	39	$0
+Real	AGUACATE	2026	40	$0
+Real	AGUACATE	2026	41	$0
+Real	AGUACATE	2026	42	$0
+Real	AGUACATE	2026	43	$0
+Real	AGUACATE	2026	44	$0
+Real	AGUACATE	2026	45	$0
+Real	AGUACATE	2026	46	$0
+Real	AGUACATE	2026	47	$0
+Real	AGUACATE	2026	48	$0
+Real	AGUACATE	2026	49	$0
+Real	AGUACATE	2026	50	$0
+Real	AGUACATE	2026	51	$0
+Real	AGUACATE	2026	52	$0
+Real	AGUACATE	2027	1	$0
+Real	AGUACATE	2027	2	$0
+Real	AGUACATE	2027	3	$0
+Real	AGUACATE	2027	4	$0
+Real	AGUACATE	2027	5	$0
+Real	AGUACATE	2027	6	$0
+Real	AGUACATE	2027	7	$0
+Real	AGUACATE	2027	8	$0
+Real	AGUACATE	2027	9	$0
+Real	AGUACATE	2027	10	$0
+Real	AGUACATE	2027	11	$0
+Real	AGUACATE	2027	12	$0
+Real	AGUACATE	2027	13	$0
+Real	AGUACATE	2027	14	$0
+Real	AGUACATE	2027	15	$0
+Real	AGUACATE	2027	16	$0
+Real	AGUACATE	2027	17	$0
+Real	AGUACATE	2027	18	$0
+Real	AGUACATE	2027	19	$0
+Real	AGUACATE	2027	20	$0
+Real	AGUACATE	2027	21	$0
+Real	AGUACATE	2027	22	$0
+Real	AGUACATE	2027	23	$0
+Real	AGUACATE	2027	24	$0
+Real	AGUACATE	2027	25	$0
+Real	AGUACATE	2027	26	$0
+Real	ARANDANO	2026	26	$0
+Real	ARANDANO	2026	27	$8,400,652
+Real	ARANDANO	2026	28	$11,944,885
+Real	ARANDANO	2026	29	$16,366,836
+Real	ARANDANO	2026	30	$25,351,433
+Real	ARANDANO	2026	31	$36,284,223
+Real	ARANDANO	2026	32	$38,724,354
+Real	ARANDANO	2026	33	$46,463,932
+Real	ARANDANO	2026	34	$48,595,854
+Real	ARANDANO	2026	35	$48,595,854
+Real	ARANDANO	2026	36	$0
+Real	ARANDANO	2026	37	$0
+Real	ARANDANO	2026	38	$0
+Real	ARANDANO	2026	39	$0
+Real	ARANDANO	2026	40	$0
+Real	ARANDANO	2026	41	$0
+Real	ARANDANO	2026	42	$0
+Real	ARANDANO	2026	43	$0
+Real	ARANDANO	2026	44	$0
+Real	ARANDANO	2026	45	$0
+Real	ARANDANO	2026	46	$0
+Real	ARANDANO	2026	47	$0
+Real	ARANDANO	2026	48	$0
+Real	ARANDANO	2026	49	$0
+Real	ARANDANO	2026	50	$0
+Real	ARANDANO	2026	51	$0
+Real	ARANDANO	2026	52	$0
+Real	ARANDANO	2027	1	$0
+Real	ARANDANO	2027	2	$0
+Real	ARANDANO	2027	3	$0
+Real	ARANDANO	2027	4	$0
+Real	ARANDANO	2027	5	$0
+Real	ARANDANO	2027	6	$0
+Real	ARANDANO	2027	7	$0
+Real	ARANDANO	2027	8	$0
+Real	ARANDANO	2027	9	$0
+Real	ARANDANO	2027	10	$0
+Real	ARANDANO	2027	11	$0
+Real	ARANDANO	2027	12	$0
+Real	ARANDANO	2027	13	$0
+Real	ARANDANO	2027	14	$0
+Real	ARANDANO	2027	15	$0
+Real	ARANDANO	2027	16	$0
+Real	ARANDANO	2027	17	$0
+Real	ARANDANO	2027	18	$0
+Real	ARANDANO	2027	19	$0
+Real	ARANDANO	2027	20	$0
+Real	ARANDANO	2027	21	$0
+Real	ARANDANO	2027	22	$0
+Real	ARANDANO	2027	23	$0
+Real	ARANDANO	2027	24	$0
+Real	ARANDANO	2027	25	$0
+Real	ARANDANO	2027	26	$0
+Real	ARANDANO	2027	27	$0
+Real	ARANDANO	2027	28	$0
+Real	EMPAQUE	2026	26	$0
+Real	EMPAQUE	2026	27	$169,502
+Real	EMPAQUE	2026	28	$867,659
+Real	EMPAQUE	2026	29	$1,284,658
+Real	EMPAQUE	2026	30	$1,577,465
+Real	EMPAQUE	2026	31	$2,684,794
+Real	EMPAQUE	2026	32	$2,893,986
+Real	EMPAQUE	2026	33	$3,186,555
+Real	EMPAQUE	2026	34	$6,533,558
+Real	EMPAQUE	2026	35	$4,968,113
+Real	EMPAQUE	2026	36	$0
+Real	EMPAQUE	2026	37	$0
+Real	EMPAQUE	2026	38	$0
+Real	EMPAQUE	2026	39	$0
+Real	EMPAQUE	2026	40	$0
+Real	EMPAQUE	2026	41	$0
+Real	EMPAQUE	2026	42	$0
+Real	EMPAQUE	2026	43	$0
+Real	EMPAQUE	2026	44	$0
+Real	EMPAQUE	2026	45	$0
+Real	EMPAQUE	2026	46	$0
+Real	EMPAQUE	2026	47	$0
+Real	EMPAQUE	2026	48	$0
+Real	EMPAQUE	2026	49	$0
+Real	EMPAQUE	2026	50	$0
+Real	EMPAQUE	2026	51	$0
+Real	EMPAQUE	2026	52	$0
+Real	EMPAQUE	2027	1	$0
+Real	EMPAQUE	2027	2	$0
+Real	EMPAQUE	2027	3	$0
+Real	EMPAQUE	2027	4	$0
+Real	EMPAQUE	2027	5	$0
+Real	EMPAQUE	2027	6	$0
+Real	EMPAQUE	2027	7	$0
+Real	EMPAQUE	2027	8	$0
+Real	EMPAQUE	2027	9	$0
+Real	EMPAQUE	2027	10	$0
+Real	EMPAQUE	2027	11	$0
+Real	EMPAQUE	2027	12	$0
+Real	EMPAQUE	2027	13	$0
+Real	EMPAQUE	2027	14	$0
+Real	EMPAQUE	2027	15	$0
+Real	EMPAQUE	2027	16	$0
+Real	EMPAQUE	2027	17	$0
+Real	EMPAQUE	2027	18	$0
+Real	EMPAQUE	2027	19	$0
+Real	EMPAQUE	2027	20	$0
+Real	EMPAQUE	2027	21	$0
+Real	EMPAQUE	2027	22	$0
+Real	EMPAQUE	2027	23	$0
+Real	EMPAQUE	2027	24	$0
+Real	EMPAQUE	2027	25	$0
+Real	EMPAQUE	2027	26	$0
+Real	EMPAQUE	2027	27	$0
+Real	EMPAQUE	2027	28	$0
+Real	ESPARRAGO	2026	26	$0
+Real	ESPARRAGO	2026	27	$120,040,414
+Real	ESPARRAGO	2026	28	$124,086,452
+Real	ESPARRAGO	2026	29	$129,481,973
+Real	ESPARRAGO	2026	30	$137,503,242
+Real	ESPARRAGO	2026	31	$145,293,922
+Real	ESPARRAGO	2026	32	$152,781,341
+Real	ESPARRAGO	2026	33	$161,239,405
+Real	ESPARRAGO	2026	34	$163,460,246
+Real	ESPARRAGO	2026	35	$163,460,246
+Real	ESPARRAGO	2026	36	$0
+Real	ESPARRAGO	2026	37	$0
+Real	ESPARRAGO	2026	38	$0
+Real	ESPARRAGO	2026	39	$0
+Real	ESPARRAGO	2026	40	$0
+Real	ESPARRAGO	2026	41	$0
+Real	ESPARRAGO	2026	42	$0
+Real	ESPARRAGO	2026	43	$0
+Real	ESPARRAGO	2026	44	$0
+Real	ESPARRAGO	2026	45	$0
+Real	ESPARRAGO	2026	46	$0
+Real	ESPARRAGO	2026	47	$0
+Real	ESPARRAGO	2026	48	$0
+Real	ESPARRAGO	2026	49	$0
+Real	ESPARRAGO	2026	50	$0
+Real	ESPARRAGO	2026	51	$0
+Real	ESPARRAGO	2026	52	$0
+Real	ESPARRAGO	2027	1	$0
+Real	ESPARRAGO	2027	2	$0
+Real	ESPARRAGO	2027	3	$0
+Real	ESPARRAGO	2027	4	$0
+Real	ESPARRAGO	2027	5	$0
+Real	ESPARRAGO	2027	6	$0
+Real	ESPARRAGO	2027	7	$0
+Real	ESPARRAGO	2027	8	$0
+Real	ESPARRAGO	2027	9	$0
+Real	ESPARRAGO	2027	10	$0
+Real	ESPARRAGO	2027	11	$0
+Real	ESPARRAGO	2027	12	$0
+Real	ESPARRAGO	2027	13	$0
+Real	ESPARRAGO	2027	14	$0
+Real	ESPARRAGO	2027	15	$0
+Real	ESPARRAGO	2027	16	$0
+Real	ESPARRAGO	2027	17	$0
+Real	ESPARRAGO	2027	18	$0
+Real	ESPARRAGO	2027	19	$0
+Real	ESPARRAGO	2027	20	$0
+Real	ESPARRAGO	2027	21	$0
+Real	ESPARRAGO	2027	22	$0
+Real	ESPARRAGO	2027	23	$0
+Real	ESPARRAGO	2027	24	$0
+Real	ESPARRAGO	2027	25	$0
+Real	ESPARRAGO	2027	26	$0
+Real	ESPARRAGO	2027	27	$0
+Real	ESPARRAGO	2027	28	$0
+Real	FRAMBUESA	2026	26	$0
+Real	FRAMBUESA	2026	27	$37,767,980
+Real	FRAMBUESA	2026	28	$44,487,250
+Real	FRAMBUESA	2026	29	$50,914,435
+Real	FRAMBUESA	2026	30	$63,743,691
+Real	FRAMBUESA	2026	31	$74,537,956
+Real	FRAMBUESA	2026	32	$79,676,008
+Real	FRAMBUESA	2026	33	$91,231,055
+Real	FRAMBUESA	2026	34	$96,164,780
+Real	FRAMBUESA	2026	35	$96,164,780
+Real	FRAMBUESA	2026	36	$0
+Real	FRAMBUESA	2026	37	$0
+Real	FRAMBUESA	2026	38	$0
+Real	FRAMBUESA	2026	39	$0
+Real	FRAMBUESA	2026	40	$0
+Real	FRAMBUESA	2026	41	$0
+Real	FRAMBUESA	2026	42	$0
+Real	FRAMBUESA	2026	43	$0
+Real	FRAMBUESA	2026	44	$0
+Real	FRAMBUESA	2026	45	$0
+Real	FRAMBUESA	2026	46	$0
+Real	FRAMBUESA	2026	47	$0
+Real	FRAMBUESA	2026	48	$0
+Real	FRAMBUESA	2026	49	$0
+Real	FRAMBUESA	2026	50	$0
+Real	FRAMBUESA	2026	51	$0
+Real	FRAMBUESA	2026	52	$0
+Real	FRAMBUESA	2027	1	$0
+Real	FRAMBUESA	2027	2	$0
+Real	FRAMBUESA	2027	3	$0
+Real	FRAMBUESA	2027	4	$0
+Real	FRAMBUESA	2027	5	$0
+Real	FRAMBUESA	2027	6	$0
+Real	FRAMBUESA	2027	7	$0
+Real	FRAMBUESA	2027	8	$0
+Real	FRAMBUESA	2027	9	$0
+Real	FRAMBUESA	2027	10	$0
+Real	FRAMBUESA	2027	11	$0
+Real	FRAMBUESA	2027	12	$0
+Real	FRAMBUESA	2027	13	$0
+Real	FRAMBUESA	2027	14	$0
+Real	FRAMBUESA	2027	15	$0
+Real	FRAMBUESA	2027	16	$0
+Real	FRAMBUESA	2027	17	$0
+Real	FRAMBUESA	2027	18	$0
+Real	FRAMBUESA	2027	19	$0
+Real	FRAMBUESA	2027	20	$0
+Real	FRAMBUESA	2027	21	$0
+Real	FRAMBUESA	2027	22	$0
+Real	FRAMBUESA	2027	23	$0
+Real	FRAMBUESA	2027	24	$0
+Real	FRAMBUESA	2027	25	$0
+Real	FRAMBUESA	2027	26	$0
+Real	FRAMBUESA	2027	27	$0
+Real	FRESA	2026	26	$0
+Real	FRESA	2026	27	$73,705,561
+Real	FRESA	2026	28	$83,357,290
+Real	FRESA	2026	29	$90,790,459
+Real	FRESA	2026	30	$115,108,529
+Real	FRESA	2026	31	$128,912,770
+Real	FRESA	2026	32	$140,145,564
+Real	FRESA	2026	33	$159,602,256
+Real	FRESA	2026	34	$168,669,119
+Real	FRESA	2026	35	$168,669,119
+Real	FRESA	2026	36	$0
+Real	FRESA	2026	37	$0
+Real	FRESA	2026	38	$0
+Real	FRESA	2026	39	$0
+Real	FRESA	2026	40	$0
+Real	FRESA	2026	41	$0
+Real	FRESA	2026	42	$0
+Real	FRESA	2026	43	$0
+Real	FRESA	2026	44	$0
+Real	FRESA	2026	45	$0
+Real	FRESA	2026	46	$0
+Real	FRESA	2026	47	$0
+Real	FRESA	2026	48	$0
+Real	FRESA	2026	49	$0
+Real	FRESA	2026	50	$0
+Real	FRESA	2026	51	$0
+Real	FRESA	2026	52	$0
+Real	FRESA	2027	1	$0
+Real	FRESA	2027	2	$0
+Real	FRESA	2027	3	$0
+Real	FRESA	2027	4	$0
+Real	FRESA	2027	5	$0
+Real	FRESA	2027	6	$0
+Real	FRESA	2027	7	$0
+Real	FRESA	2027	8	$0
+Real	FRESA	2027	9	$0
+Real	FRESA	2027	10	$0
+Real	FRESA	2027	11	$0
+Real	FRESA	2027	12	$0
+Real	FRESA	2027	13	$0
+Real	FRESA	2027	14	$0
+Real	FRESA	2027	15	$0
+Real	FRESA	2027	16	$0
+Real	FRESA	2027	17	$0
+Real	FRESA	2027	18	$0
+Real	FRESA	2027	19	$0
+Real	FRESA	2027	20	$0
+Real	FRESA	2027	21	$0
+Real	FRESA	2027	22	$0
+Real	FRESA	2027	23	$0
+Real	FRESA	2027	24	$0
+Real	FRESA	2027	25	$0
+Real	FRESA	2027	26	$0
+Real	FRESA	2027	27	$0
+Real	FRESA	2027	28	$0
+Real	PAPA	2026	26	$0
+Real	PAPA	2026	27	$12,850,722
+Real	PAPA	2026	28	$15,542,932
+Real	PAPA	2026	29	$16,914,450
+Real	PAPA	2026	30	$20,630,867
+Real	PAPA	2026	31	$22,279,068
+Real	PAPA	2026	32	$21,669,112
+Real	PAPA	2026	33	$23,651,991
+Real	PAPA	2026	34	$24,481,804
+Real	PAPA	2026	35	$24,481,804
+Real	PAPA	2026	36	$0
+Real	PAPA	2026	37	$0
+Real	PAPA	2026	38	$0
+Real	PAPA	2026	39	$0
+Real	PAPA	2026	40	$0
+Real	PAPA	2026	41	$0
+Real	PAPA	2026	42	$0
+Real	PAPA	2026	43	$0
+Real	PAPA	2026	44	$0
+Real	PAPA	2026	45	$0
+Real	PAPA	2026	46	$0
+Real	PAPA	2026	47	$0
+Real	PAPA	2026	48	$0
+Real	PAPA	2026	49	$0
+Real	PAPA	2026	50	$0
+Real	PAPA	2026	51	$0
+Real	PAPA	2026	52	$0
+Real	PAPA	2027	1	$0
+Real	PAPA	2027	2	$0
+Real	PAPA	2027	3	$0
+Real	PAPA	2027	4	$0
+Real	PAPA	2027	5	$0
+Real	PAPA	2027	6	$0
+Real	PAPA	2027	7	$0
+Real	PAPA	2027	8	$0
+Real	PAPA	2027	9	$0
+Real	PAPA	2027	10	$0
+Real	PAPA	2027	11	$0
+Real	PAPA	2027	12	$0
+Real	PAPA	2027	13	$0
+Real	PAPA	2027	14	$0
+Real	PAPA	2027	15	$0
+Real	PAPA	2027	16	$0
+Real	PAPA	2027	17	$0
+Real	PAPA	2027	18	$0
+Real	PAPA	2027	19	$0
+Real	PAPA	2027	20	$0
+Real	PAPA	2027	21	$0
+Real	PAPA	2027	22	$0
+Real	PAPA	2027	23	$0
+Real	PAPA	2027	24	$0
+Real	PAPA	2027	25	$0
+Real	PAPA	2027	26	$0
+Real	PAPA	2027	27	$0
+Real	ZARZAMORA	2026	26	$0
+Real	ZARZAMORA	2026	27	$11,346,037
+Real	ZARZAMORA	2026	28	$13,751,738
+Real	ZARZAMORA	2026	29	$17,226,386
+Real	ZARZAMORA	2026	30	$23,097,593
+Real	ZARZAMORA	2026	31	$28,780,496
+Real	ZARZAMORA	2026	32	$30,834,366
+Real	ZARZAMORA	2026	33	$35,476,936
+Real	ZARZAMORA	2026	34	$36,529,912
+Real	ZARZAMORA	2026	35	$36,529,912
+Real	ZARZAMORA	2026	36	$0
+Real	ZARZAMORA	2026	37	$0
+Real	ZARZAMORA	2026	38	$0
+Real	ZARZAMORA	2026	39	$0
+Real	ZARZAMORA	2026	40	$0
+Real	ZARZAMORA	2026	41	$0
+Real	ZARZAMORA	2026	42	$0
+Real	ZARZAMORA	2026	43	$0
+Real	ZARZAMORA	2026	44	$0
+Real	ZARZAMORA	2026	45	$0
+Real	ZARZAMORA	2026	46	$0
+Real	ZARZAMORA	2026	47	$0
+Real	ZARZAMORA	2026	48	$0
+Real	ZARZAMORA	2026	49	$0
+Real	ZARZAMORA	2026	50	$0
+Real	ZARZAMORA	2026	51	$0
+Real	ZARZAMORA	2026	52	$0
+Real	ZARZAMORA	2027	1	$0
+Real	ZARZAMORA	2027	2	$0
+Real	ZARZAMORA	2027	3	$0
+Real	ZARZAMORA	2027	4	$0
+Real	ZARZAMORA	2027	5	$0
+Real	ZARZAMORA	2027	6	$0
+Real	ZARZAMORA	2027	7	$0
+Real	ZARZAMORA	2027	8	$0
+Real	ZARZAMORA	2027	9	$0
+Real	ZARZAMORA	2027	10	$0
+Real	ZARZAMORA	2027	11	$0
+Real	ZARZAMORA	2027	12	$0
+Real	ZARZAMORA	2027	13	$0
+Real	ZARZAMORA	2027	14	$0
+Real	ZARZAMORA	2027	15	$0
+Real	ZARZAMORA	2027	16	$0
+Real	ZARZAMORA	2027	17	$0
+Real	ZARZAMORA	2027	18	$0
+Real	ZARZAMORA	2027	19	$0
+Real	ZARZAMORA	2027	20	$0
+Real	ZARZAMORA	2027	21	$0
+Real	ZARZAMORA	2027	22	$0
+Real	ZARZAMORA	2027	23	$0
+Real	ZARZAMORA	2027	24	$0
+Real	ZARZAMORA	2027	25	$0
+Real	ZARZAMORA	2027	26	$0
+Real	ZARZAMORA	2027	27	$0
+Real	ZARZAMORA	2027	28	$0`,
   proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe acumulado
 Proyección	AGUACATE	2026	26	$0
 Proyección	AGUACATE	2026	27	$195,285,603
@@ -2582,16 +2683,8 @@ Proyección	ZARZAMORA	2027	26	0
 Proyección	ZARZAMORA	2027	27	0
 Proyección	ZARZAMORA	2027	28	$0`
  },
- ingreso: {
-  real: ``,
-  presupuesto: ``,
-  proyeccion: ``
- },
- produccion: {
-  real: ``,
-  presupuesto: ``,
-  proyeccion: ``
- }
+ ingreso: { real:'', presupuesto:'', proyeccion:'' },
+ produccion: { real:'', presupuesto:'', proyeccion:'' }
 };
 
 function slotId(tipo,variable){ return `slot_${tipo}_${variable}`; }
@@ -2733,8 +2826,11 @@ function buildFilterUI(){
   focal.addEventListener('change', ()=>{ state.filters.focalCrop = focal.value; renderAll(); });
 
   const chipwrap = document.getElementById('includedChips');
-  chipwrap.innerHTML = CROPS.map(c=>`
-    <label class="chip on" data-crop="${c}"><input type="checkbox" checked value="${c}">${ICONS[c]} ${DISPLAY[c]}</label>`).join('');
+  const chipItems = CROPS.concat([OTHER_LABEL]);
+  chipwrap.innerHTML = chipItems.map(c=>{
+    const on = state.filters.included.has(c);
+    return `<label class="chip ${on?'on':''}" data-crop="${c}"><input type="checkbox" ${on?'checked':''} value="${c}">${ICONS[c]} ${DISPLAY[c]}</label>`;
+  }).join('');
   chipwrap.querySelectorAll('.chip').forEach(chip=>{
     const cb = chip.querySelector('input');
     cb.addEventListener('change', ()=>{
