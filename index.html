@@ -846,7 +846,14 @@ function computeMethodModel(sortedRecords, method){
 const PROJECTION_MONTHS = Array.from(new Set(recentHistoricalMonths(12).concat(FORECAST_MONTHS)));
 
 function monthHasReal(variable, crops, mk){
-  return state.raw[variable].some(r=> r.tipo==='real' && crops.includes(r.cultivo) && monthKeyFromDate(r.date)===mk);
+  // Ojo: algunas hojas "Real" (p.ej. Egreso/Producción ya sin acumular) vienen con TODAS las
+  // semanas de la temporada precargadas, incluidas las que todavía no ocurren, en $0 como relleno.
+  // Si se contara cualquier fila como "ya hay dato real", un mes futuro con puras filas de $0
+  // se mostraría como Real=$0 en vez de proyectarse — el mismo bug de septiembre, mismo síntoma,
+  // pero por otra causa. Por eso solo cuentan las filas cuya fecha (derivada de ejercicio+semana)
+  // ya pasó — igual que se filtra al ajustar el modelo de proyección — sin importar si su importe
+  // es $0 o no (una semana ya transcurrida con gasto real de $0 sí debe contar como Real).
+  return state.raw[variable].some(r=> r.tipo==='real' && crops.includes(r.cultivo) && r.date<=NOW_UTC && monthKeyFromDate(r.date)===mk);
 }
 
 const baseForecastCache = {};
