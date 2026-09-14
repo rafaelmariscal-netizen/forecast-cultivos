@@ -264,7 +264,7 @@
       <div class="field">
         <h3>Método de proyección</h3>
         <select id="metodoProyeccion">
-          <option value="regresion">📈 Regresión lineal (semanal)</option>
+          <option value="polinomial">📈 Regresión polinomial (grado 2)</option>
           <option value="promedio">📋 Promedio histórico</option>
           <option value="movil">🔄 Promedio móvil (12 semanas)</option>
         </select>
@@ -546,7 +546,7 @@ const state = {
   monthly: null,                                    // built index
   // 'OTROS' (Empaque) se incluye por default: es egreso real que ya viene en la base de datos y
   // debe contar en el EBITDA/KPIs consolidados salvo que el usuario lo desmarque.
-  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat(['OTROS'])), mes: 'TOTAL3', escenario:'base', metodo:'regresion' },
+  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat(['OTROS'])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial' },
   scenarios: {
     base:      { ingreso:0, egreso:0, produccion:0, tc:0 },
     optimista: { ingreso:8, egreso:-5, produccion:5, tc:5 },
@@ -762,26 +762,69 @@ function realWeeklyFor(variable, crop){
   return state.raw[variable].filter(r=>r.tipo==='real' && r.cultivo===crop).sort((a,b)=>a.date-b.date);
 }
 
+// Resuelve un sistema lineal 3x3 A·x=B por regla de Cramer. Devuelve null si A es (casi)
+// singular — típico cuando hay menos de 3 semanas con fechas distintas — para que el
+// llamador pueda caer de vuelta al promedio en vez de dividir entre ~0.
+function solve3x3(A, B){
+  const det3 = m => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])
+                   - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])
+                   + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+  const D = det3(A);
+  if(Math.abs(D) < 1e-9) return null;
+  const withCol = (m,col,vec) => m.map((row,i)=> row.map((v,j)=> j===col ? vec[i] : v));
+  return [det3(withCol(A,0,B))/D, det3(withCol(A,1,B))/D, det3(withCol(A,2,B))/D];
+}
+
 function computeMethodModel(sortedRecords, method){
   if(!sortedRecords.length) return ()=>0;
   const t0 = sortedRecords[0].date.getTime();
   const toX = d => (d.getTime()-t0)/(7*DAY_MS);
-  if(method==='regresion'){
+  if(method==='polinomial'){
+    // Regresión polinomial de grado 2 (cuadrática): importe ≈ a + b·x + c·x², ajustada por
+    // mínimos cuadrados sobre las semanas reales (x = semanas desde el inicio de la serie).
+    // A diferencia de una recta, esta curva SÍ puede capturar aceleración/desaceleración
+    // dentro de los datos reales (útil para ver si el ritmo de gasto/ingreso se está
+    // acelerando o frenando). El problema de usar la parábola tal cual para PROYECTAR es que
+    // el término cuadrático crece sin freno mientras más te alejas — puede disparar o
+    // colapsar el pronóstico en solo un par de semanas. Por eso, para extrapolar, no se sigue
+    // dibujando la parábola: se toma el valor y la pendiente que la curva tiene justo en la
+    // última semana con dato real, y esa pendiente se va "amortiguando" semana a semana
+    // (tendencia amortiguada / damped trend, técnica estándar de pronóstico) en vez de
+    // acumularse para siempre — así el pronóstico converge a un nivel estable en vez de
+    // explotar, pero sigue reflejando si la tendencia reciente era al alza o a la baja.
     const n = sortedRecords.length;
-    let sumX=0,sumY=0,sumXY=0,sumXX=0;
-    sortedRecords.forEach(r=>{ const x=toX(r.date), y=r.importe; sumX+=x; sumY+=y; sumXY+=x*y; sumXX+=x*x; });
-    const denom = (n*sumXX - sumX*sumX) || 1;
-    const slope = (n*sumXY - sumX*sumY)/denom;
-    const intercept = (sumY - slope*sumX)/n;
-    const avg = sumY/n;
-    // Con pocas semanas de historia (inicio de temporada) una regresión pura puede
-    // extrapolar una pendiente inestable y colapsar a $0 muchas semanas hacia adelante.
-    // Se atenúa el peso de la tendencia cuando hay poca información (n chico), mezclando
-    // con el promedio histórico — a partir de ~12 semanas de datos la proyección es
-    // prácticamente la regresión lineal pura.
+    const avg = sortedRecords.reduce((a,r)=>a+r.importe,0)/n;
+    let sx=0,sx2=0,sx3=0,sx4=0,sy=0,sxy=0,sx2y=0;
+    sortedRecords.forEach(r=>{
+      const x=toX(r.date), y=r.importe, x2=x*x;
+      sx+=x; sx2+=x2; sx3+=x2*x; sx4+=x2*x2;
+      sy+=y; sxy+=x*y; sx2y+=x2*y;
+    });
+    const coef = solve3x3(
+      [[n,sx,sx2],[sx,sx2,sx3],[sx2,sx3,sx4]],
+      [sy,sxy,sx2y]
+    );
+    if(!coef) return ()=>avg;
+    const [a,b,c] = coef;
+    const lastX = toX(sortedRecords[n-1].date);
+    const yLast = Math.max(0, a + b*lastX + c*lastX*lastX); // valor de la curva en la última semana real
+    const slopeLast = b + 2*c*lastX; // pendiente (tendencia) de la curva en ese punto
+    const PHI = 0.85; // factor de amortiguamiento semanal de la tendencia (0-1; más chico = frena más rápido)
+    const maxHist = Math.max(avg, ...sortedRecords.map(r=>r.importe));
+    const cap = maxHist*2; // techo duro de seguridad adicional
+    // Con pocas semanas de historia (inicio de temporada) el ajuste cuadrático puede ser
+    // inestable; se atenúa el peso de la curva cuando hay poca información (n chico),
+    // mezclando con el promedio histórico — a partir de ~12 semanas de datos la proyección
+    // es prácticamente la tendencia amortiguada pura.
     const trendWeight = Math.min(1, Math.max(0, (n-3)/9));
     return d => {
-      const raw = Math.max(0, slope*toX(d)+intercept);
+      const x = toX(d);
+      const h = Math.max(0, x - lastX); // semanas hacia adelante desde la última semana real
+      // Suma geométrica amortiguada de la pendiente: cada semana adicional pesa PHI veces
+      // menos que la anterior, así que el efecto de la tendencia se va aplanando en vez de
+      // acumularse sin límite (converge a slopeLast·PHI/(1-PHI) en vez de crecer para siempre).
+      const dampedSum = PHI*(1-Math.pow(PHI,h))/(1-PHI);
+      const raw = Math.min(cap, Math.max(0, yLast + slopeLast*dampedSum));
       return Math.max(0, trendWeight*raw + (1-trendWeight)*avg);
     };
   }
@@ -1324,443 +1367,6 @@ const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción'
 // el Google Sheet — cada actualización solo tiene que reescribir este bloque.
 const BAKED_DATA = {
  egreso: {
-  real: `Egreso	Cultivo	ejercicio	semana	Importe acumulado
-Real	AGUACATE	2026	26	$0
-Real	AGUACATE	2026	27	$195,285,603
-Real	AGUACATE	2026	28	$198,387,549
-Real	AGUACATE	2026	29	$202,079,299
-Real	AGUACATE	2026	30	$213,492,043
-Real	AGUACATE	2026	31	$226,106,233
-Real	AGUACATE	2026	32	$229,843,022
-Real	AGUACATE	2026	33	$235,850,257
-Real	AGUACATE	2026	34	$236,677,977
-Real	AGUACATE	2026	35	$236,677,977
-Real	AGUACATE	2026	36	$0
-Real	AGUACATE	2026	37	$0
-Real	AGUACATE	2026	38	$0
-Real	AGUACATE	2026	39	$0
-Real	AGUACATE	2026	40	$0
-Real	AGUACATE	2026	41	$0
-Real	AGUACATE	2026	42	$0
-Real	AGUACATE	2026	43	$0
-Real	AGUACATE	2026	44	$0
-Real	AGUACATE	2026	45	$0
-Real	AGUACATE	2026	46	$0
-Real	AGUACATE	2026	47	$0
-Real	AGUACATE	2026	48	$0
-Real	AGUACATE	2026	49	$0
-Real	AGUACATE	2026	50	$0
-Real	AGUACATE	2026	51	$0
-Real	AGUACATE	2026	52	$0
-Real	AGUACATE	2027	1	$0
-Real	AGUACATE	2027	2	$0
-Real	AGUACATE	2027	3	$0
-Real	AGUACATE	2027	4	$0
-Real	AGUACATE	2027	5	$0
-Real	AGUACATE	2027	6	$0
-Real	AGUACATE	2027	7	$0
-Real	AGUACATE	2027	8	$0
-Real	AGUACATE	2027	9	$0
-Real	AGUACATE	2027	10	$0
-Real	AGUACATE	2027	11	$0
-Real	AGUACATE	2027	12	$0
-Real	AGUACATE	2027	13	$0
-Real	AGUACATE	2027	14	$0
-Real	AGUACATE	2027	15	$0
-Real	AGUACATE	2027	16	$0
-Real	AGUACATE	2027	17	$0
-Real	AGUACATE	2027	18	$0
-Real	AGUACATE	2027	19	$0
-Real	AGUACATE	2027	20	$0
-Real	AGUACATE	2027	21	$0
-Real	AGUACATE	2027	22	$0
-Real	AGUACATE	2027	23	$0
-Real	AGUACATE	2027	24	$0
-Real	AGUACATE	2027	25	$0
-Real	AGUACATE	2027	26	$0
-Real	ARANDANO	2026	26	$0
-Real	ARANDANO	2026	27	$8,400,652
-Real	ARANDANO	2026	28	$11,944,885
-Real	ARANDANO	2026	29	$16,366,836
-Real	ARANDANO	2026	30	$25,351,433
-Real	ARANDANO	2026	31	$36,284,223
-Real	ARANDANO	2026	32	$38,724,354
-Real	ARANDANO	2026	33	$46,463,932
-Real	ARANDANO	2026	34	$48,595,854
-Real	ARANDANO	2026	35	$48,595,854
-Real	ARANDANO	2026	36	$0
-Real	ARANDANO	2026	37	$0
-Real	ARANDANO	2026	38	$0
-Real	ARANDANO	2026	39	$0
-Real	ARANDANO	2026	40	$0
-Real	ARANDANO	2026	41	$0
-Real	ARANDANO	2026	42	$0
-Real	ARANDANO	2026	43	$0
-Real	ARANDANO	2026	44	$0
-Real	ARANDANO	2026	45	$0
-Real	ARANDANO	2026	46	$0
-Real	ARANDANO	2026	47	$0
-Real	ARANDANO	2026	48	$0
-Real	ARANDANO	2026	49	$0
-Real	ARANDANO	2026	50	$0
-Real	ARANDANO	2026	51	$0
-Real	ARANDANO	2026	52	$0
-Real	ARANDANO	2027	1	$0
-Real	ARANDANO	2027	2	$0
-Real	ARANDANO	2027	3	$0
-Real	ARANDANO	2027	4	$0
-Real	ARANDANO	2027	5	$0
-Real	ARANDANO	2027	6	$0
-Real	ARANDANO	2027	7	$0
-Real	ARANDANO	2027	8	$0
-Real	ARANDANO	2027	9	$0
-Real	ARANDANO	2027	10	$0
-Real	ARANDANO	2027	11	$0
-Real	ARANDANO	2027	12	$0
-Real	ARANDANO	2027	13	$0
-Real	ARANDANO	2027	14	$0
-Real	ARANDANO	2027	15	$0
-Real	ARANDANO	2027	16	$0
-Real	ARANDANO	2027	17	$0
-Real	ARANDANO	2027	18	$0
-Real	ARANDANO	2027	19	$0
-Real	ARANDANO	2027	20	$0
-Real	ARANDANO	2027	21	$0
-Real	ARANDANO	2027	22	$0
-Real	ARANDANO	2027	23	$0
-Real	ARANDANO	2027	24	$0
-Real	ARANDANO	2027	25	$0
-Real	ARANDANO	2027	26	$0
-Real	ARANDANO	2027	27	$0
-Real	ARANDANO	2027	28	$0
-Real	EMPAQUE	2026	26	$0
-Real	EMPAQUE	2026	27	$169,502
-Real	EMPAQUE	2026	28	$867,659
-Real	EMPAQUE	2026	29	$1,284,658
-Real	EMPAQUE	2026	30	$1,577,465
-Real	EMPAQUE	2026	31	$2,684,794
-Real	EMPAQUE	2026	32	$2,893,986
-Real	EMPAQUE	2026	33	$3,186,555
-Real	EMPAQUE	2026	34	$6,533,558
-Real	EMPAQUE	2026	35	$4,968,113
-Real	EMPAQUE	2026	36	$0
-Real	EMPAQUE	2026	37	$0
-Real	EMPAQUE	2026	38	$0
-Real	EMPAQUE	2026	39	$0
-Real	EMPAQUE	2026	40	$0
-Real	EMPAQUE	2026	41	$0
-Real	EMPAQUE	2026	42	$0
-Real	EMPAQUE	2026	43	$0
-Real	EMPAQUE	2026	44	$0
-Real	EMPAQUE	2026	45	$0
-Real	EMPAQUE	2026	46	$0
-Real	EMPAQUE	2026	47	$0
-Real	EMPAQUE	2026	48	$0
-Real	EMPAQUE	2026	49	$0
-Real	EMPAQUE	2026	50	$0
-Real	EMPAQUE	2026	51	$0
-Real	EMPAQUE	2026	52	$0
-Real	EMPAQUE	2027	1	$0
-Real	EMPAQUE	2027	2	$0
-Real	EMPAQUE	2027	3	$0
-Real	EMPAQUE	2027	4	$0
-Real	EMPAQUE	2027	5	$0
-Real	EMPAQUE	2027	6	$0
-Real	EMPAQUE	2027	7	$0
-Real	EMPAQUE	2027	8	$0
-Real	EMPAQUE	2027	9	$0
-Real	EMPAQUE	2027	10	$0
-Real	EMPAQUE	2027	11	$0
-Real	EMPAQUE	2027	12	$0
-Real	EMPAQUE	2027	13	$0
-Real	EMPAQUE	2027	14	$0
-Real	EMPAQUE	2027	15	$0
-Real	EMPAQUE	2027	16	$0
-Real	EMPAQUE	2027	17	$0
-Real	EMPAQUE	2027	18	$0
-Real	EMPAQUE	2027	19	$0
-Real	EMPAQUE	2027	20	$0
-Real	EMPAQUE	2027	21	$0
-Real	EMPAQUE	2027	22	$0
-Real	EMPAQUE	2027	23	$0
-Real	EMPAQUE	2027	24	$0
-Real	EMPAQUE	2027	25	$0
-Real	EMPAQUE	2027	26	$0
-Real	EMPAQUE	2027	27	$0
-Real	EMPAQUE	2027	28	$0
-Real	ESPARRAGO	2026	26	$0
-Real	ESPARRAGO	2026	27	$120,040,414
-Real	ESPARRAGO	2026	28	$124,086,452
-Real	ESPARRAGO	2026	29	$129,481,973
-Real	ESPARRAGO	2026	30	$137,503,242
-Real	ESPARRAGO	2026	31	$145,293,922
-Real	ESPARRAGO	2026	32	$152,781,341
-Real	ESPARRAGO	2026	33	$161,239,405
-Real	ESPARRAGO	2026	34	$163,460,246
-Real	ESPARRAGO	2026	35	$163,460,246
-Real	ESPARRAGO	2026	36	$0
-Real	ESPARRAGO	2026	37	$0
-Real	ESPARRAGO	2026	38	$0
-Real	ESPARRAGO	2026	39	$0
-Real	ESPARRAGO	2026	40	$0
-Real	ESPARRAGO	2026	41	$0
-Real	ESPARRAGO	2026	42	$0
-Real	ESPARRAGO	2026	43	$0
-Real	ESPARRAGO	2026	44	$0
-Real	ESPARRAGO	2026	45	$0
-Real	ESPARRAGO	2026	46	$0
-Real	ESPARRAGO	2026	47	$0
-Real	ESPARRAGO	2026	48	$0
-Real	ESPARRAGO	2026	49	$0
-Real	ESPARRAGO	2026	50	$0
-Real	ESPARRAGO	2026	51	$0
-Real	ESPARRAGO	2026	52	$0
-Real	ESPARRAGO	2027	1	$0
-Real	ESPARRAGO	2027	2	$0
-Real	ESPARRAGO	2027	3	$0
-Real	ESPARRAGO	2027	4	$0
-Real	ESPARRAGO	2027	5	$0
-Real	ESPARRAGO	2027	6	$0
-Real	ESPARRAGO	2027	7	$0
-Real	ESPARRAGO	2027	8	$0
-Real	ESPARRAGO	2027	9	$0
-Real	ESPARRAGO	2027	10	$0
-Real	ESPARRAGO	2027	11	$0
-Real	ESPARRAGO	2027	12	$0
-Real	ESPARRAGO	2027	13	$0
-Real	ESPARRAGO	2027	14	$0
-Real	ESPARRAGO	2027	15	$0
-Real	ESPARRAGO	2027	16	$0
-Real	ESPARRAGO	2027	17	$0
-Real	ESPARRAGO	2027	18	$0
-Real	ESPARRAGO	2027	19	$0
-Real	ESPARRAGO	2027	20	$0
-Real	ESPARRAGO	2027	21	$0
-Real	ESPARRAGO	2027	22	$0
-Real	ESPARRAGO	2027	23	$0
-Real	ESPARRAGO	2027	24	$0
-Real	ESPARRAGO	2027	25	$0
-Real	ESPARRAGO	2027	26	$0
-Real	ESPARRAGO	2027	27	$0
-Real	ESPARRAGO	2027	28	$0
-Real	FRAMBUESA	2026	26	$0
-Real	FRAMBUESA	2026	27	$37,767,980
-Real	FRAMBUESA	2026	28	$44,487,250
-Real	FRAMBUESA	2026	29	$50,914,435
-Real	FRAMBUESA	2026	30	$63,743,691
-Real	FRAMBUESA	2026	31	$74,537,956
-Real	FRAMBUESA	2026	32	$79,676,008
-Real	FRAMBUESA	2026	33	$91,231,055
-Real	FRAMBUESA	2026	34	$96,164,780
-Real	FRAMBUESA	2026	35	$96,164,780
-Real	FRAMBUESA	2026	36	$0
-Real	FRAMBUESA	2026	37	$0
-Real	FRAMBUESA	2026	38	$0
-Real	FRAMBUESA	2026	39	$0
-Real	FRAMBUESA	2026	40	$0
-Real	FRAMBUESA	2026	41	$0
-Real	FRAMBUESA	2026	42	$0
-Real	FRAMBUESA	2026	43	$0
-Real	FRAMBUESA	2026	44	$0
-Real	FRAMBUESA	2026	45	$0
-Real	FRAMBUESA	2026	46	$0
-Real	FRAMBUESA	2026	47	$0
-Real	FRAMBUESA	2026	48	$0
-Real	FRAMBUESA	2026	49	$0
-Real	FRAMBUESA	2026	50	$0
-Real	FRAMBUESA	2026	51	$0
-Real	FRAMBUESA	2026	52	$0
-Real	FRAMBUESA	2027	1	$0
-Real	FRAMBUESA	2027	2	$0
-Real	FRAMBUESA	2027	3	$0
-Real	FRAMBUESA	2027	4	$0
-Real	FRAMBUESA	2027	5	$0
-Real	FRAMBUESA	2027	6	$0
-Real	FRAMBUESA	2027	7	$0
-Real	FRAMBUESA	2027	8	$0
-Real	FRAMBUESA	2027	9	$0
-Real	FRAMBUESA	2027	10	$0
-Real	FRAMBUESA	2027	11	$0
-Real	FRAMBUESA	2027	12	$0
-Real	FRAMBUESA	2027	13	$0
-Real	FRAMBUESA	2027	14	$0
-Real	FRAMBUESA	2027	15	$0
-Real	FRAMBUESA	2027	16	$0
-Real	FRAMBUESA	2027	17	$0
-Real	FRAMBUESA	2027	18	$0
-Real	FRAMBUESA	2027	19	$0
-Real	FRAMBUESA	2027	20	$0
-Real	FRAMBUESA	2027	21	$0
-Real	FRAMBUESA	2027	22	$0
-Real	FRAMBUESA	2027	23	$0
-Real	FRAMBUESA	2027	24	$0
-Real	FRAMBUESA	2027	25	$0
-Real	FRAMBUESA	2027	26	$0
-Real	FRAMBUESA	2027	27	$0
-Real	FRESA	2026	26	$0
-Real	FRESA	2026	27	$73,705,561
-Real	FRESA	2026	28	$83,357,290
-Real	FRESA	2026	29	$90,790,459
-Real	FRESA	2026	30	$115,108,529
-Real	FRESA	2026	31	$128,912,770
-Real	FRESA	2026	32	$140,145,564
-Real	FRESA	2026	33	$159,602,256
-Real	FRESA	2026	34	$168,669,119
-Real	FRESA	2026	35	$168,669,119
-Real	FRESA	2026	36	$0
-Real	FRESA	2026	37	$0
-Real	FRESA	2026	38	$0
-Real	FRESA	2026	39	$0
-Real	FRESA	2026	40	$0
-Real	FRESA	2026	41	$0
-Real	FRESA	2026	42	$0
-Real	FRESA	2026	43	$0
-Real	FRESA	2026	44	$0
-Real	FRESA	2026	45	$0
-Real	FRESA	2026	46	$0
-Real	FRESA	2026	47	$0
-Real	FRESA	2026	48	$0
-Real	FRESA	2026	49	$0
-Real	FRESA	2026	50	$0
-Real	FRESA	2026	51	$0
-Real	FRESA	2026	52	$0
-Real	FRESA	2027	1	$0
-Real	FRESA	2027	2	$0
-Real	FRESA	2027	3	$0
-Real	FRESA	2027	4	$0
-Real	FRESA	2027	5	$0
-Real	FRESA	2027	6	$0
-Real	FRESA	2027	7	$0
-Real	FRESA	2027	8	$0
-Real	FRESA	2027	9	$0
-Real	FRESA	2027	10	$0
-Real	FRESA	2027	11	$0
-Real	FRESA	2027	12	$0
-Real	FRESA	2027	13	$0
-Real	FRESA	2027	14	$0
-Real	FRESA	2027	15	$0
-Real	FRESA	2027	16	$0
-Real	FRESA	2027	17	$0
-Real	FRESA	2027	18	$0
-Real	FRESA	2027	19	$0
-Real	FRESA	2027	20	$0
-Real	FRESA	2027	21	$0
-Real	FRESA	2027	22	$0
-Real	FRESA	2027	23	$0
-Real	FRESA	2027	24	$0
-Real	FRESA	2027	25	$0
-Real	FRESA	2027	26	$0
-Real	FRESA	2027	27	$0
-Real	FRESA	2027	28	$0
-Real	PAPA	2026	26	$0
-Real	PAPA	2026	27	$12,850,722
-Real	PAPA	2026	28	$15,542,932
-Real	PAPA	2026	29	$16,914,450
-Real	PAPA	2026	30	$20,630,867
-Real	PAPA	2026	31	$22,279,068
-Real	PAPA	2026	32	$21,669,112
-Real	PAPA	2026	33	$23,651,991
-Real	PAPA	2026	34	$24,481,804
-Real	PAPA	2026	35	$24,481,804
-Real	PAPA	2026	36	$0
-Real	PAPA	2026	37	$0
-Real	PAPA	2026	38	$0
-Real	PAPA	2026	39	$0
-Real	PAPA	2026	40	$0
-Real	PAPA	2026	41	$0
-Real	PAPA	2026	42	$0
-Real	PAPA	2026	43	$0
-Real	PAPA	2026	44	$0
-Real	PAPA	2026	45	$0
-Real	PAPA	2026	46	$0
-Real	PAPA	2026	47	$0
-Real	PAPA	2026	48	$0
-Real	PAPA	2026	49	$0
-Real	PAPA	2026	50	$0
-Real	PAPA	2026	51	$0
-Real	PAPA	2026	52	$0
-Real	PAPA	2027	1	$0
-Real	PAPA	2027	2	$0
-Real	PAPA	2027	3	$0
-Real	PAPA	2027	4	$0
-Real	PAPA	2027	5	$0
-Real	PAPA	2027	6	$0
-Real	PAPA	2027	7	$0
-Real	PAPA	2027	8	$0
-Real	PAPA	2027	9	$0
-Real	PAPA	2027	10	$0
-Real	PAPA	2027	11	$0
-Real	PAPA	2027	12	$0
-Real	PAPA	2027	13	$0
-Real	PAPA	2027	14	$0
-Real	PAPA	2027	15	$0
-Real	PAPA	2027	16	$0
-Real	PAPA	2027	17	$0
-Real	PAPA	2027	18	$0
-Real	PAPA	2027	19	$0
-Real	PAPA	2027	20	$0
-Real	PAPA	2027	21	$0
-Real	PAPA	2027	22	$0
-Real	PAPA	2027	23	$0
-Real	PAPA	2027	24	$0
-Real	PAPA	2027	25	$0
-Real	PAPA	2027	26	$0
-Real	PAPA	2027	27	$0
-Real	ZARZAMORA	2026	26	$0
-Real	ZARZAMORA	2026	27	$11,346,037
-Real	ZARZAMORA	2026	28	$13,751,738
-Real	ZARZAMORA	2026	29	$17,226,386
-Real	ZARZAMORA	2026	30	$23,097,593
-Real	ZARZAMORA	2026	31	$28,780,496
-Real	ZARZAMORA	2026	32	$30,834,366
-Real	ZARZAMORA	2026	33	$35,476,936
-Real	ZARZAMORA	2026	34	$36,529,912
-Real	ZARZAMORA	2026	35	$36,529,912
-Real	ZARZAMORA	2026	36	$0
-Real	ZARZAMORA	2026	37	$0
-Real	ZARZAMORA	2026	38	$0
-Real	ZARZAMORA	2026	39	$0
-Real	ZARZAMORA	2026	40	$0
-Real	ZARZAMORA	2026	41	$0
-Real	ZARZAMORA	2026	42	$0
-Real	ZARZAMORA	2026	43	$0
-Real	ZARZAMORA	2026	44	$0
-Real	ZARZAMORA	2026	45	$0
-Real	ZARZAMORA	2026	46	$0
-Real	ZARZAMORA	2026	47	$0
-Real	ZARZAMORA	2026	48	$0
-Real	ZARZAMORA	2026	49	$0
-Real	ZARZAMORA	2026	50	$0
-Real	ZARZAMORA	2026	51	$0
-Real	ZARZAMORA	2026	52	$0
-Real	ZARZAMORA	2027	1	$0
-Real	ZARZAMORA	2027	2	$0
-Real	ZARZAMORA	2027	3	$0
-Real	ZARZAMORA	2027	4	$0
-Real	ZARZAMORA	2027	5	$0
-Real	ZARZAMORA	2027	6	$0
-Real	ZARZAMORA	2027	7	$0
-Real	ZARZAMORA	2027	8	$0
-Real	ZARZAMORA	2027	9	$0
-Real	ZARZAMORA	2027	10	$0
-Real	ZARZAMORA	2027	11	$0
-Real	ZARZAMORA	2027	12	$0
-Real	ZARZAMORA	2027	13	$0
-Real	ZARZAMORA	2027	14	$0
-Real	ZARZAMORA	2027	15	$0
-Real	ZARZAMORA	2027	16	$0
-Real	ZARZAMORA	2027	17	$0
-Real	ZARZAMORA	2027	18	$0
-Real	ZARZAMORA	2027	19	$0
-Real	ZARZAMORA	2027	20	$0
-Real	ZARZAMORA	2027	21	$0
-Real	ZARZAMORA	2027	22	$0
-Real	ZARZAMORA	2027	23	$0
-Real	ZARZAMORA	2027	24	$0
-Real	ZARZAMORA	2027	25	$0
-Real	ZARZAMORA	2027	26	$0
-Real	ZARZAMORA	2027	27	$0
-Real	ZARZAMORA	2027	28	$0`,
   presupuesto: `Egreso	Cultivo	ejercicio	semana	Importe
 Presupuesto	AGUACATE	2026	26	$127,862,028
 Presupuesto	AGUACATE	2026	27	$4,825,763
@@ -2198,6 +1804,443 @@ Presupuesto	ZARZAMORA	2027	25	$3,365,892
 Presupuesto	ZARZAMORA	2027	26	$1,348,037
 Presupuesto	ZARZAMORA	2027	27	$2,581,442
 Presupuesto	ZARZAMORA	2027	28	$669`,
+  real: `Egreso	Cultivo	ejercicio	semana	Importe acumulado
+Real	AGUACATE	2026	26	$0
+Real	AGUACATE	2026	27	$195,285,603
+Real	AGUACATE	2026	28	$198,387,549
+Real	AGUACATE	2026	29	$202,079,299
+Real	AGUACATE	2026	30	$213,492,043
+Real	AGUACATE	2026	31	$226,106,233
+Real	AGUACATE	2026	32	$229,843,022
+Real	AGUACATE	2026	33	$235,850,257
+Real	AGUACATE	2026	34	$236,677,977
+Real	AGUACATE	2026	35	$236,677,977
+Real	AGUACATE	2026	36	$0
+Real	AGUACATE	2026	37	$0
+Real	AGUACATE	2026	38	$0
+Real	AGUACATE	2026	39	$0
+Real	AGUACATE	2026	40	$0
+Real	AGUACATE	2026	41	$0
+Real	AGUACATE	2026	42	$0
+Real	AGUACATE	2026	43	$0
+Real	AGUACATE	2026	44	$0
+Real	AGUACATE	2026	45	$0
+Real	AGUACATE	2026	46	$0
+Real	AGUACATE	2026	47	$0
+Real	AGUACATE	2026	48	$0
+Real	AGUACATE	2026	49	$0
+Real	AGUACATE	2026	50	$0
+Real	AGUACATE	2026	51	$0
+Real	AGUACATE	2026	52	$0
+Real	AGUACATE	2027	1	$0
+Real	AGUACATE	2027	2	$0
+Real	AGUACATE	2027	3	$0
+Real	AGUACATE	2027	4	$0
+Real	AGUACATE	2027	5	$0
+Real	AGUACATE	2027	6	$0
+Real	AGUACATE	2027	7	$0
+Real	AGUACATE	2027	8	$0
+Real	AGUACATE	2027	9	$0
+Real	AGUACATE	2027	10	$0
+Real	AGUACATE	2027	11	$0
+Real	AGUACATE	2027	12	$0
+Real	AGUACATE	2027	13	$0
+Real	AGUACATE	2027	14	$0
+Real	AGUACATE	2027	15	$0
+Real	AGUACATE	2027	16	$0
+Real	AGUACATE	2027	17	$0
+Real	AGUACATE	2027	18	$0
+Real	AGUACATE	2027	19	$0
+Real	AGUACATE	2027	20	$0
+Real	AGUACATE	2027	21	$0
+Real	AGUACATE	2027	22	$0
+Real	AGUACATE	2027	23	$0
+Real	AGUACATE	2027	24	$0
+Real	AGUACATE	2027	25	$0
+Real	AGUACATE	2027	26	$0
+Real	ARANDANO	2026	26	$0
+Real	ARANDANO	2026	27	$8,400,652
+Real	ARANDANO	2026	28	$11,944,885
+Real	ARANDANO	2026	29	$16,366,836
+Real	ARANDANO	2026	30	$25,351,433
+Real	ARANDANO	2026	31	$36,284,223
+Real	ARANDANO	2026	32	$38,724,354
+Real	ARANDANO	2026	33	$46,463,932
+Real	ARANDANO	2026	34	$48,595,854
+Real	ARANDANO	2026	35	$48,595,854
+Real	ARANDANO	2026	36	$0
+Real	ARANDANO	2026	37	$0
+Real	ARANDANO	2026	38	$0
+Real	ARANDANO	2026	39	$0
+Real	ARANDANO	2026	40	$0
+Real	ARANDANO	2026	41	$0
+Real	ARANDANO	2026	42	$0
+Real	ARANDANO	2026	43	$0
+Real	ARANDANO	2026	44	$0
+Real	ARANDANO	2026	45	$0
+Real	ARANDANO	2026	46	$0
+Real	ARANDANO	2026	47	$0
+Real	ARANDANO	2026	48	$0
+Real	ARANDANO	2026	49	$0
+Real	ARANDANO	2026	50	$0
+Real	ARANDANO	2026	51	$0
+Real	ARANDANO	2026	52	$0
+Real	ARANDANO	2027	1	$0
+Real	ARANDANO	2027	2	$0
+Real	ARANDANO	2027	3	$0
+Real	ARANDANO	2027	4	$0
+Real	ARANDANO	2027	5	$0
+Real	ARANDANO	2027	6	$0
+Real	ARANDANO	2027	7	$0
+Real	ARANDANO	2027	8	$0
+Real	ARANDANO	2027	9	$0
+Real	ARANDANO	2027	10	$0
+Real	ARANDANO	2027	11	$0
+Real	ARANDANO	2027	12	$0
+Real	ARANDANO	2027	13	$0
+Real	ARANDANO	2027	14	$0
+Real	ARANDANO	2027	15	$0
+Real	ARANDANO	2027	16	$0
+Real	ARANDANO	2027	17	$0
+Real	ARANDANO	2027	18	$0
+Real	ARANDANO	2027	19	$0
+Real	ARANDANO	2027	20	$0
+Real	ARANDANO	2027	21	$0
+Real	ARANDANO	2027	22	$0
+Real	ARANDANO	2027	23	$0
+Real	ARANDANO	2027	24	$0
+Real	ARANDANO	2027	25	$0
+Real	ARANDANO	2027	26	$0
+Real	ARANDANO	2027	27	$0
+Real	ARANDANO	2027	28	$0
+Real	EMPAQUE	2026	26	$0
+Real	EMPAQUE	2026	27	$169,502
+Real	EMPAQUE	2026	28	$867,659
+Real	EMPAQUE	2026	29	$1,284,658
+Real	EMPAQUE	2026	30	$1,577,465
+Real	EMPAQUE	2026	31	$2,684,794
+Real	EMPAQUE	2026	32	$2,893,986
+Real	EMPAQUE	2026	33	$3,186,555
+Real	EMPAQUE	2026	34	$6,533,558
+Real	EMPAQUE	2026	35	$4,968,113
+Real	EMPAQUE	2026	36	$0
+Real	EMPAQUE	2026	37	$0
+Real	EMPAQUE	2026	38	$0
+Real	EMPAQUE	2026	39	$0
+Real	EMPAQUE	2026	40	$0
+Real	EMPAQUE	2026	41	$0
+Real	EMPAQUE	2026	42	$0
+Real	EMPAQUE	2026	43	$0
+Real	EMPAQUE	2026	44	$0
+Real	EMPAQUE	2026	45	$0
+Real	EMPAQUE	2026	46	$0
+Real	EMPAQUE	2026	47	$0
+Real	EMPAQUE	2026	48	$0
+Real	EMPAQUE	2026	49	$0
+Real	EMPAQUE	2026	50	$0
+Real	EMPAQUE	2026	51	$0
+Real	EMPAQUE	2026	52	$0
+Real	EMPAQUE	2027	1	$0
+Real	EMPAQUE	2027	2	$0
+Real	EMPAQUE	2027	3	$0
+Real	EMPAQUE	2027	4	$0
+Real	EMPAQUE	2027	5	$0
+Real	EMPAQUE	2027	6	$0
+Real	EMPAQUE	2027	7	$0
+Real	EMPAQUE	2027	8	$0
+Real	EMPAQUE	2027	9	$0
+Real	EMPAQUE	2027	10	$0
+Real	EMPAQUE	2027	11	$0
+Real	EMPAQUE	2027	12	$0
+Real	EMPAQUE	2027	13	$0
+Real	EMPAQUE	2027	14	$0
+Real	EMPAQUE	2027	15	$0
+Real	EMPAQUE	2027	16	$0
+Real	EMPAQUE	2027	17	$0
+Real	EMPAQUE	2027	18	$0
+Real	EMPAQUE	2027	19	$0
+Real	EMPAQUE	2027	20	$0
+Real	EMPAQUE	2027	21	$0
+Real	EMPAQUE	2027	22	$0
+Real	EMPAQUE	2027	23	$0
+Real	EMPAQUE	2027	24	$0
+Real	EMPAQUE	2027	25	$0
+Real	EMPAQUE	2027	26	$0
+Real	EMPAQUE	2027	27	$0
+Real	EMPAQUE	2027	28	$0
+Real	ESPARRAGO	2026	26	$0
+Real	ESPARRAGO	2026	27	$120,040,414
+Real	ESPARRAGO	2026	28	$124,086,452
+Real	ESPARRAGO	2026	29	$129,481,973
+Real	ESPARRAGO	2026	30	$137,503,242
+Real	ESPARRAGO	2026	31	$145,293,922
+Real	ESPARRAGO	2026	32	$152,781,341
+Real	ESPARRAGO	2026	33	$161,239,405
+Real	ESPARRAGO	2026	34	$163,460,246
+Real	ESPARRAGO	2026	35	$163,460,246
+Real	ESPARRAGO	2026	36	$0
+Real	ESPARRAGO	2026	37	$0
+Real	ESPARRAGO	2026	38	$0
+Real	ESPARRAGO	2026	39	$0
+Real	ESPARRAGO	2026	40	$0
+Real	ESPARRAGO	2026	41	$0
+Real	ESPARRAGO	2026	42	$0
+Real	ESPARRAGO	2026	43	$0
+Real	ESPARRAGO	2026	44	$0
+Real	ESPARRAGO	2026	45	$0
+Real	ESPARRAGO	2026	46	$0
+Real	ESPARRAGO	2026	47	$0
+Real	ESPARRAGO	2026	48	$0
+Real	ESPARRAGO	2026	49	$0
+Real	ESPARRAGO	2026	50	$0
+Real	ESPARRAGO	2026	51	$0
+Real	ESPARRAGO	2026	52	$0
+Real	ESPARRAGO	2027	1	$0
+Real	ESPARRAGO	2027	2	$0
+Real	ESPARRAGO	2027	3	$0
+Real	ESPARRAGO	2027	4	$0
+Real	ESPARRAGO	2027	5	$0
+Real	ESPARRAGO	2027	6	$0
+Real	ESPARRAGO	2027	7	$0
+Real	ESPARRAGO	2027	8	$0
+Real	ESPARRAGO	2027	9	$0
+Real	ESPARRAGO	2027	10	$0
+Real	ESPARRAGO	2027	11	$0
+Real	ESPARRAGO	2027	12	$0
+Real	ESPARRAGO	2027	13	$0
+Real	ESPARRAGO	2027	14	$0
+Real	ESPARRAGO	2027	15	$0
+Real	ESPARRAGO	2027	16	$0
+Real	ESPARRAGO	2027	17	$0
+Real	ESPARRAGO	2027	18	$0
+Real	ESPARRAGO	2027	19	$0
+Real	ESPARRAGO	2027	20	$0
+Real	ESPARRAGO	2027	21	$0
+Real	ESPARRAGO	2027	22	$0
+Real	ESPARRAGO	2027	23	$0
+Real	ESPARRAGO	2027	24	$0
+Real	ESPARRAGO	2027	25	$0
+Real	ESPARRAGO	2027	26	$0
+Real	ESPARRAGO	2027	27	$0
+Real	ESPARRAGO	2027	28	$0
+Real	FRAMBUESA	2026	26	$0
+Real	FRAMBUESA	2026	27	$37,767,980
+Real	FRAMBUESA	2026	28	$44,487,250
+Real	FRAMBUESA	2026	29	$50,914,435
+Real	FRAMBUESA	2026	30	$63,743,691
+Real	FRAMBUESA	2026	31	$74,537,956
+Real	FRAMBUESA	2026	32	$79,676,008
+Real	FRAMBUESA	2026	33	$91,231,055
+Real	FRAMBUESA	2026	34	$96,164,780
+Real	FRAMBUESA	2026	35	$96,164,780
+Real	FRAMBUESA	2026	36	$0
+Real	FRAMBUESA	2026	37	$0
+Real	FRAMBUESA	2026	38	$0
+Real	FRAMBUESA	2026	39	$0
+Real	FRAMBUESA	2026	40	$0
+Real	FRAMBUESA	2026	41	$0
+Real	FRAMBUESA	2026	42	$0
+Real	FRAMBUESA	2026	43	$0
+Real	FRAMBUESA	2026	44	$0
+Real	FRAMBUESA	2026	45	$0
+Real	FRAMBUESA	2026	46	$0
+Real	FRAMBUESA	2026	47	$0
+Real	FRAMBUESA	2026	48	$0
+Real	FRAMBUESA	2026	49	$0
+Real	FRAMBUESA	2026	50	$0
+Real	FRAMBUESA	2026	51	$0
+Real	FRAMBUESA	2026	52	$0
+Real	FRAMBUESA	2027	1	$0
+Real	FRAMBUESA	2027	2	$0
+Real	FRAMBUESA	2027	3	$0
+Real	FRAMBUESA	2027	4	$0
+Real	FRAMBUESA	2027	5	$0
+Real	FRAMBUESA	2027	6	$0
+Real	FRAMBUESA	2027	7	$0
+Real	FRAMBUESA	2027	8	$0
+Real	FRAMBUESA	2027	9	$0
+Real	FRAMBUESA	2027	10	$0
+Real	FRAMBUESA	2027	11	$0
+Real	FRAMBUESA	2027	12	$0
+Real	FRAMBUESA	2027	13	$0
+Real	FRAMBUESA	2027	14	$0
+Real	FRAMBUESA	2027	15	$0
+Real	FRAMBUESA	2027	16	$0
+Real	FRAMBUESA	2027	17	$0
+Real	FRAMBUESA	2027	18	$0
+Real	FRAMBUESA	2027	19	$0
+Real	FRAMBUESA	2027	20	$0
+Real	FRAMBUESA	2027	21	$0
+Real	FRAMBUESA	2027	22	$0
+Real	FRAMBUESA	2027	23	$0
+Real	FRAMBUESA	2027	24	$0
+Real	FRAMBUESA	2027	25	$0
+Real	FRAMBUESA	2027	26	$0
+Real	FRAMBUESA	2027	27	$0
+Real	FRESA	2026	26	$0
+Real	FRESA	2026	27	$73,705,561
+Real	FRESA	2026	28	$83,357,290
+Real	FRESA	2026	29	$90,790,459
+Real	FRESA	2026	30	$115,108,529
+Real	FRESA	2026	31	$128,912,770
+Real	FRESA	2026	32	$140,145,564
+Real	FRESA	2026	33	$159,602,256
+Real	FRESA	2026	34	$168,669,119
+Real	FRESA	2026	35	$168,669,119
+Real	FRESA	2026	36	$0
+Real	FRESA	2026	37	$0
+Real	FRESA	2026	38	$0
+Real	FRESA	2026	39	$0
+Real	FRESA	2026	40	$0
+Real	FRESA	2026	41	$0
+Real	FRESA	2026	42	$0
+Real	FRESA	2026	43	$0
+Real	FRESA	2026	44	$0
+Real	FRESA	2026	45	$0
+Real	FRESA	2026	46	$0
+Real	FRESA	2026	47	$0
+Real	FRESA	2026	48	$0
+Real	FRESA	2026	49	$0
+Real	FRESA	2026	50	$0
+Real	FRESA	2026	51	$0
+Real	FRESA	2026	52	$0
+Real	FRESA	2027	1	$0
+Real	FRESA	2027	2	$0
+Real	FRESA	2027	3	$0
+Real	FRESA	2027	4	$0
+Real	FRESA	2027	5	$0
+Real	FRESA	2027	6	$0
+Real	FRESA	2027	7	$0
+Real	FRESA	2027	8	$0
+Real	FRESA	2027	9	$0
+Real	FRESA	2027	10	$0
+Real	FRESA	2027	11	$0
+Real	FRESA	2027	12	$0
+Real	FRESA	2027	13	$0
+Real	FRESA	2027	14	$0
+Real	FRESA	2027	15	$0
+Real	FRESA	2027	16	$0
+Real	FRESA	2027	17	$0
+Real	FRESA	2027	18	$0
+Real	FRESA	2027	19	$0
+Real	FRESA	2027	20	$0
+Real	FRESA	2027	21	$0
+Real	FRESA	2027	22	$0
+Real	FRESA	2027	23	$0
+Real	FRESA	2027	24	$0
+Real	FRESA	2027	25	$0
+Real	FRESA	2027	26	$0
+Real	FRESA	2027	27	$0
+Real	FRESA	2027	28	$0
+Real	PAPA	2026	26	$0
+Real	PAPA	2026	27	$12,850,722
+Real	PAPA	2026	28	$15,542,932
+Real	PAPA	2026	29	$16,914,450
+Real	PAPA	2026	30	$20,630,867
+Real	PAPA	2026	31	$22,279,068
+Real	PAPA	2026	32	$21,669,112
+Real	PAPA	2026	33	$23,651,991
+Real	PAPA	2026	34	$24,481,804
+Real	PAPA	2026	35	$24,481,804
+Real	PAPA	2026	36	$0
+Real	PAPA	2026	37	$0
+Real	PAPA	2026	38	$0
+Real	PAPA	2026	39	$0
+Real	PAPA	2026	40	$0
+Real	PAPA	2026	41	$0
+Real	PAPA	2026	42	$0
+Real	PAPA	2026	43	$0
+Real	PAPA	2026	44	$0
+Real	PAPA	2026	45	$0
+Real	PAPA	2026	46	$0
+Real	PAPA	2026	47	$0
+Real	PAPA	2026	48	$0
+Real	PAPA	2026	49	$0
+Real	PAPA	2026	50	$0
+Real	PAPA	2026	51	$0
+Real	PAPA	2026	52	$0
+Real	PAPA	2027	1	$0
+Real	PAPA	2027	2	$0
+Real	PAPA	2027	3	$0
+Real	PAPA	2027	4	$0
+Real	PAPA	2027	5	$0
+Real	PAPA	2027	6	$0
+Real	PAPA	2027	7	$0
+Real	PAPA	2027	8	$0
+Real	PAPA	2027	9	$0
+Real	PAPA	2027	10	$0
+Real	PAPA	2027	11	$0
+Real	PAPA	2027	12	$0
+Real	PAPA	2027	13	$0
+Real	PAPA	2027	14	$0
+Real	PAPA	2027	15	$0
+Real	PAPA	2027	16	$0
+Real	PAPA	2027	17	$0
+Real	PAPA	2027	18	$0
+Real	PAPA	2027	19	$0
+Real	PAPA	2027	20	$0
+Real	PAPA	2027	21	$0
+Real	PAPA	2027	22	$0
+Real	PAPA	2027	23	$0
+Real	PAPA	2027	24	$0
+Real	PAPA	2027	25	$0
+Real	PAPA	2027	26	$0
+Real	PAPA	2027	27	$0
+Real	ZARZAMORA	2026	26	$0
+Real	ZARZAMORA	2026	27	$11,346,037
+Real	ZARZAMORA	2026	28	$13,751,738
+Real	ZARZAMORA	2026	29	$17,226,386
+Real	ZARZAMORA	2026	30	$23,097,593
+Real	ZARZAMORA	2026	31	$28,780,496
+Real	ZARZAMORA	2026	32	$30,834,366
+Real	ZARZAMORA	2026	33	$35,476,936
+Real	ZARZAMORA	2026	34	$36,529,912
+Real	ZARZAMORA	2026	35	$36,529,912
+Real	ZARZAMORA	2026	36	$0
+Real	ZARZAMORA	2026	37	$0
+Real	ZARZAMORA	2026	38	$0
+Real	ZARZAMORA	2026	39	$0
+Real	ZARZAMORA	2026	40	$0
+Real	ZARZAMORA	2026	41	$0
+Real	ZARZAMORA	2026	42	$0
+Real	ZARZAMORA	2026	43	$0
+Real	ZARZAMORA	2026	44	$0
+Real	ZARZAMORA	2026	45	$0
+Real	ZARZAMORA	2026	46	$0
+Real	ZARZAMORA	2026	47	$0
+Real	ZARZAMORA	2026	48	$0
+Real	ZARZAMORA	2026	49	$0
+Real	ZARZAMORA	2026	50	$0
+Real	ZARZAMORA	2026	51	$0
+Real	ZARZAMORA	2026	52	$0
+Real	ZARZAMORA	2027	1	$0
+Real	ZARZAMORA	2027	2	$0
+Real	ZARZAMORA	2027	3	$0
+Real	ZARZAMORA	2027	4	$0
+Real	ZARZAMORA	2027	5	$0
+Real	ZARZAMORA	2027	6	$0
+Real	ZARZAMORA	2027	7	$0
+Real	ZARZAMORA	2027	8	$0
+Real	ZARZAMORA	2027	9	$0
+Real	ZARZAMORA	2027	10	$0
+Real	ZARZAMORA	2027	11	$0
+Real	ZARZAMORA	2027	12	$0
+Real	ZARZAMORA	2027	13	$0
+Real	ZARZAMORA	2027	14	$0
+Real	ZARZAMORA	2027	15	$0
+Real	ZARZAMORA	2027	16	$0
+Real	ZARZAMORA	2027	17	$0
+Real	ZARZAMORA	2027	18	$0
+Real	ZARZAMORA	2027	19	$0
+Real	ZARZAMORA	2027	20	$0
+Real	ZARZAMORA	2027	21	$0
+Real	ZARZAMORA	2027	22	$0
+Real	ZARZAMORA	2027	23	$0
+Real	ZARZAMORA	2027	24	$0
+Real	ZARZAMORA	2027	25	$0
+Real	ZARZAMORA	2027	26	$0
+Real	ZARZAMORA	2027	27	$0
+Real	ZARZAMORA	2027	28	$0`,
   proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe acumulado
 Proyección	AGUACATE	2026	26	$0
 Proyección	AGUACATE	2026	27	$195,285,603
@@ -2636,16 +2679,8 @@ Proyección	ZARZAMORA	2027	26	0
 Proyección	ZARZAMORA	2027	27	0
 Proyección	ZARZAMORA	2027	28	$0`
  },
- ingreso: {
-  real: ``,
-  presupuesto: ``,
-  proyeccion: ``
- },
- produccion: {
-  real: ``,
-  presupuesto: ``,
-  proyeccion: ``
- }
+ ingreso: { real:'', presupuesto:'', proyeccion:'' },
+ produccion: { real:'', presupuesto:'', proyeccion:'' }
 };
 
 function slotId(tipo,variable){ return `slot_${tipo}_${variable}`; }
