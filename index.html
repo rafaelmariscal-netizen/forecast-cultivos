@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Forecast de Cultivos</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -267,6 +272,7 @@
           <option value="polinomial">📈 Regresión polinomial (grado 2)</option>
           <option value="promedio">📋 Promedio histórico</option>
           <option value="movil">🔄 Promedio móvil (12 semanas)</option>
+          <option value="estacional">📐 Variación estacional (método Excel)</option>
         </select>
       </div>
       <p class="hint">El forecast corre semana a semana sobre los datos <b>Real</b> y se agrega a nivel mes. El tipo de cambio solo afecta a los cultivos de exportación — papa se vende en mercado nacional.</p>
@@ -458,6 +464,22 @@ const CROP_PROFILES = {
   PAPA:       { weeklyKg: 26000,priceUsd: null, priceMxn: 9.4, weeklyEgreso: 215000, growth: 0.01 }
 };
 
+// Tasas de variación semanal (temporada 26-27) extraídas de la hoja "Egresos T2627 Sem" del Excel
+// de Rafael (bloque "Var. T2526", filas 30-38), usadas como respaldo del método "Variación
+// estacional" cuando todavía no hay suficiente historia real cargada para calcularlas en vivo. Ojo:
+// el Excel original tiene un bug de desfase de filas donde Frambuesa/Zarzamora/Aguacate terminan
+// aplicando la curva de variación del cultivo de arriba; aquí las tasas ya están reasignadas al
+// cultivo correcto. Clave "AAAA-S" = año calendario ISO + semana ISO.
+const VARIACION_SEASONAL_RATES_DEFAULT = {
+  FRESA: {"2026-28":0.04,"2026-29":0.05,"2026-30":0.06,"2026-31":0.1,"2026-32":0.05,"2026-33":0.06,"2026-34":0.05,"2026-35":0.76,"2026-36":0.05,"2026-37":0.06,"2026-38":0.04,"2026-39":0.05,"2026-40":0.04,"2026-41":0.04,"2026-42":0.04,"2026-43":0.04,"2026-44":0.17,"2026-45":0.02,"2026-46":0.03,"2026-47":0.03,"2026-48":0.04,"2026-49":0.03,"2026-50":0.02,"2026-51":0.06,"2026-52":0.04,"2027-1":0.02,"2027-2":0.04,"2027-3":0.04,"2027-4":0.04,"2027-5":0.06,"2027-6":0.04,"2027-7":0.05,"2027-8":0.03,"2027-9":0.03,"2027-10":0.01,"2027-11":0.03,"2027-12":0.02,"2027-13":0.02,"2027-14":0.01,"2027-15":0.01,"2027-16":0.02,"2027-17":0.01,"2027-18":0.02,"2027-19":0.02,"2027-20":0.02,"2027-21":0.01,"2027-22":0.04,"2027-23":0.01,"2027-24":0.01,"2027-25":0.02,"2027-26":0.02,"2027-27":0.02},
+  FRAMBUESA: {"2026-28":0.31,"2026-29":0.18,"2026-30":0.2,"2026-31":0.24,"2026-32":0.15,"2026-33":0.12,"2026-34":0.09,"2026-35":0.16,"2026-36":0.1,"2026-37":0.1,"2026-38":0.1,"2026-39":0.1,"2026-40":0.09,"2026-41":0.06,"2026-42":0.05,"2026-43":0.06,"2026-44":0.07,"2026-45":0.04,"2026-46":0.04,"2026-47":0.06,"2026-48":0.06,"2026-49":0.05,"2026-50":0.04,"2026-51":0.06,"2026-52":0.04,"2027-1":0.02,"2027-2":0.03,"2027-3":0.05,"2027-4":0.06,"2027-5":0.06,"2027-6":0.05,"2027-7":0.05,"2027-8":0.04,"2027-9":0.03,"2027-10":0.07,"2027-11":0.03,"2027-12":0.05,"2027-13":0.05,"2027-14":0.01,"2027-15":0.05,"2027-16":0.03,"2027-17":0.02,"2027-18":0.05,"2027-19":0.04,"2027-20":0.05,"2027-21":0.02,"2027-22":0.05,"2027-23":0.02,"2027-24":0.02,"2027-25":0.02,"2027-26":0.02,"2027-27":0.04},
+  ZARZAMORA: {"2026-28":0.01,"2026-29":0.02,"2026-30":0.02,"2026-31":0.02,"2026-32":0.02,"2026-33":0.02,"2026-34":0.02,"2026-35":0.02,"2026-36":0.01,"2026-37":0.02,"2026-38":0.02,"2026-39":0.01,"2026-40":0.02,"2026-41":0.02,"2026-42":0.02,"2026-43":0.05,"2026-44":0.04,"2026-45":0.02,"2026-46":0.02,"2026-47":0.02,"2026-48":0.05,"2026-49":0.03,"2026-50":0.02,"2026-51":0.05,"2026-52":0.03,"2027-1":0.03,"2027-2":0.02,"2027-3":0.02,"2027-4":0.06,"2027-5":0.04,"2027-6":0.01,"2027-7":0.04,"2027-8":0.04,"2027-9":0.03,"2027-10":0.01,"2027-11":0.04,"2027-12":0.05,"2027-13":0.03,"2027-14":0.01,"2027-15":0.03,"2027-16":0.02,"2027-17":0.04,"2027-18":0.03,"2027-19":0.02,"2027-20":0.01,"2027-21":0.02,"2027-22":0.04,"2027-23":0.03,"2027-24":0.02,"2027-25":0.03,"2027-26":0.04,"2027-27":0.01},
+  ARANDANO: {"2026-28":0.1,"2026-29":0.11,"2026-30":0.2,"2026-31":0.08,"2026-32":0.05,"2026-33":0.11,"2026-34":0.04,"2026-35":0.15,"2026-36":0.06,"2026-37":0.06,"2026-38":0.03,"2026-39":0.09,"2026-40":0.04,"2026-41":0.03,"2026-42":0.03,"2026-43":0.08,"2026-44":0.04,"2026-45":0.02,"2026-46":0.02,"2026-47":0.07,"2026-48":0.02,"2026-49":0.03,"2026-50":0.03,"2026-51":0.04,"2026-52":0.06,"2027-1":0.02,"2027-2":0.02,"2027-3":0.02,"2027-4":0.02,"2027-5":0.07,"2027-6":0.03,"2027-7":0.03,"2027-8":0.06,"2027-9":0.04,"2027-10":0.02,"2027-11":0.02,"2027-12":0.03,"2027-13":0.04,"2027-14":0.02,"2027-15":0.02,"2027-16":0.02,"2027-17":0.01,"2027-18":0.05,"2027-19":0.02,"2027-20":0.04,"2027-21":0.01,"2027-22":0.07,"2027-23":0.03,"2027-24":0.02,"2027-25":0.01,"2027-26":0.01,"2027-27":0.01},
+  ESPARRAGO: {"2026-28":0.05,"2026-29":0.06,"2026-30":0.05,"2026-31":0.04,"2026-32":0.03,"2026-33":0.06,"2026-34":0.06,"2026-35":0.05,"2026-36":0.04,"2026-37":0.03,"2026-38":0.06,"2026-39":0.04,"2026-40":0.04,"2026-41":0.03,"2026-42":0.04,"2026-43":0.04,"2026-44":0.02,"2026-45":0.03,"2026-46":0.03,"2026-47":0.03,"2026-48":0.02,"2026-49":0.02,"2026-50":0.02,"2026-51":0.04,"2026-52":0.02,"2027-1":0.02,"2027-2":0.02,"2027-3":0.03,"2027-4":0.02,"2027-5":0.03,"2027-6":0.02,"2027-7":0.02,"2027-8":0.02,"2027-9":0.02,"2027-10":0.01,"2027-11":0.01,"2027-12":0.01,"2027-13":0.02,"2027-14":0.0,"2027-15":0.01,"2027-16":0.02,"2027-17":0.02,"2027-18":0.01,"2027-19":0.01,"2027-20":0.02,"2027-21":0.02,"2027-22":0.02,"2027-23":0.02,"2027-24":0.02,"2027-25":0.01,"2027-26":0.01,"2027-27":0.01},
+  AGUACATE: {"2026-28":0.15,"2026-29":0.09,"2026-30":0.12,"2026-31":0.18,"2026-32":0.06,"2026-33":0.11,"2026-34":0.08,"2026-35":0.12,"2026-36":0.13,"2026-37":0.07,"2026-38":0.11,"2026-39":0.11,"2026-40":0.13,"2026-41":0.12,"2026-42":0.08,"2026-43":0.09,"2026-44":0.1,"2026-45":0.06,"2026-46":0.05,"2026-47":0.05,"2026-48":0.05,"2026-49":0.06,"2026-50":0.04,"2026-51":0.05,"2026-52":0.04,"2027-1":0.02,"2027-2":0.02,"2027-3":0.03,"2027-4":0.04,"2027-5":0.05,"2027-6":0.03,"2027-7":0.04,"2027-8":0.02,"2027-9":0.04,"2027-10":0.04,"2027-11":0.04,"2027-12":0.06,"2027-13":0.04,"2027-14":0.03,"2027-15":0.06,"2027-16":0.06,"2027-17":0.05,"2027-18":0.03,"2027-19":0.02,"2027-20":0.02,"2027-21":0.02,"2027-22":0.03,"2027-23":0.03,"2027-24":0.02,"2027-25":0.02,"2027-26":0.02,"2027-27":0.02},
+  PAPA: {"2026-28":0.1,"2026-29":0.29,"2026-30":0.33,"2026-31":0.16,"2026-32":0.07,"2026-33":0.09,"2026-34":0.12,"2026-35":0.07,"2026-36":0.04,"2026-37":0.06,"2026-38":0.11,"2026-39":0.04,"2026-40":0.05,"2026-41":0.06,"2026-42":0.05,"2026-43":0.11,"2026-44":0.08,"2026-45":0.07,"2026-46":0.1,"2026-47":0.04,"2026-48":0.07,"2026-49":0.05,"2026-50":0.04,"2026-51":0.05,"2026-52":0.03,"2027-1":0.04,"2027-2":0.05,"2027-3":0.05,"2027-4":0.03,"2027-5":0.05,"2027-6":0.02,"2027-7":0.08,"2027-8":0.03,"2027-9":0.05,"2027-10":0.01,"2027-11":0.03,"2027-12":0.03,"2027-13":0.03,"2027-14":0.01,"2027-15":0.02,"2027-16":0.01,"2027-17":0.02,"2027-18":0.01,"2027-19":0.01,"2027-20":0.01,"2027-21":0.02,"2027-22":0.02,"2027-23":0.01,"2027-24":0.01,"2027-25":0.0,"2027-26":0.02,"2027-27":0.02},
+};
+
 /* ============================================================
    2. DATE / SEASON HELPERS
    ============================================================ */
@@ -490,6 +512,30 @@ function isoWeekToDate(year, week){
   const jan4DayMon0 = (jan4.getUTCDay()+6)%7; // lunes=0
   const week1Monday = new Date(jan4.getTime() - jan4DayMon0*DAY_MS);
   return new Date(week1Monday.getTime() + (week-1)*7*DAY_MS);
+}
+// Inversa de isoWeekToDate: dada una fecha cualquiera, regresa {y,w} (año calendario ISO + semana
+// ISO 1-52/53) — usada por el método "Variación estacional" para ubicar, semana a semana, qué tasa
+// de variación de la temporada anterior le corresponde a cada semana proyectada, sin importar si la
+// fecha vino de un ejercicio "AA-AA" o de un año calendario. Se revisa primero el año calendario de
+// la propia fecha (y solo como respaldo el anterior/siguiente) para evitar la ambigüedad típica de
+// fin de año, donde un lunes puede describirse como "semana 53 del año Y" o "semana 1 del año Y+1";
+// se prefiere cualquier resultado en el rango 1-52 antes que caer en una semana 53.
+function dateToWeekYear(d){
+  let fallback53 = null;
+  for(const y of [d.getUTCFullYear(), d.getUTCFullYear()-1, d.getUTCFullYear()+1]){
+    const jan4 = new Date(Date.UTC(y,0,4));
+    const jan4DayMon0 = (jan4.getUTCDay()+6)%7;
+    const week1Monday = new Date(jan4.getTime() - jan4DayMon0*DAY_MS);
+    const diffWeeks = Math.round((d.getTime()-week1Monday.getTime())/(7*DAY_MS));
+    if(diffWeeks>=0 && diffWeeks<52) return { y, w: diffWeeks+1 };
+    if(diffWeeks===52 && !fallback53) fallback53 = { y, w: 53 };
+  }
+  if(fallback53) return fallback53;
+  const y = d.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(y,0,4));
+  const jan4DayMon0 = (jan4.getUTCDay()+6)%7;
+  const week1Monday = new Date(jan4.getTime() - jan4DayMon0*DAY_MS);
+  return { y, w: Math.round((d.getTime()-week1Monday.getTime())/(7*DAY_MS))+1 };
 }
 function resolveRowDate(ejercicioRaw, semana){
   // Acepta dos formatos de "ejercicio": temporada "AA-AA" (semana 1-52 desde julio) o año calendario "AAAA" + semana ISO del año
@@ -792,7 +838,64 @@ function solve3x3(A, B){
   return [det3(withCol(A,0,B))/D, det3(withCol(A,1,B))/D, det3(withCol(A,2,B))/D];
 }
 
-function computeMethodModel(sortedRecords, method){
+// Calcula, para un cultivo/variable dado, la tasa de variación semana-a-semana de la temporada
+// anterior (misma mecánica que el bloque "Var. T2526" del Excel, pero derivada en vivo de los
+// datos Real cargados en vez de un valor fijo): para cada semana de la temporada previa, la
+// variación % contra la semana anterior se guarda bajo la clave año-semana ISO que le
+// correspondería 52 semanas después (es decir, la semana equivalente de la temporada actual).
+// Devuelve null si no hay al menos dos temporadas con suficiente historia real, para que el
+// llamador pueda caer de vuelta a VARIACION_SEASONAL_RATES_DEFAULT.
+function computeSeasonalRatesFromHistory(variable, crop){
+  const all = state.raw[variable].filter(r=>r.tipo==='real' && r.cultivo===crop).sort((a,b)=>a.date-b.date);
+  if(all.length<10) return null;
+  const bySeason = {};
+  all.forEach(r=>{ const s=getSeasonLabel(r.date); (bySeason[s]=bySeason[s]||[]).push(r); });
+  const seasons = Object.keys(bySeason).sort();
+  if(seasons.length<2) return null;
+  const priorRows = bySeason[seasons[seasons.length-2]].sort((a,b)=>a.date-b.date);
+  if(priorRows.length<10) return null;
+  const rates = {};
+  for(let i=1;i<priorRows.length;i++){
+    const prev = priorRows[i-1].importe, cur = priorRows[i].importe;
+    if(prev>0){
+      const shifted = new Date(priorRows[i].date.getTime() + 52*7*DAY_MS);
+      const {y,w} = dateToWeekYear(shifted);
+      rates[y+'-'+w] = (cur/prev)-1;
+    }
+  }
+  return Object.keys(rates).length ? rates : null;
+}
+
+// Método "Variación estacional (método Excel)": reproduce la fórmula real que Rafael usa en su
+// Excel para proyectar (hoja "Egresos T2627 Sem"): cada semana proyectada = semana anterior ×
+// (1 + variación % que tuvo esa misma semana calendario en la temporada pasada). Es un
+// carry-forward semana a semana (no una regresión), así que se arma como un closure con cursor
+// que avanza de una semana en una semana y cachea lo ya calculado, para que llamadas repetidas del
+// modelo (una por cada semana de forecast) sean baratas y consistentes entre sí.
+function buildSeasonalCarryforwardModel(sortedRecords, crop, variable){
+  const liveRates = computeSeasonalRatesFromHistory(variable, crop);
+  const cropRates = liveRates || VARIACION_SEASONAL_RATES_DEFAULT[crop] || null;
+  const last = sortedRecords[sortedRecords.length-1];
+  const cache = {};
+  let cursorTime = last.date.getTime();
+  let cursorValue = last.importe;
+  cache[cursorTime] = cursorValue;
+  return d => {
+    const target = d.getTime();
+    if(cache[target]!=null) return cache[target];
+    while(cursorTime < target){
+      const nextTime = cursorTime + 7*DAY_MS;
+      const {y,w} = dateToWeekYear(new Date(nextTime));
+      const rate = cropRates ? cropRates[y+'-'+w] : undefined;
+      cursorValue = (rate!=null) ? Math.max(0, cursorValue*(1+rate)) : cursorValue;
+      cursorTime = nextTime;
+      cache[cursorTime] = cursorValue;
+    }
+    return cache[target]!=null ? cache[target] : cursorValue;
+  };
+}
+
+function computeMethodModel(sortedRecords, method, crop, variable){
   if(!sortedRecords.length) return ()=>0;
   const t0 = sortedRecords[0].date.getTime();
   const toX = d => (d.getTime()-t0)/(7*DAY_MS);
@@ -850,6 +953,9 @@ function computeMethodModel(sortedRecords, method){
     const avg = lastN.reduce((a,r)=>a+r.importe,0)/lastN.length;
     return ()=>avg;
   }
+  if(method==='estacional'){
+    return buildSeasonalCarryforwardModel(sortedRecords, crop, variable);
+  }
   const avg = sortedRecords.reduce((a,r)=>a+r.importe,0)/sortedRecords.length;
   return ()=>avg;
 }
@@ -885,7 +991,7 @@ function baseForecastFor(variable, crop, method){
   const series = realWeeklyFor(variable, crop).filter(r=> r.date <= NOW_UTC);
   const out = Object.fromEntries(PROJECTION_MONTHS.map(m=>[m,0]));
   if(series.length){
-    const model = computeMethodModel(series, method);
+    const model = computeMethodModel(series, method, crop, variable);
     const lastDate = series[series.length-1].date;
     const horizonEnd = monthEndDate(FORECAST_MONTHS[FORECAST_MONTHS.length-1]);
     let cursor = new Date(lastDate.getTime()+7*DAY_MS);
@@ -4104,3 +4210,4 @@ function init(){
 document.addEventListener('DOMContentLoaded', init);
 })();
 </script>
+</html>
