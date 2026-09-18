@@ -873,57 +873,55 @@ function computeSeasonalRatesFromHistory(variable, crop){
 // que avanza de una semana en una semana y cachea lo ya calculado, para que llamadas repetidas del
 // modelo (una por cada semana de forecast) sean baratas y consistentes entre sí.
 function buildSeasonalCarryforwardModel(sortedRecords, crop, variable){
+  // Rediseño (18 sep, 2ª iteración del día): Rafael confirmó que anclar este método en la hoja
+  // "Proyección" de su base de datos no reproduce su cálculo aparte (~$257M en octubre contra
+  // ~$226M que daba esa vía) — esa hoja, aunque trae un número ya calculado, no está siguiendo la
+  // MISMA fórmula de variación estacional que su Excel de control (hoja "Egresos T2627 Sem"), así
+  // que usarla como fuente de verdad para ESTE método metía un descuadre en vez de resolverlo.
+  // Por eso se vuelve a construir el método ÚNICAMENTE a partir de las hojas "de base" del forecast
+  // (el Real semana a semana, y el historial de 2+ temporadas de Real cuando existe) en vez de leer
+  // un número ya proyectado por otra hoja — replicando bit a bit la fórmula real de su Excel:
+  //   proyección_semana = SI(real_semana=0, proyección_semana_anterior × (1 + variación % que tuvo
+  //   esa misma semana calendario en la temporada pasada), real_semana)
+  // Es decir: se ancla en la última semana con Real > 0 (ignorando el $0 de relleno de la semana en
+  // curso todavía sin capturar) y se arrastra hacia adelante semana a semana aplicando la tasa de
+  // esa semana calendario — la tasa se calcula en vivo si hay 2+ temporadas de Real disponibles
+  // (computeSeasonalRatesFromHistory) y, si no, se usa VARIACION_SEASONAL_RATES_DEFAULT, que son las
+  // 52 tasas ya extraídas directamente del Excel real de Rafael (T26-27, con el cruce
+  // Frambuesa/Zarzamora/Aguacate corregido) — la MISMA tasa que usa su cálculo aparte, así que este
+  // método debería acercarse a esa cifra de referencia en vez de a la de la hoja Proyección.
+  let anchorIdx = -1;
+  for(let i=sortedRecords.length-1;i>=0;i--){
+    if(sortedRecords[i].importe>0){ anchorIdx = i; break; }
+  }
+  if(anchorIdx===-1) return ()=>0;
+  const anchorTime = sortedRecords[anchorIdx].date.getTime();
+  const anchorValue = sortedRecords[anchorIdx].importe;
+
   const liveRates = computeSeasonalRatesFromHistory(variable, crop);
   const cropRates = liveRates || VARIACION_SEASONAL_RATES_DEFAULT[crop] || null;
-  // La hoja "Proyección" que Rafael ya mantiene en Sheets (casilla "Proyección Egreso" y sus
-  // equivalentes de Ingreso/Producción) trae, semana a semana, el importe real ya ocurrido para
-  // las semanas pasadas y el importe YA CALCULADO por Excel con esta misma fórmula de variación
-  // estacional para las semanas futuras — es decir, ahí ya está el resultado de este método,
-  // corrida por Rafael/su equipo y refrescada todos los días por el script de Apps Script. Por
-  // eso, semana a semana, se prefiere ese valor tal cual cuando existe (más fiel y siempre al
-  // día) en vez de recalcularlo con las tasas de respaldo; la fórmula propia de variación
-  // estacional solo entra para las semanas que esa hoja todavía no cubre (temporada incompleta o
-  // más allá de lo que el equipo ha proyectado a mano).
-  const proyeccionByTime = {};
-  state.raw[variable].forEach(r=>{
-    if(r.tipo==='proyeccion' && r.cultivo===crop) proyeccionByTime[r.date.getTime()] = r.importe;
-  });
-  // Ancla el arrastre en la última semana con importe > 0, no en la última fila cruda: la semana
-  // en curso normalmente llega en $0 hasta que el equipo termina de capturarla en el Sheet, y si
-  // esa fila en $0 se usara como punto de partida, $0 × (1+tasa) se queda en $0 para siempre
-  // (mismo bug ya conocido y resuelto antes en baseForecastFor/monthHasReal, aplicado aquí porque
-  // este método usa su propio mecanismo de arrastre en vez de un ajuste sobre toda la serie).
-  let last = sortedRecords[sortedRecords.length-1];
-  for(let i=sortedRecords.length-1;i>=0;i--){
-    if(sortedRecords[i].importe>0){ last = sortedRecords[i]; break; }
-  }
   const cache = {};
-  let cursorTime = last.date.getTime();
-  let cursorValue = last.importe;
-  cache[cursorTime] = cursorValue;
+
   return d => {
     const target = d.getTime();
+    if(target<=anchorTime) return anchorValue;
     if(cache[target]!=null) return cache[target];
+    let cursorTime = anchorTime;
+    let cursorValue = anchorValue;
     while(cursorTime < target){
       const nextTime = cursorTime + 7*DAY_MS;
-      // Igual que en la serie Real, un $0 en la hoja de Proyección para una semana futura casi
-      // siempre es un relleno de "todavía no la calculo/capturo", no un $0 real — si se tomara tal
-      // cual, esa semana (y todo lo que se arrastre desde ahí) se quedaría en $0 hasta que una
-      // semana posterior de la hoja SÍ traiga un número, causando un hueco a $0 en medio de la
-      // curva (visible primero en el mes en el que cae esa semana) antes de "recuperarse" en el
-      // siguiente mes con datos. Por eso solo se confía en el valor de Proyección cuando es > 0.
-      const proyVal = proyeccionByTime[nextTime];
-      if(proyVal!=null && proyVal>0){
-        cursorValue = proyVal;
+      if(cache[nextTime]!=null){
+        cursorValue = cache[nextTime];
       } else {
         const {y,w} = dateToWeekYear(new Date(nextTime));
         const rate = cropRates ? cropRates[y+'-'+w] : undefined;
         cursorValue = (rate!=null) ? Math.max(0, cursorValue*(1+rate)) : cursorValue;
+        cache[nextTime] = cursorValue;
       }
       cursorTime = nextTime;
-      cache[cursorTime] = cursorValue;
     }
-    return cache[target]!=null ? cache[target] : cursorValue;
+    cache[target] = cursorValue;
+    return cursorValue;
   };
 }
 
@@ -4241,5 +4239,4 @@ function init(){
 
 document.addEventListener('DOMContentLoaded', init);
 })();
-</script>
-</html>
+</script></html>
