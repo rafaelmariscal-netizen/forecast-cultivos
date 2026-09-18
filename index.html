@@ -873,25 +873,30 @@ function computeSeasonalRatesFromHistory(variable, crop){
 // que avanza de una semana en una semana y cachea lo ya calculado, para que llamadas repetidas del
 // modelo (una por cada semana de forecast) sean baratas y consistentes entre sí.
 function buildSeasonalCarryforwardModel(sortedRecords, crop, variable){
-  // Simplificación pedida por Rafael (18 sep): este método se basa ÚNICAMENTE en la hoja
-  // "Proyección" (p.ej. Proyección Egreso) — esa sola hoja ya trae, semana a semana, el egreso
-  // real para las semanas que ya pasaron y el egreso ya proyectado ("forecast") por el propio
-  // Excel de Rafael para las que faltan. Antes este método se anclaba en un solo punto (la última
-  // semana con dato) y avanzaba secuencialmente desde ahí — eso podía saltarse semanas "de hueco"
-  // en medio de dos semanas SÍ cubiertas por la hoja de Proyección. Ahora se arma una lista de
-  // puntos conocidos (Proyección primero, Real solo donde Proyección no tiene esa semana exacta,
-  // ambos ignorando $0 de relleno) y, para cualquier semana pedida: si está en la lista, se usa
-  // tal cual; si no, se busca el punto conocido INMEDIATAMENTE ANTERIOR a esa semana y se arrastra
-  // desde ahí semana a semana con las tasas de variación estacional hasta llegar a la semana
-  // pedida — así una semana intermedia sin dato en ninguna de las dos hojas se calcula a partir de
-  // la semana conocida más cercana, no de un ancla fija que puede quedar lejos en el tiempo.
-  const knownByTime = {};
-  sortedRecords.forEach(r=>{ if(r.importe>0) knownByTime[r.date.getTime()] = r.importe; });
-  state.raw[variable].forEach(r=>{
-    if(r.tipo==='proyeccion' && r.cultivo===crop && r.importe>0) knownByTime[r.date.getTime()] = r.importe;
-  });
-  const knownTimes = Object.keys(knownByTime).map(Number).sort((a,b)=>a-b);
-  if(!knownTimes.length) return ()=>0;
+  // Rediseño (18 sep, 2ª iteración del día): Rafael confirmó que anclar este método en la hoja
+  // "Proyección" de su base de datos no reproduce su cálculo aparte (~$257M en octubre contra
+  // ~$226M que daba esa vía) — esa hoja, aunque trae un número ya calculado, no está siguiendo la
+  // MISMA fórmula de variación estacional que su Excel de control (hoja "Egresos T2627 Sem"), así
+  // que usarla como fuente de verdad para ESTE método metía un descuadre en vez de resolverlo.
+  // Por eso se vuelve a construir el método ÚNICAMENTE a partir de las hojas "de base" del forecast
+  // (el Real semana a semana, y el historial de 2+ temporadas de Real cuando existe) en vez de leer
+  // un número ya proyectado por otra hoja — replicando bit a bit la fórmula real de su Excel:
+  //   proyección_semana = SI(real_semana=0, proyección_semana_anterior × (1 + variación % que tuvo
+  //   esa misma semana calendario en la temporada pasada), real_semana)
+  // Es decir: se ancla en la última semana con Real > 0 (ignorando el $0 de relleno de la semana en
+  // curso todavía sin capturar) y se arrastra hacia adelante semana a semana aplicando la tasa de
+  // esa semana calendario — la tasa se calcula en vivo si hay 2+ temporadas de Real disponibles
+  // (computeSeasonalRatesFromHistory) y, si no, se usa VARIACION_SEASONAL_RATES_DEFAULT, que son las
+  // 52 tasas ya extraídas directamente del Excel real de Rafael (T26-27, con el cruce
+  // Frambuesa/Zarzamora/Aguacate corregido) — la MISMA tasa que usa su cálculo aparte, así que este
+  // método debería acercarse a esa cifra de referencia en vez de a la de la hoja Proyección.
+  let anchorIdx = -1;
+  for(let i=sortedRecords.length-1;i>=0;i--){
+    if(sortedRecords[i].importe>0){ anchorIdx = i; break; }
+  }
+  if(anchorIdx===-1) return ()=>0;
+  const anchorTime = sortedRecords[anchorIdx].date.getTime();
+  const anchorValue = sortedRecords[anchorIdx].importe;
 
   const liveRates = computeSeasonalRatesFromHistory(variable, crop);
   const cropRates = liveRates || VARIACION_SEASONAL_RATES_DEFAULT[crop] || null;
@@ -899,20 +904,13 @@ function buildSeasonalCarryforwardModel(sortedRecords, crop, variable){
 
   return d => {
     const target = d.getTime();
-    if(knownByTime[target]!=null) return knownByTime[target];
+    if(target<=anchorTime) return anchorValue;
     if(cache[target]!=null) return cache[target];
-    let baseTime = null;
-    for(let i=knownTimes.length-1;i>=0;i--){
-      if(knownTimes[i] < target){ baseTime = knownTimes[i]; break; }
-    }
-    if(baseTime==null) return knownByTime[knownTimes[0]];
-    let cursorTime = baseTime;
-    let cursorValue = knownByTime[baseTime];
+    let cursorTime = anchorTime;
+    let cursorValue = anchorValue;
     while(cursorTime < target){
       const nextTime = cursorTime + 7*DAY_MS;
-      if(knownByTime[nextTime]!=null){
-        cursorValue = knownByTime[nextTime];
-      } else if(cache[nextTime]!=null){
+      if(cache[nextTime]!=null){
         cursorValue = cache[nextTime];
       } else {
         const {y,w} = dateToWeekYear(new Date(nextTime));
@@ -1519,7 +1517,7 @@ const SLOT_DEFS = [
   { tipo:'presupuesto', variable:'egreso' }, { tipo:'presupuesto', variable:'ingreso' }, { tipo:'presupuesto', variable:'produccion' },
   { tipo:'proyeccion', variable:'egreso' }, { tipo:'proyeccion', variable:'ingreso' }, { tipo:'proyeccion', variable:'produccion' }
 ];
-const TIPO_LABEL = { real:'Real', presupuesto:'Presupuesto', proyeccion:'Proyección equipo' };
+const TIPO_LABEL = { real:'Real (ya no se usa)', presupuesto:'Presupuesto', proyeccion:'Proyección equipo' };
 const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción' };
 
 // Datos base de Rafael (Google Sheet / FORECAST.xlsx) — se usan como dato por defecto para que
@@ -4069,13 +4067,36 @@ function loadBakedDefaults(){
 }
 
 function processAllSlots(){
+  // Decisión de Rafael (18 sep, tarde): dejar de usar la hoja "Real" — su casilla se queda en la
+  // pestaña Datos por si alguien pega algo ahí por costumbre, pero ya no se procesa (ver
+  // TIPO_LABEL.real). En su lugar, la hoja "Proyección" (la misma que ya se pegaba antes) hace las
+  // dos funciones: Rafael la mantiene con el egreso REAL ya ocurrido en las semanas que pasaron y el
+  // egreso PROYECTADO por su Excel en las semanas que faltan, todo en una sola columna. Por eso, al
+  // leerla, se separa por fecha: las filas de semanas que ya pasaron (fecha <= hoy) alimentan el
+  // mismo lugar que antes alimentaba "Real" (re-etiquetadas tipo:'real' — el resto de la herramienta,
+  // que ya sabe leer tipo:'real' para ajustar los métodos de proyección, la tabla, los KPIs y el
+  // corte "¿ya hay dato de este mes?", no necesita ningún otro cambio); las filas de semanas futuras
+  // siguen siendo la referencia "Proyección equipo", igual que antes, solo que ya sin duplicar filas
+  // de semanas pasadas. Un $0 en una semana que ya pasó se trata como "todavía no capturada" (mismo
+  // criterio que ya se usaba en toda la herramienta) y no se cuenta como real.
   const newRaw = { egreso:[], ingreso:[], produccion:[] };
   const errors = [], notes = [];
   SLOT_DEFS.forEach(({tipo,variable})=>{
     const id = slotId(tipo,variable);
+    if(tipo==='real'){
+      document.getElementById(id+'_count').textContent = 'no se usa';
+      document.getElementById(id+'_count').classList.remove('has');
+      return;
+    }
     const text = document.getElementById(id+'_text').value;
     const { records, errors: errs, notes: nts } = parseSlot(text, tipo);
-    newRaw[variable] = newRaw[variable].concat(records);
+    if(tipo==='proyeccion'){
+      const pasadas = records.filter(r=>r.date<=NOW_UTC && r.importe>0).map(r=>Object.assign({}, r, {tipo:'real'}));
+      const futuras = records.filter(r=>r.date>NOW_UTC);
+      newRaw[variable] = newRaw[variable].concat(pasadas, futuras);
+    } else {
+      newRaw[variable] = newRaw[variable].concat(records);
+    }
     errs.forEach(e=> errors.push(`[${VAR_LABEL[variable]} · ${TIPO_LABEL[tipo]}] ${e}`));
     (nts||[]).forEach(n=> notes.push(`[${VAR_LABEL[variable]} · ${TIPO_LABEL[tipo]}] ${n}`));
     document.getElementById(id+'_count').textContent = records.length+' filas';
@@ -4241,5 +4262,4 @@ function init(){
 
 document.addEventListener('DOMContentLoaded', init);
 })();
-</script>
-</html>
+</script></html>
