@@ -873,57 +873,50 @@ function computeSeasonalRatesFromHistory(variable, crop){
 // que avanza de una semana en una semana y cachea lo ya calculado, para que llamadas repetidas del
 // modelo (una por cada semana de forecast) sean baratas y consistentes entre sí.
 function buildSeasonalCarryforwardModel(sortedRecords, crop, variable){
-  // Simplificación pedida por Rafael (18 sep): este método se basa ÚNICAMENTE en la hoja
-  // "Proyección" (p.ej. Proyección Egreso) — esa sola hoja ya trae, semana a semana, el egreso
-  // real para las semanas que ya pasaron y el egreso ya proyectado ("forecast") por el propio
-  // Excel de Rafael para las que faltan. Antes este método se anclaba en un solo punto (la última
-  // semana con dato) y avanzaba secuencialmente desde ahí — eso podía saltarse semanas "de hueco"
-  // en medio de dos semanas SÍ cubiertas por la hoja de Proyección. Ahora se arma una lista de
-  // puntos conocidos (Proyección primero, Real solo donde Proyección no tiene esa semana exacta,
-  // ambos ignorando $0 de relleno) y, para cualquier semana pedida: si está en la lista, se usa
-  // tal cual; si no, se busca el punto conocido INMEDIATAMENTE ANTERIOR a esa semana y se arrastra
-  // desde ahí semana a semana con las tasas de variación estacional hasta llegar a la semana
-  // pedida — así una semana intermedia sin dato en ninguna de las dos hojas se calcula a partir de
-  // la semana conocida más cercana, no de un ancla fija que puede quedar lejos en el tiempo.
-  const knownByTime = {};
-  sortedRecords.forEach(r=>{ if(r.importe>0) knownByTime[r.date.getTime()] = r.importe; });
-  state.raw[variable].forEach(r=>{
-    if(r.tipo==='proyeccion' && r.cultivo===crop && r.importe>0) knownByTime[r.date.getTime()] = r.importe;
-  });
-  const knownTimes = Object.keys(knownByTime).map(Number).sort((a,b)=>a-b);
-  if(!knownTimes.length) return ()=>0;
-
   const liveRates = computeSeasonalRatesFromHistory(variable, crop);
   const cropRates = liveRates || VARIACION_SEASONAL_RATES_DEFAULT[crop] || null;
+  // La hoja "Proyección" que Rafael ya mantiene en Sheets (casilla "Proyección Egreso" y sus
+  // equivalentes de Ingreso/Producción) trae, semana a semana, el importe real ya ocurrido para
+  // las semanas pasadas y el importe YA CALCULADO por Excel con esta misma fórmula de variación
+  // estacional para las semanas futuras — es decir, ahí ya está el resultado de este método,
+  // corrida por Rafael/su equipo y refrescada todos los días por el script de Apps Script. Por
+  // eso, semana a semana, se prefiere ese valor tal cual cuando existe (más fiel y siempre al
+  // día) en vez de recalcularlo con las tasas de respaldo; la fórmula propia de variación
+  // estacional solo entra para las semanas que esa hoja todavía no cubre (temporada incompleta o
+  // más allá de lo que el equipo ha proyectado a mano).
+  const proyeccionByTime = {};
+  state.raw[variable].forEach(r=>{
+    if(r.tipo==='proyeccion' && r.cultivo===crop) proyeccionByTime[r.date.getTime()] = r.importe;
+  });
+  // Ancla el arrastre en la última semana con importe > 0, no en la última fila cruda: la semana
+  // en curso normalmente llega en $0 hasta que el equipo termina de capturarla en el Sheet, y si
+  // esa fila en $0 se usara como punto de partida, $0 × (1+tasa) se queda en $0 para siempre
+  // (mismo bug ya conocido y resuelto antes en baseForecastFor/monthHasReal, aplicado aquí porque
+  // este método usa su propio mecanismo de arrastre en vez de un ajuste sobre toda la serie).
+  let last = sortedRecords[sortedRecords.length-1];
+  for(let i=sortedRecords.length-1;i>=0;i--){
+    if(sortedRecords[i].importe>0){ last = sortedRecords[i]; break; }
+  }
   const cache = {};
-
+  let cursorTime = last.date.getTime();
+  let cursorValue = last.importe;
+  cache[cursorTime] = cursorValue;
   return d => {
     const target = d.getTime();
-    if(knownByTime[target]!=null) return knownByTime[target];
     if(cache[target]!=null) return cache[target];
-    let baseTime = null;
-    for(let i=knownTimes.length-1;i>=0;i--){
-      if(knownTimes[i] < target){ baseTime = knownTimes[i]; break; }
-    }
-    if(baseTime==null) return knownByTime[knownTimes[0]];
-    let cursorTime = baseTime;
-    let cursorValue = knownByTime[baseTime];
     while(cursorTime < target){
       const nextTime = cursorTime + 7*DAY_MS;
-      if(knownByTime[nextTime]!=null){
-        cursorValue = knownByTime[nextTime];
-      } else if(cache[nextTime]!=null){
-        cursorValue = cache[nextTime];
+      if(proyeccionByTime[nextTime]!=null){
+        cursorValue = proyeccionByTime[nextTime];
       } else {
         const {y,w} = dateToWeekYear(new Date(nextTime));
         const rate = cropRates ? cropRates[y+'-'+w] : undefined;
         cursorValue = (rate!=null) ? Math.max(0, cursorValue*(1+rate)) : cursorValue;
-        cache[nextTime] = cursorValue;
       }
       cursorTime = nextTime;
+      cache[cursorTime] = cursorValue;
     }
-    cache[target] = cursorValue;
-    return cursorValue;
+    return cache[target]!=null ? cache[target] : cursorValue;
   };
 }
 
@@ -1529,7 +1522,7 @@ const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción'
 // el Google Sheet — cada actualización solo tiene que reescribir este bloque.
 const BAKED_DATA = {
  egreso: {
-  real: `Egreso	Cultivo	ejercicio	semana	Importe
+  real: `Egreso	Cultivo	ejercicio	semana	Importe 
 Real	AGUACATE	2026	26	0
 Real	AGUACATE	2026	27	174937256
 Real	AGUACATE	2026	28	2371571
@@ -1912,17 +1905,17 @@ Real	ZARZAMORA	2027	26	0
 Real	ZARZAMORA	2027	27	0
 Real	ZARZAMORA	2027	28	0
 Real	EMPAQUE	2026	26	0
-Real	EMPAQUE	2026	27	120449
-Real	EMPAQUE	2026	28	420738
+Real	EMPAQUE	2026	27	120450
+Real	EMPAQUE	2026	28	420740
 Real	EMPAQUE	2026	29	339804
 Real	EMPAQUE	2026	30	222040
-Real	EMPAQUE	2026	31	1045543
-Real	EMPAQUE	2026	32	327605
-Real	EMPAQUE	2026	33	366123
-Real	EMPAQUE	2026	34	3820233
-Real	EMPAQUE	2026	35	1094196
-Real	EMPAQUE	2026	36	2091821
-Real	EMPAQUE	2026	37	1327173
+Real	EMPAQUE	2026	31	1045542
+Real	EMPAQUE	2026	32	327604
+Real	EMPAQUE	2026	33	366122
+Real	EMPAQUE	2026	34	3820231
+Real	EMPAQUE	2026	35	1094195
+Real	EMPAQUE	2026	36	2091820
+Real	EMPAQUE	2026	37	1327171
 Real	EMPAQUE	2026	38	0
 Real	EMPAQUE	2026	39	0
 Real	EMPAQUE	2026	40	0
@@ -2403,443 +2396,443 @@ Presupuesto	ZARZAMORA	2027	25	3365892
 Presupuesto	ZARZAMORA	2027	26	1348037
 Presupuesto	ZARZAMORA	2027	27	2581442
 Presupuesto	ZARZAMORA	2027	28	669`,
-  proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe
-Forecast	AGUACATE	2026	26	0
-Forecast	AGUACATE	2026	27	174937256
-Forecast	AGUACATE	2026	28	2371571
-Forecast	AGUACATE	2026	29	3223080
-Forecast	AGUACATE	2026	30	10619357
-Forecast	AGUACATE	2026	31	12153942
-Forecast	AGUACATE	2026	32	3489155
-Forecast	AGUACATE	2026	33	6151725
-Forecast	AGUACATE	2026	34	5319971
-Forecast	AGUACATE	2026	35	10406527
-Forecast	AGUACATE	2026	36	4132519
-Forecast	AGUACATE	2026	37	2651255
-Forecast	AGUACATE	2026	38	2942893.0500000003
-Forecast	AGUACATE	2026	39	3266611.2855000007
-Forecast	AGUACATE	2026	40	3691270.7526150006
-Forecast	AGUACATE	2026	41	4134223.242928801
-Forecast	AGUACATE	2026	42	4464961.102363106
-Forecast	AGUACATE	2026	43	4866807.601575785
-Forecast	AGUACATE	2026	44	5353488.361733364
-Forecast	AGUACATE	2026	45	5674697.6634373665
-Forecast	AGUACATE	2026	46	5958432.546609235
-Forecast	AGUACATE	2026	47	6256354.173939697
-Forecast	AGUACATE	2026	48	6569171.882636682
-Forecast	AGUACATE	2026	49	
-Forecast	AGUACATE	2026	50	
-Forecast	AGUACATE	2026	51	
-Forecast	AGUACATE	2026	52	
-Forecast	AGUACATE	2027	1	
-Forecast	AGUACATE	2027	2	
-Forecast	AGUACATE	2027	3	
-Forecast	AGUACATE	2027	4	
-Forecast	AGUACATE	2027	5	
-Forecast	AGUACATE	2027	6	
-Forecast	AGUACATE	2027	7	
-Forecast	AGUACATE	2027	8	
-Forecast	AGUACATE	2027	9	
-Forecast	AGUACATE	2027	10	
-Forecast	AGUACATE	2027	11	
-Forecast	AGUACATE	2027	12	
-Forecast	AGUACATE	2027	13	
-Forecast	AGUACATE	2027	14	
-Forecast	AGUACATE	2027	15	
-Forecast	AGUACATE	2027	16	
-Forecast	AGUACATE	2027	17	
-Forecast	AGUACATE	2027	18	
-Forecast	AGUACATE	2027	19	
-Forecast	AGUACATE	2027	20	
-Forecast	AGUACATE	2027	21	
-Forecast	AGUACATE	2027	22	
-Forecast	AGUACATE	2027	23	
-Forecast	AGUACATE	2027	24	
-Forecast	AGUACATE	2027	25	
-Forecast	AGUACATE	2027	26	
-Forecast	ARANDANO	2026	26	0
-Forecast	ARANDANO	2026	27	4799906
-Forecast	ARANDANO	2026	28	1360606
-Forecast	ARANDANO	2026	29	2248386
-Forecast	ARANDANO	2026	30	6683481
-Forecast	ARANDANO	2026	31	9520206
-Forecast	ARANDANO	2026	32	1096454
-Forecast	ARANDANO	2026	33	5950670
-Forecast	ARANDANO	2026	34	899701
-Forecast	ARANDANO	2026	35	6501001
-Forecast	ARANDANO	2026	36	4306725
-Forecast	ARANDANO	2026	37	5905080
-Forecast	ARANDANO	2026	38	6082232.4
-Forecast	ARANDANO	2026	39	6629633.316000001
-Forecast	ARANDANO	2026	40	6894818.648640001
-Forecast	ARANDANO	2026	41	7101663.208099201
-Forecast	ARANDANO	2026	42	7314713.1043421775
-Forecast	ARANDANO	2026	43	7899890.152689552
-Forecast	ARANDANO	2026	44	8215885.758797134
-Forecast	ARANDANO	2026	45	8380203.473973077
-Forecast	ARANDANO	2026	46	8547807.543452539
-Forecast	ARANDANO	2026	47	9146154.071494216
-Forecast	ARANDANO	2026	48	9329077.1529241
-Forecast	ARANDANO	2026	49	
-Forecast	ARANDANO	2026	50	
-Forecast	ARANDANO	2026	51	
-Forecast	ARANDANO	2026	52	
-Forecast	ARANDANO	2027	1	
-Forecast	ARANDANO	2027	2	
-Forecast	ARANDANO	2027	3	
-Forecast	ARANDANO	2027	4	
-Forecast	ARANDANO	2027	5	
-Forecast	ARANDANO	2027	6	
-Forecast	ARANDANO	2027	7	
-Forecast	ARANDANO	2027	8	
-Forecast	ARANDANO	2027	9	
-Forecast	ARANDANO	2027	10	
-Forecast	ARANDANO	2027	11	
-Forecast	ARANDANO	2027	12	
-Forecast	ARANDANO	2027	13	
-Forecast	ARANDANO	2027	14	
-Forecast	ARANDANO	2027	15	
-Forecast	ARANDANO	2027	16	
-Forecast	ARANDANO	2027	17	
-Forecast	ARANDANO	2027	18	
-Forecast	ARANDANO	2027	19	
-Forecast	ARANDANO	2027	20	
-Forecast	ARANDANO	2027	21	
-Forecast	ARANDANO	2027	22	
-Forecast	ARANDANO	2027	23	
-Forecast	ARANDANO	2027	24	
-Forecast	ARANDANO	2027	25	
-Forecast	ARANDANO	2027	26	
-Forecast	ARANDANO	2027	27	
-Forecast	ARANDANO	2027	28	0
-Forecast	ESPARRAGO	2026	26	0
-Forecast	ESPARRAGO	2026	27	109927366
-Forecast	ESPARRAGO	2026	28	3677980
-Forecast	ESPARRAGO	2026	29	5005817
-Forecast	ESPARRAGO	2026	30	7596454
-Forecast	ESPARRAGO	2026	31	7267964
-Forecast	ESPARRAGO	2026	32	7209569
-Forecast	ESPARRAGO	2026	33	8862046
-Forecast	ESPARRAGO	2026	34	5215117
-Forecast	ESPARRAGO	2026	35	5442217
-Forecast	ESPARRAGO	2026	36	7105484
-Forecast	ESPARRAGO	2026	37	4521230
-Forecast	ESPARRAGO	2026	38	4792503.8
-Forecast	ESPARRAGO	2026	39	4984203.952
-Forecast	ESPARRAGO	2026	40	5183572.11008
-Forecast	ESPARRAGO	2026	41	5339079.2733824
-Forecast	ESPARRAGO	2026	42	5552642.444317697
-Forecast	ESPARRAGO	2026	43	5774748.142090404
-Forecast	ESPARRAGO	2026	44	5890243.104932212
-Forecast	ESPARRAGO	2026	45	6066950.398080179
-Forecast	ESPARRAGO	2026	46	6248958.910022584
-Forecast	ESPARRAGO	2026	47	6436427.677323261
-Forecast	ESPARRAGO	2026	48	6565156.230869726
-Forecast	ESPARRAGO	2026	49	
-Forecast	ESPARRAGO	2026	50	
-Forecast	ESPARRAGO	2026	51	
-Forecast	ESPARRAGO	2026	52	
-Forecast	ESPARRAGO	2027	1	
-Forecast	ESPARRAGO	2027	2	
-Forecast	ESPARRAGO	2027	3	
-Forecast	ESPARRAGO	2027	4	
-Forecast	ESPARRAGO	2027	5	
-Forecast	ESPARRAGO	2027	6	
-Forecast	ESPARRAGO	2027	7	
-Forecast	ESPARRAGO	2027	8	
-Forecast	ESPARRAGO	2027	9	
-Forecast	ESPARRAGO	2027	10	
-Forecast	ESPARRAGO	2027	11	
-Forecast	ESPARRAGO	2027	12	
-Forecast	ESPARRAGO	2027	13	
-Forecast	ESPARRAGO	2027	14	
-Forecast	ESPARRAGO	2027	15	
-Forecast	ESPARRAGO	2027	16	
-Forecast	ESPARRAGO	2027	17	
-Forecast	ESPARRAGO	2027	18	
-Forecast	ESPARRAGO	2027	19	
-Forecast	ESPARRAGO	2027	20	
-Forecast	ESPARRAGO	2027	21	
-Forecast	ESPARRAGO	2027	22	
-Forecast	ESPARRAGO	2027	23	
-Forecast	ESPARRAGO	2027	24	
-Forecast	ESPARRAGO	2027	25	
-Forecast	ESPARRAGO	2027	26	
-Forecast	ESPARRAGO	2027	27	
-Forecast	ESPARRAGO	2027	28	0
-Forecast	FRAMBUESA	2026	26	0
-Forecast	FRAMBUESA	2026	27	22070424
-Forecast	FRAMBUESA	2026	28	1983118
-Forecast	FRAMBUESA	2026	29	1512561
-Forecast	FRAMBUESA	2026	30	7945792
-Forecast	FRAMBUESA	2026	31	7962106
-Forecast	FRAMBUESA	2026	32	2221586
-Forecast	FRAMBUESA	2026	33	8597470
-Forecast	FRAMBUESA	2026	34	5772626
-Forecast	FRAMBUESA	2026	35	6837542
-Forecast	FRAMBUESA	2026	36	6806748
-Forecast	FRAMBUESA	2026	37	7332511
-Forecast	FRAMBUESA	2026	38	8065762.100000001
-Forecast	FRAMBUESA	2026	39	8872338.31
-Forecast	FRAMBUESA	2026	40	9670848.757900001
-Forecast	FRAMBUESA	2026	41	10251099.683374003
-Forecast	FRAMBUESA	2026	42	10763654.667542703
-Forecast	FRAMBUESA	2026	43	11409473.947595267
-Forecast	FRAMBUESA	2026	44	12208137.123926936
-Forecast	FRAMBUESA	2026	45	12696462.608884014
-Forecast	FRAMBUESA	2026	46	13204321.113239376
-Forecast	FRAMBUESA	2026	47	13996580.380033739
-Forecast	FRAMBUESA	2026	48	14836375.202835765
-Forecast	FRAMBUESA	2026	49	
-Forecast	FRAMBUESA	2026	50	
-Forecast	FRAMBUESA	2026	51	
-Forecast	FRAMBUESA	2026	52	
-Forecast	FRAMBUESA	2027	1	
-Forecast	FRAMBUESA	2027	2	
-Forecast	FRAMBUESA	2027	3	
-Forecast	FRAMBUESA	2027	4	
-Forecast	FRAMBUESA	2027	5	
-Forecast	FRAMBUESA	2027	6	
-Forecast	FRAMBUESA	2027	7	
-Forecast	FRAMBUESA	2027	8	
-Forecast	FRAMBUESA	2027	9	
-Forecast	FRAMBUESA	2027	10	
-Forecast	FRAMBUESA	2027	11	
-Forecast	FRAMBUESA	2027	12	
-Forecast	FRAMBUESA	2027	13	
-Forecast	FRAMBUESA	2027	14	
-Forecast	FRAMBUESA	2027	15	
-Forecast	FRAMBUESA	2027	16	
-Forecast	FRAMBUESA	2027	17	
-Forecast	FRAMBUESA	2027	18	
-Forecast	FRAMBUESA	2027	19	
-Forecast	FRAMBUESA	2027	20	
-Forecast	FRAMBUESA	2027	21	
-Forecast	FRAMBUESA	2027	22	
-Forecast	FRAMBUESA	2027	23	
-Forecast	FRAMBUESA	2027	24	
-Forecast	FRAMBUESA	2027	25	
-Forecast	FRAMBUESA	2027	26	
-Forecast	FRAMBUESA	2027	27	
-Forecast	FRESA	2026	26	0
-Forecast	FRESA	2026	27	55044916
-Forecast	FRESA	2026	28	6561940
-Forecast	FRESA	2026	29	3953203
-Forecast	FRESA	2026	30	20459935
-Forecast	FRESA	2026	31	9015767
-Forecast	FRESA	2026	32	5825288
-Forecast	FRESA	2026	33	9613622
-Forecast	FRESA	2026	34	3613694
-Forecast	FRESA	2026	35	7621321
-Forecast	FRESA	2026	36	15220093
-Forecast	FRESA	2026	37	14351353
-Forecast	FRESA	2026	38	14925407.120000001
-Forecast	FRESA	2026	39	15671677.476000002
-Forecast	FRESA	2026	40	16298544.575040001
-Forecast	FRESA	2026	41	16950486.358041603
-Forecast	FRESA	2026	42	17628505.812363267
-Forecast	FRESA	2026	43	18333646.0448578
-Forecast	FRESA	2026	44	21450365.872483626
-Forecast	FRESA	2026	45	21879373.1899333
-Forecast	FRESA	2026	46	22535754.3856313
-Forecast	FRESA	2026	47	23211827.01720024
-Forecast	FRESA	2026	48	24140300.09788825
-Forecast	FRESA	2026	49	
-Forecast	FRESA	2026	50	
-Forecast	FRESA	2026	51	
-Forecast	FRESA	2026	52	
-Forecast	FRESA	2027	1	
-Forecast	FRESA	2027	2	
-Forecast	FRESA	2027	3	
-Forecast	FRESA	2027	4	
-Forecast	FRESA	2027	5	
-Forecast	FRESA	2027	6	
-Forecast	FRESA	2027	7	
-Forecast	FRESA	2027	8	
-Forecast	FRESA	2027	9	
-Forecast	FRESA	2027	10	
-Forecast	FRESA	2027	11	
-Forecast	FRESA	2027	12	
-Forecast	FRESA	2027	13	
-Forecast	FRESA	2027	14	
-Forecast	FRESA	2027	15	
-Forecast	FRESA	2027	16	
-Forecast	FRESA	2027	17	
-Forecast	FRESA	2027	18	
-Forecast	FRESA	2027	19	
-Forecast	FRESA	2027	20	
-Forecast	FRESA	2027	21	
-Forecast	FRESA	2027	22	
-Forecast	FRESA	2027	23	
-Forecast	FRESA	2027	24	
-Forecast	FRESA	2027	25	
-Forecast	FRESA	2027	26	
-Forecast	FRESA	2027	27	
-Forecast	FRESA	2027	28	0
-Forecast	PAPA	2026	26	0
-Forecast	PAPA	2026	27	12226222
-Forecast	PAPA	2026	28	2591432
-Forecast	PAPA	2026	29	1275774
-Forecast	PAPA	2026	30	3607352
-Forecast	PAPA	2026	31	1570988
-Forecast	PAPA	2026	32	-616502
-Forecast	PAPA	2026	33	1931787
-Forecast	PAPA	2026	34	1244530
-Forecast	PAPA	2026	35	2245538
-Forecast	PAPA	2026	36	1550035
-Forecast	PAPA	2026	37	1022828
-Forecast	PAPA	2026	38	1135339.08
-Forecast	PAPA	2026	39	1180752.6432
-Forecast	PAPA	2026	40	1239790.27536
-Forecast	PAPA	2026	41	1314177.6918816
-Forecast	PAPA	2026	42	1379886.57647568
-Forecast	PAPA	2026	43	1531674.099888005
-Forecast	PAPA	2026	44	1654208.0278790456
-Forecast	PAPA	2026	45	1770002.5898305788
-Forecast	PAPA	2026	46	1947002.8488136367
-Forecast	PAPA	2026	47	2024882.9627661821
-Forecast	PAPA	2026	48	2166624.770159815
-Forecast	PAPA	2026	49	
-Forecast	PAPA	2026	50	
-Forecast	PAPA	2026	51	
-Forecast	PAPA	2026	52	
-Forecast	PAPA	2027	1	
-Forecast	PAPA	2027	2	
-Forecast	PAPA	2027	3	
-Forecast	PAPA	2027	4	
-Forecast	PAPA	2027	5	
-Forecast	PAPA	2027	6	
-Forecast	PAPA	2027	7	
-Forecast	PAPA	2027	8	
-Forecast	PAPA	2027	9	
-Forecast	PAPA	2027	10	
-Forecast	PAPA	2027	11	
-Forecast	PAPA	2027	12	
-Forecast	PAPA	2027	13	
-Forecast	PAPA	2027	14	
-Forecast	PAPA	2027	15	
-Forecast	PAPA	2027	16	
-Forecast	PAPA	2027	17	
-Forecast	PAPA	2027	18	
-Forecast	PAPA	2027	19	
-Forecast	PAPA	2027	20	
-Forecast	PAPA	2027	21	
-Forecast	PAPA	2027	22	
-Forecast	PAPA	2027	23	
-Forecast	PAPA	2027	24	
-Forecast	PAPA	2027	25	
-Forecast	PAPA	2027	26	
-Forecast	PAPA	2027	27	
-Forecast	ZARZAMORA	2026	26	0
-Forecast	ZARZAMORA	2026	27	7021162
-Forecast	ZARZAMORA	2026	28	909856
-Forecast	ZARZAMORA	2026	29	1982028
-Forecast	ZARZAMORA	2026	30	4054404
-Forecast	ZARZAMORA	2026	31	4210491
-Forecast	ZARZAMORA	2026	32	1035807
-Forecast	ZARZAMORA	2026	33	3372313
-Forecast	ZARZAMORA	2026	34	1287315
-Forecast	ZARZAMORA	2026	35	3332619
-Forecast	ZARZAMORA	2026	36	2460472
-Forecast	ZARZAMORA	2026	37	3263244
-Forecast	ZARZAMORA	2026	38	3328508.88
-Forecast	ZARZAMORA	2026	39	3361793.9688
-Forecast	ZARZAMORA	2026	40	3429029.848176
-Forecast	ZARZAMORA	2026	41	3497610.4451395203
-Forecast	ZARZAMORA	2026	42	3567562.654042311
-Forecast	ZARZAMORA	2026	43	3745940.786744427
-Forecast	ZARZAMORA	2026	44	3895778.4182142043
-Forecast	ZARZAMORA	2026	45	3973693.9865784883
-Forecast	ZARZAMORA	2026	46	4053167.866310058
-Forecast	ZARZAMORA	2026	47	4134231.2236362593
-Forecast	ZARZAMORA	2026	48	4340942.784818073
-Forecast	ZARZAMORA	2026	49	
-Forecast	ZARZAMORA	2026	50	
-Forecast	ZARZAMORA	2026	51	
-Forecast	ZARZAMORA	2026	52	
-Forecast	ZARZAMORA	2027	1	
-Forecast	ZARZAMORA	2027	2	
-Forecast	ZARZAMORA	2027	3	
-Forecast	ZARZAMORA	2027	4	
-Forecast	ZARZAMORA	2027	5	
-Forecast	ZARZAMORA	2027	6	
-Forecast	ZARZAMORA	2027	7	
-Forecast	ZARZAMORA	2027	8	
-Forecast	ZARZAMORA	2027	9	
-Forecast	ZARZAMORA	2027	10	
-Forecast	ZARZAMORA	2027	11	
-Forecast	ZARZAMORA	2027	12	
-Forecast	ZARZAMORA	2027	13	
-Forecast	ZARZAMORA	2027	14	
-Forecast	ZARZAMORA	2027	15	
-Forecast	ZARZAMORA	2027	16	
-Forecast	ZARZAMORA	2027	17	
-Forecast	ZARZAMORA	2027	18	
-Forecast	ZARZAMORA	2027	19	
-Forecast	ZARZAMORA	2027	20	
-Forecast	ZARZAMORA	2027	21	
-Forecast	ZARZAMORA	2027	22	
-Forecast	ZARZAMORA	2027	23	
-Forecast	ZARZAMORA	2027	24	
-Forecast	ZARZAMORA	2027	25	
-Forecast	ZARZAMORA	2027	26	
-Forecast	ZARZAMORA	2027	27	
-Forecast	ZARZAMORA	2027	28	0
-Forecast	EMPAQUE	2026	26	0
-Forecast	EMPAQUE	2026	27	120449
-Forecast	EMPAQUE	2026	28	420738
-Forecast	EMPAQUE	2026	29	339804
-Forecast	EMPAQUE	2026	30	222040
-Forecast	EMPAQUE	2026	31	1045543
-Forecast	EMPAQUE	2026	32	327605
-Forecast	EMPAQUE	2026	33	366123
-Forecast	EMPAQUE	2026	34	3820233
-Forecast	EMPAQUE	2026	35	1094196
-Forecast	EMPAQUE	2026	36	2091821
-Forecast	EMPAQUE	2026	37	1327173
-Forecast	EMPAQUE	2026	38	1446618.57
-Forecast	EMPAQUE	2026	39	1518949.4985000002
-Forecast	EMPAQUE	2026	40	1944255.3580800004
-Forecast	EMPAQUE	2026	41	2022025.5724032004
-Forecast	EMPAQUE	2026	42	2305109.1525396486
-Forecast	EMPAQUE	2026	43	1959342.7796587013
-Forecast	EMPAQUE	2026	44	2547145.613556312
-Forecast	EMPAQUE	2026	45	3820718.4203344677
-Forecast	EMPAQUE	2026	46	4088168.709757881
-Forecast	EMPAQUE	2026	47	4292577.145245775
-Forecast	EMPAQUE	2026	48	3434061.71619662
-Forecast	EMPAQUE	2026	49	
-Forecast	EMPAQUE	2026	50	
-Forecast	EMPAQUE	2026	51	
-Forecast	EMPAQUE	2026	52	
-Forecast	EMPAQUE	2027	1	
-Forecast	EMPAQUE	2027	2	
-Forecast	EMPAQUE	2027	3	
-Forecast	EMPAQUE	2027	4	
-Forecast	EMPAQUE	2027	5	
-Forecast	EMPAQUE	2027	6	
-Forecast	EMPAQUE	2027	7	
-Forecast	EMPAQUE	2027	8	
-Forecast	EMPAQUE	2027	9	
-Forecast	EMPAQUE	2027	10	
-Forecast	EMPAQUE	2027	11	
-Forecast	EMPAQUE	2027	12	
-Forecast	EMPAQUE	2027	13	
-Forecast	EMPAQUE	2027	14	
-Forecast	EMPAQUE	2027	15	
-Forecast	EMPAQUE	2027	16	
-Forecast	EMPAQUE	2027	17	
-Forecast	EMPAQUE	2027	18	
-Forecast	EMPAQUE	2027	19	
-Forecast	EMPAQUE	2027	20	
-Forecast	EMPAQUE	2027	21	
-Forecast	EMPAQUE	2027	22	
-Forecast	EMPAQUE	2027	23	
-Forecast	EMPAQUE	2027	24	
-Forecast	EMPAQUE	2027	25	
-Forecast	EMPAQUE	2027	26	
-Forecast	EMPAQUE	2027	27	
-Forecast	EMPAQUE	2027	28	0`
+  proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe 
+Proyección	AGUACATE	2026	26	0
+Proyección	AGUACATE	2026	27	174937256
+Proyección	AGUACATE	2026	28	2371571
+Proyección	AGUACATE	2026	29	3223080
+Proyección	AGUACATE	2026	30	10619357
+Proyección	AGUACATE	2026	31	12153942
+Proyección	AGUACATE	2026	32	3489155
+Proyección	AGUACATE	2026	33	6151725
+Proyección	AGUACATE	2026	34	5319971
+Proyección	AGUACATE	2026	35	10406527
+Proyección	AGUACATE	2026	36	4132519
+Proyección	AGUACATE	2026	37	2651255
+Proyección	AGUACATE	2026	38	2704280
+Proyección	AGUACATE	2026	39	2731323
+Proyección	AGUACATE	2026	40	2785949
+Proyección	AGUACATE	2026	41	2841668
+Proyección	AGUACATE	2026	42	2898502
+Proyección	AGUACATE	2026	43	3043427
+Proyección	AGUACATE	2026	44	3165164
+Proyección	AGUACATE	2026	45	3228467
+Proyección	AGUACATE	2026	46	3293036
+Proyección	AGUACATE	2026	47	3358897
+Proyección	AGUACATE	2026	48	3526842
+Proyección	AGUACATE	2026	49	0
+Proyección	AGUACATE	2026	50	0
+Proyección	AGUACATE	2026	51	0
+Proyección	AGUACATE	2026	52	0
+Proyección	AGUACATE	2027	1	0
+Proyección	AGUACATE	2027	2	0
+Proyección	AGUACATE	2027	3	0
+Proyección	AGUACATE	2027	4	0
+Proyección	AGUACATE	2027	5	0
+Proyección	AGUACATE	2027	6	0
+Proyección	AGUACATE	2027	7	0
+Proyección	AGUACATE	2027	8	0
+Proyección	AGUACATE	2027	9	0
+Proyección	AGUACATE	2027	10	0
+Proyección	AGUACATE	2027	11	0
+Proyección	AGUACATE	2027	12	0
+Proyección	AGUACATE	2027	13	0
+Proyección	AGUACATE	2027	14	0
+Proyección	AGUACATE	2027	15	0
+Proyección	AGUACATE	2027	16	0
+Proyección	AGUACATE	2027	17	0
+Proyección	AGUACATE	2027	18	0
+Proyección	AGUACATE	2027	19	0
+Proyección	AGUACATE	2027	20	0
+Proyección	AGUACATE	2027	21	0
+Proyección	AGUACATE	2027	22	0
+Proyección	AGUACATE	2027	23	0
+Proyección	AGUACATE	2027	24	0
+Proyección	AGUACATE	2027	25	0
+Proyección	AGUACATE	2027	26	0
+Proyección	ARANDANO	2026	26	0
+Proyección	ARANDANO	2026	27	4799906
+Proyección	ARANDANO	2026	28	1360606
+Proyección	ARANDANO	2026	29	2248386
+Proyección	ARANDANO	2026	30	6683481
+Proyección	ARANDANO	2026	31	9520206
+Proyección	ARANDANO	2026	32	1096454
+Proyección	ARANDANO	2026	33	5950670
+Proyección	ARANDANO	2026	34	899701
+Proyección	ARANDANO	2026	35	6501001
+Proyección	ARANDANO	2026	36	4306725
+Proyección	ARANDANO	2026	37	5905080
+Proyección	ARANDANO	2026	38	6082232
+Proyección	ARANDANO	2026	39	6629633
+Proyección	ARANDANO	2026	40	6894819
+Proyección	ARANDANO	2026	41	7101663
+Proyección	ARANDANO	2026	42	7314713
+Proyección	ARANDANO	2026	43	7899890
+Proyección	ARANDANO	2026	44	8215886
+Proyección	ARANDANO	2026	45	8380203
+Proyección	ARANDANO	2026	46	8547808
+Proyección	ARANDANO	2026	47	9146154
+Proyección	ARANDANO	2026	48	9329077
+Proyección	ARANDANO	2026	49	0
+Proyección	ARANDANO	2026	50	0
+Proyección	ARANDANO	2026	51	0
+Proyección	ARANDANO	2026	52	0
+Proyección	ARANDANO	2027	1	0
+Proyección	ARANDANO	2027	2	0
+Proyección	ARANDANO	2027	3	0
+Proyección	ARANDANO	2027	4	0
+Proyección	ARANDANO	2027	5	0
+Proyección	ARANDANO	2027	6	0
+Proyección	ARANDANO	2027	7	0
+Proyección	ARANDANO	2027	8	0
+Proyección	ARANDANO	2027	9	0
+Proyección	ARANDANO	2027	10	0
+Proyección	ARANDANO	2027	11	0
+Proyección	ARANDANO	2027	12	0
+Proyección	ARANDANO	2027	13	0
+Proyección	ARANDANO	2027	14	0
+Proyección	ARANDANO	2027	15	0
+Proyección	ARANDANO	2027	16	0
+Proyección	ARANDANO	2027	17	0
+Proyección	ARANDANO	2027	18	0
+Proyección	ARANDANO	2027	19	0
+Proyección	ARANDANO	2027	20	0
+Proyección	ARANDANO	2027	21	0
+Proyección	ARANDANO	2027	22	0
+Proyección	ARANDANO	2027	23	0
+Proyección	ARANDANO	2027	24	0
+Proyección	ARANDANO	2027	25	0
+Proyección	ARANDANO	2027	26	0
+Proyección	ARANDANO	2027	27	0
+Proyección	ARANDANO	2027	28	0
+Proyección	ESPARRAGO	2026	26	0
+Proyección	ESPARRAGO	2026	27	109927366
+Proyección	ESPARRAGO	2026	28	3677980
+Proyección	ESPARRAGO	2026	29	5005817
+Proyección	ESPARRAGO	2026	30	7596454
+Proyección	ESPARRAGO	2026	31	7267964
+Proyección	ESPARRAGO	2026	32	7209569
+Proyección	ESPARRAGO	2026	33	8862046
+Proyección	ESPARRAGO	2026	34	5215117
+Proyección	ESPARRAGO	2026	35	5442217
+Proyección	ESPARRAGO	2026	36	7105484
+Proyección	ESPARRAGO	2026	37	4521230
+Proyección	ESPARRAGO	2026	38	4792504
+Proyección	ESPARRAGO	2026	39	4984204
+Proyección	ESPARRAGO	2026	40	5183572
+Proyección	ESPARRAGO	2026	41	5339079
+Proyección	ESPARRAGO	2026	42	5552642
+Proyección	ESPARRAGO	2026	43	5774748
+Proyección	ESPARRAGO	2026	44	5890243
+Proyección	ESPARRAGO	2026	45	6066950
+Proyección	ESPARRAGO	2026	46	6248959
+Proyección	ESPARRAGO	2026	47	6436428
+Proyección	ESPARRAGO	2026	48	6565156
+Proyección	ESPARRAGO	2026	49	0
+Proyección	ESPARRAGO	2026	50	0
+Proyección	ESPARRAGO	2026	51	0
+Proyección	ESPARRAGO	2026	52	0
+Proyección	ESPARRAGO	2027	1	0
+Proyección	ESPARRAGO	2027	2	0
+Proyección	ESPARRAGO	2027	3	0
+Proyección	ESPARRAGO	2027	4	0
+Proyección	ESPARRAGO	2027	5	0
+Proyección	ESPARRAGO	2027	6	0
+Proyección	ESPARRAGO	2027	7	0
+Proyección	ESPARRAGO	2027	8	0
+Proyección	ESPARRAGO	2027	9	0
+Proyección	ESPARRAGO	2027	10	0
+Proyección	ESPARRAGO	2027	11	0
+Proyección	ESPARRAGO	2027	12	0
+Proyección	ESPARRAGO	2027	13	0
+Proyección	ESPARRAGO	2027	14	0
+Proyección	ESPARRAGO	2027	15	0
+Proyección	ESPARRAGO	2027	16	0
+Proyección	ESPARRAGO	2027	17	0
+Proyección	ESPARRAGO	2027	18	0
+Proyección	ESPARRAGO	2027	19	0
+Proyección	ESPARRAGO	2027	20	0
+Proyección	ESPARRAGO	2027	21	0
+Proyección	ESPARRAGO	2027	22	0
+Proyección	ESPARRAGO	2027	23	0
+Proyección	ESPARRAGO	2027	24	0
+Proyección	ESPARRAGO	2027	25	0
+Proyección	ESPARRAGO	2027	26	0
+Proyección	ESPARRAGO	2027	27	0
+Proyección	ESPARRAGO	2027	28	0
+Proyección	FRAMBUESA	2026	26	0
+Proyección	FRAMBUESA	2026	27	22070424
+Proyección	FRAMBUESA	2026	28	1983118
+Proyección	FRAMBUESA	2026	29	1512561
+Proyección	FRAMBUESA	2026	30	7945792
+Proyección	FRAMBUESA	2026	31	7962106
+Proyección	FRAMBUESA	2026	32	2221586
+Proyección	FRAMBUESA	2026	33	8597470
+Proyección	FRAMBUESA	2026	34	5772626
+Proyección	FRAMBUESA	2026	35	6837542
+Proyección	FRAMBUESA	2026	36	6806748
+Proyección	FRAMBUESA	2026	37	7332511
+Proyección	FRAMBUESA	2026	38	8139087
+Proyección	FRAMBUESA	2026	39	9034387
+Proyección	FRAMBUESA	2026	40	10208857
+Proyección	FRAMBUESA	2026	41	11433920
+Proyección	FRAMBUESA	2026	42	12348634
+Proyección	FRAMBUESA	2026	43	13460011
+Proyección	FRAMBUESA	2026	44	14806012
+Proyección	FRAMBUESA	2026	45	15694372
+Proyección	FRAMBUESA	2026	46	16479091
+Proyección	FRAMBUESA	2026	47	17303045
+Proyección	FRAMBUESA	2026	48	18168198
+Proyección	FRAMBUESA	2026	49	0
+Proyección	FRAMBUESA	2026	50	0
+Proyección	FRAMBUESA	2026	51	0
+Proyección	FRAMBUESA	2026	52	0
+Proyección	FRAMBUESA	2027	1	0
+Proyección	FRAMBUESA	2027	2	0
+Proyección	FRAMBUESA	2027	3	0
+Proyección	FRAMBUESA	2027	4	0
+Proyección	FRAMBUESA	2027	5	0
+Proyección	FRAMBUESA	2027	6	0
+Proyección	FRAMBUESA	2027	7	0
+Proyección	FRAMBUESA	2027	8	0
+Proyección	FRAMBUESA	2027	9	0
+Proyección	FRAMBUESA	2027	10	0
+Proyección	FRAMBUESA	2027	11	0
+Proyección	FRAMBUESA	2027	12	0
+Proyección	FRAMBUESA	2027	13	0
+Proyección	FRAMBUESA	2027	14	0
+Proyección	FRAMBUESA	2027	15	0
+Proyección	FRAMBUESA	2027	16	0
+Proyección	FRAMBUESA	2027	17	0
+Proyección	FRAMBUESA	2027	18	0
+Proyección	FRAMBUESA	2027	19	0
+Proyección	FRAMBUESA	2027	20	0
+Proyección	FRAMBUESA	2027	21	0
+Proyección	FRAMBUESA	2027	22	0
+Proyección	FRAMBUESA	2027	23	0
+Proyección	FRAMBUESA	2027	24	0
+Proyección	FRAMBUESA	2027	25	0
+Proyección	FRAMBUESA	2027	26	0
+Proyección	FRAMBUESA	2027	27	0
+Proyección	FRESA	2026	26	0
+Proyección	FRESA	2026	27	55044916
+Proyección	FRESA	2026	28	6561940
+Proyección	FRESA	2026	29	3953203
+Proyección	FRESA	2026	30	20459935
+Proyección	FRESA	2026	31	9015767
+Proyección	FRESA	2026	32	5825288
+Proyección	FRESA	2026	33	9613622
+Proyección	FRESA	2026	34	3613694
+Proyección	FRESA	2026	35	7621321
+Proyección	FRESA	2026	36	15220093
+Proyección	FRESA	2026	37	14351353
+Proyección	FRESA	2026	38	14925407
+Proyección	FRESA	2026	39	15671677
+Proyección	FRESA	2026	40	16298545
+Proyección	FRESA	2026	41	16950486
+Proyección	FRESA	2026	42	17628506
+Proyección	FRESA	2026	43	18333646
+Proyección	FRESA	2026	44	21450366
+Proyección	FRESA	2026	45	21879373
+Proyección	FRESA	2026	46	22535754
+Proyección	FRESA	2026	47	23211827
+Proyección	FRESA	2026	48	24140300
+Proyección	FRESA	2026	49	0
+Proyección	FRESA	2026	50	0
+Proyección	FRESA	2026	51	0
+Proyección	FRESA	2026	52	0
+Proyección	FRESA	2027	1	0
+Proyección	FRESA	2027	2	0
+Proyección	FRESA	2027	3	0
+Proyección	FRESA	2027	4	0
+Proyección	FRESA	2027	5	0
+Proyección	FRESA	2027	6	0
+Proyección	FRESA	2027	7	0
+Proyección	FRESA	2027	8	0
+Proyección	FRESA	2027	9	0
+Proyección	FRESA	2027	10	0
+Proyección	FRESA	2027	11	0
+Proyección	FRESA	2027	12	0
+Proyección	FRESA	2027	13	0
+Proyección	FRESA	2027	14	0
+Proyección	FRESA	2027	15	0
+Proyección	FRESA	2027	16	0
+Proyección	FRESA	2027	17	0
+Proyección	FRESA	2027	18	0
+Proyección	FRESA	2027	19	0
+Proyección	FRESA	2027	20	0
+Proyección	FRESA	2027	21	0
+Proyección	FRESA	2027	22	0
+Proyección	FRESA	2027	23	0
+Proyección	FRESA	2027	24	0
+Proyección	FRESA	2027	25	0
+Proyección	FRESA	2027	26	0
+Proyección	FRESA	2027	27	0
+Proyección	FRESA	2027	28	0
+Proyección	PAPA	2026	26	0
+Proyección	PAPA	2026	27	12226222
+Proyección	PAPA	2026	28	2591432
+Proyección	PAPA	2026	29	1275774
+Proyección	PAPA	2026	30	3607352
+Proyección	PAPA	2026	31	1570988
+Proyección	PAPA	2026	32	-616502
+Proyección	PAPA	2026	33	1931787
+Proyección	PAPA	2026	34	1244530
+Proyección	PAPA	2026	35	2245538
+Proyección	PAPA	2026	36	1550035
+Proyección	PAPA	2026	37	1022828
+Proyección	PAPA	2026	38	1135339
+Proyección	PAPA	2026	39	1180753
+Proyección	PAPA	2026	40	1239790
+Proyección	PAPA	2026	41	1314178
+Proyección	PAPA	2026	42	1379887
+Proyección	PAPA	2026	43	1531674
+Proyección	PAPA	2026	44	1654208
+Proyección	PAPA	2026	45	1770003
+Proyección	PAPA	2026	46	1947003
+Proyección	PAPA	2026	47	2024883
+Proyección	PAPA	2026	48	2166625
+Proyección	PAPA	2026	49	0
+Proyección	PAPA	2026	50	0
+Proyección	PAPA	2026	51	0
+Proyección	PAPA	2026	52	0
+Proyección	PAPA	2027	1	0
+Proyección	PAPA	2027	2	0
+Proyección	PAPA	2027	3	0
+Proyección	PAPA	2027	4	0
+Proyección	PAPA	2027	5	0
+Proyección	PAPA	2027	6	0
+Proyección	PAPA	2027	7	0
+Proyección	PAPA	2027	8	0
+Proyección	PAPA	2027	9	0
+Proyección	PAPA	2027	10	0
+Proyección	PAPA	2027	11	0
+Proyección	PAPA	2027	12	0
+Proyección	PAPA	2027	13	0
+Proyección	PAPA	2027	14	0
+Proyección	PAPA	2027	15	0
+Proyección	PAPA	2027	16	0
+Proyección	PAPA	2027	17	0
+Proyección	PAPA	2027	18	0
+Proyección	PAPA	2027	19	0
+Proyección	PAPA	2027	20	0
+Proyección	PAPA	2027	21	0
+Proyección	PAPA	2027	22	0
+Proyección	PAPA	2027	23	0
+Proyección	PAPA	2027	24	0
+Proyección	PAPA	2027	25	0
+Proyección	PAPA	2027	26	0
+Proyección	PAPA	2027	27	0
+Proyección	ZARZAMORA	2026	26	0
+Proyección	ZARZAMORA	2026	27	7021162
+Proyección	ZARZAMORA	2026	28	909856
+Proyección	ZARZAMORA	2026	29	1982028
+Proyección	ZARZAMORA	2026	30	4054404
+Proyección	ZARZAMORA	2026	31	4210491
+Proyección	ZARZAMORA	2026	32	1035807
+Proyección	ZARZAMORA	2026	33	3372313
+Proyección	ZARZAMORA	2026	34	1287315
+Proyección	ZARZAMORA	2026	35	3332619
+Proyección	ZARZAMORA	2026	36	2460472
+Proyección	ZARZAMORA	2026	37	3263244
+Proyección	ZARZAMORA	2026	38	3589568
+Proyección	ZARZAMORA	2026	39	3948525
+Proyección	ZARZAMORA	2026	40	4303893
+Proyección	ZARZAMORA	2026	41	4562126
+Proyección	ZARZAMORA	2026	42	4790232
+Proyección	ZARZAMORA	2026	43	5077646
+Proyección	ZARZAMORA	2026	44	5433082
+Proyección	ZARZAMORA	2026	45	5650405
+Proyección	ZARZAMORA	2026	46	5876421
+Proyección	ZARZAMORA	2026	47	6229006
+Proyección	ZARZAMORA	2026	48	6602747
+Proyección	ZARZAMORA	2026	49	0
+Proyección	ZARZAMORA	2026	50	0
+Proyección	ZARZAMORA	2026	51	0
+Proyección	ZARZAMORA	2026	52	0
+Proyección	ZARZAMORA	2027	1	0
+Proyección	ZARZAMORA	2027	2	0
+Proyección	ZARZAMORA	2027	3	0
+Proyección	ZARZAMORA	2027	4	0
+Proyección	ZARZAMORA	2027	5	0
+Proyección	ZARZAMORA	2027	6	0
+Proyección	ZARZAMORA	2027	7	0
+Proyección	ZARZAMORA	2027	8	0
+Proyección	ZARZAMORA	2027	9	0
+Proyección	ZARZAMORA	2027	10	0
+Proyección	ZARZAMORA	2027	11	0
+Proyección	ZARZAMORA	2027	12	0
+Proyección	ZARZAMORA	2027	13	0
+Proyección	ZARZAMORA	2027	14	0
+Proyección	ZARZAMORA	2027	15	0
+Proyección	ZARZAMORA	2027	16	0
+Proyección	ZARZAMORA	2027	17	0
+Proyección	ZARZAMORA	2027	18	0
+Proyección	ZARZAMORA	2027	19	0
+Proyección	ZARZAMORA	2027	20	0
+Proyección	ZARZAMORA	2027	21	0
+Proyección	ZARZAMORA	2027	22	0
+Proyección	ZARZAMORA	2027	23	0
+Proyección	ZARZAMORA	2027	24	0
+Proyección	ZARZAMORA	2027	25	0
+Proyección	ZARZAMORA	2027	26	0
+Proyección	ZARZAMORA	2027	27	0
+Proyección	ZARZAMORA	2027	28	0
+Proyección	EMPAQUE	2026	26	0
+Proyección	EMPAQUE	2026	27	120450
+Proyección	EMPAQUE	2026	28	420740
+Proyección	EMPAQUE	2026	29	339804
+Proyección	EMPAQUE	2026	30	222040
+Proyección	EMPAQUE	2026	31	1045542
+Proyección	EMPAQUE	2026	32	327604
+Proyección	EMPAQUE	2026	33	366122
+Proyección	EMPAQUE	2026	34	3820231
+Proyección	EMPAQUE	2026	35	1094195
+Proyección	EMPAQUE	2026	36	2091820
+Proyección	EMPAQUE	2026	37	1327171
+Proyección	EMPAQUE	2026	38	1446616
+Proyección	EMPAQUE	2026	39	1518947
+Proyección	EMPAQUE	2026	40	1944252
+Proyección	EMPAQUE	2026	41	2022023
+Proyección	EMPAQUE	2026	42	2305106
+Proyección	EMPAQUE	2026	43	1959340
+Proyección	EMPAQUE	2026	44	2547142
+Proyección	EMPAQUE	2026	45	3820713
+Proyección	EMPAQUE	2026	46	4088163
+Proyección	EMPAQUE	2026	47	4292571
+Proyección	EMPAQUE	2026	48	3434057
+Proyección	EMPAQUE	2026	49	0
+Proyección	EMPAQUE	2026	50	0
+Proyección	EMPAQUE	2026	51	0
+Proyección	EMPAQUE	2026	52	-1717028.5
+Proyección	EMPAQUE	2027	1	-2747245.6
+Proyección	EMPAQUE	2027	2	-3777462.7
+Proyección	EMPAQUE	2027	3	-4807679.8
+Proyección	EMPAQUE	2027	4	-5837896.9
+Proyección	EMPAQUE	2027	5	-6868114
+Proyección	EMPAQUE	2027	6	-7898331.1
+Proyección	EMPAQUE	2027	7	-8928548.2
+Proyección	EMPAQUE	2027	8	-9958765.3
+Proyección	EMPAQUE	2027	9	-10988982.4
+Proyección	EMPAQUE	2027	10	-12019199.5
+Proyección	EMPAQUE	2027	11	-13049416.6
+Proyección	EMPAQUE	2027	12	-14079633.7
+Proyección	EMPAQUE	2027	13	-15109850.8
+Proyección	EMPAQUE	2027	14	-16140067.9
+Proyección	EMPAQUE	2027	15	-17170285
+Proyección	EMPAQUE	2027	16	-18200502.1
+Proyección	EMPAQUE	2027	17	-19230719.2
+Proyección	EMPAQUE	2027	18	-20260936.3
+Proyección	EMPAQUE	2027	19	-21291153.4
+Proyección	EMPAQUE	2027	20	-22321370.5
+Proyección	EMPAQUE	2027	21	-23351587.6
+Proyección	EMPAQUE	2027	22	-24381804.7
+Proyección	EMPAQUE	2027	23	-25412021.8
+Proyección	EMPAQUE	2027	24	-26442238.9
+Proyección	EMPAQUE	2027	25	-27472456
+Proyección	EMPAQUE	2027	26	-28502673.1
+Proyección	EMPAQUE	2027	27	-29532890.2
+Proyección	EMPAQUE	2027	28	0`
  },
  ingreso: {
   real: ``,
@@ -3619,392 +3612,392 @@ Presupuesto	ESPARRAGO	2027	25	90450
 Presupuesto	ESPARRAGO	2027	26	90450
 Presupuesto	ESPARRAGO	2027	27	90450
 Presupuesto	ESPARRAGO	2027	28	90450`,
-  proyeccion: `Producción	Cultivo	ejercicio	semana	Producción
-Forecast	FRESA	2026	27	0
-Forecast	FRESA	2026	28	0
-Forecast	FRESA	2026	29	0
-Forecast	FRESA	2026	30	0
-Forecast	FRESA	2026	31	0
-Forecast	FRESA	2026	32	0
-Forecast	FRESA	2026	33	0
-Forecast	FRESA	2026	34	0
-Forecast	FRESA	2026	35	0
-Forecast	FRESA	2026	36	440
-Forecast	FRESA	2026	37	440
-Forecast	FRESA	2026	38	440
-Forecast	FRESA	2026	39	7458
-Forecast	FRESA	2026	40	15139.740000000002
-Forecast	FRESA	2026	41	25283.365800000003
-Forecast	FRESA	2026	42	33879.71017200001
-Forecast	FRESA	2026	43	43027.23191844001
-Forecast	FRESA	2026	44	50772.13366375921
-Forecast	FRESA	2026	45	0
-Forecast	FRESA	2026	46	0
-Forecast	FRESA	2026	47	0
-Forecast	FRESA	2026	48	0
-Forecast	FRESA	2026	49	0
-Forecast	FRESA	2026	50	0
-Forecast	FRESA	2026	51	0
-Forecast	FRESA	2026	52	0
-Forecast	FRESA	2027	1	0
-Forecast	FRESA	2027	2	0
-Forecast	FRESA	2027	3	0
-Forecast	FRESA	2027	4	0
-Forecast	FRESA	2027	5	0
-Forecast	FRESA	2027	6	0
-Forecast	FRESA	2027	7	0
-Forecast	FRESA	2027	8	0
-Forecast	FRESA	2027	9	0
-Forecast	FRESA	2027	10	0
-Forecast	FRESA	2027	11	0
-Forecast	FRESA	2027	12	0
-Forecast	FRESA	2027	13	0
-Forecast	FRESA	2027	14	0
-Forecast	FRESA	2027	15	0
-Forecast	FRESA	2027	16	0
-Forecast	FRESA	2027	17	0
-Forecast	FRESA	2027	18	0
-Forecast	FRESA	2027	19	0
-Forecast	FRESA	2027	20	0
-Forecast	FRESA	2027	21	0
-Forecast	FRESA	2027	22	0
-Forecast	FRESA	2027	23	0
-Forecast	FRESA	2027	24	0
-Forecast	FRESA	2027	25	0
-Forecast	FRESA	2027	26	0
-Forecast	FRESA	2027	27	0
-Forecast	FRESA	2027	28	0
-Forecast	ARANDANO	2026	27	0
-Forecast	ARANDANO	2026	28	0
-Forecast	ARANDANO	2026	29	1862
-Forecast	ARANDANO	2026	30	1327
-Forecast	ARANDANO	2026	31	1687
-Forecast	ARANDANO	2026	32	1913
-Forecast	ARANDANO	2026	33	3191
-Forecast	ARANDANO	2026	34	3664
-Forecast	ARANDANO	2026	35	4115
-Forecast	ARANDANO	2026	36	1259
-Forecast	ARANDANO	2026	37	426
-Forecast	ARANDANO	2026	38	460.08000000000004
-Forecast	ARANDANO	2026	39	377.26560000000006
-Forecast	ARANDANO	2026	40	437.628096
-Forecast	ARANDANO	2026	41	446.38065792000003
-Forecast	ARANDANO	2026	42	571.3672421376001
-Forecast	ARANDANO	2026	43	491.37582823833606
-Forecast	ARANDANO	2026	44	368.53187117875206
-Forecast	ARANDANO	2026	45	0
-Forecast	ARANDANO	2026	46	0
-Forecast	ARANDANO	2026	47	0
-Forecast	ARANDANO	2026	48	0
-Forecast	ARANDANO	2026	49	0
-Forecast	ARANDANO	2026	50	0
-Forecast	ARANDANO	2026	51	0
-Forecast	ARANDANO	2026	52	0
-Forecast	ARANDANO	2027	1	0
-Forecast	ARANDANO	2027	2	0
-Forecast	ARANDANO	2027	3	0
-Forecast	ARANDANO	2027	4	0
-Forecast	ARANDANO	2027	5	0
-Forecast	ARANDANO	2027	6	0
-Forecast	ARANDANO	2027	7	0
-Forecast	ARANDANO	2027	8	0
-Forecast	ARANDANO	2027	9	0
-Forecast	ARANDANO	2027	10	0
-Forecast	ARANDANO	2027	11	0
-Forecast	ARANDANO	2027	12	0
-Forecast	ARANDANO	2027	13	0
-Forecast	ARANDANO	2027	14	0
-Forecast	ARANDANO	2027	15	0
-Forecast	ARANDANO	2027	16	0
-Forecast	ARANDANO	2027	17	0
-Forecast	ARANDANO	2027	18	0
-Forecast	ARANDANO	2027	19	0
-Forecast	ARANDANO	2027	20	0
-Forecast	ARANDANO	2027	21	0
-Forecast	ARANDANO	2027	22	0
-Forecast	ARANDANO	2027	23	0
-Forecast	ARANDANO	2027	24	0
-Forecast	ARANDANO	2027	25	0
-Forecast	ARANDANO	2027	26	0
-Forecast	ARANDANO	2027	27	0
-Forecast	ARANDANO	2027	28	0
-Forecast	ARANDANO	2027	29	0
-Forecast	FRAMBUESA	2026	27	0
-Forecast	FRAMBUESA	2026	28	0
-Forecast	FRAMBUESA	2026	29	768
-Forecast	FRAMBUESA	2026	30	768
-Forecast	FRAMBUESA	2026	31	768
-Forecast	FRAMBUESA	2026	32	768
-Forecast	FRAMBUESA	2026	33	2987.52
-Forecast	FRAMBUESA	2026	34	4511.1552
-Forecast	FRAMBUESA	2026	35	290
-Forecast	FRAMBUESA	2026	36	498
-Forecast	FRAMBUESA	2026	37	3529
-Forecast	FRAMBUESA	2026	38	5822.849999999999
-Forecast	FRAMBUESA	2026	39	8559.589499999998
-Forecast	FRAMBUESA	2026	40	10785.082769999997
-Forecast	FRAMBUESA	2026	41	11432.187736199998
-Forecast	FRAMBUESA	2026	42	11317.865858837999
-Forecast	FRAMBUESA	2026	43	11883.7591517799
-Forecast	FRAMBUESA	2026	44	12834.459883922293
-Forecast	FRAMBUESA	2026	45	0
-Forecast	FRAMBUESA	2026	46	0
-Forecast	FRAMBUESA	2026	47	0
-Forecast	FRAMBUESA	2026	48	0
-Forecast	FRAMBUESA	2026	49	0
-Forecast	FRAMBUESA	2026	50	0
-Forecast	FRAMBUESA	2026	51	0
-Forecast	FRAMBUESA	2026	52	0
-Forecast	FRAMBUESA	2027	1	0
-Forecast	FRAMBUESA	2027	2	0
-Forecast	FRAMBUESA	2027	3	0
-Forecast	FRAMBUESA	2027	4	0
-Forecast	FRAMBUESA	2027	5	0
-Forecast	FRAMBUESA	2027	6	0
-Forecast	FRAMBUESA	2027	7	0
-Forecast	FRAMBUESA	2027	8	0
-Forecast	FRAMBUESA	2027	9	0
-Forecast	FRAMBUESA	2027	10	0
-Forecast	FRAMBUESA	2027	11	0
-Forecast	FRAMBUESA	2027	12	0
-Forecast	FRAMBUESA	2027	13	0
-Forecast	FRAMBUESA	2027	14	0
-Forecast	FRAMBUESA	2027	15	0
-Forecast	FRAMBUESA	2027	16	0
-Forecast	FRAMBUESA	2027	17	0
-Forecast	FRAMBUESA	2027	18	0
-Forecast	FRAMBUESA	2027	19	0
-Forecast	FRAMBUESA	2027	20	0
-Forecast	FRAMBUESA	2027	21	0
-Forecast	FRAMBUESA	2027	22	0
-Forecast	FRAMBUESA	2027	23	0
-Forecast	FRAMBUESA	2027	24	0
-Forecast	FRAMBUESA	2027	25	0
-Forecast	FRAMBUESA	2027	26	0
-Forecast	FRAMBUESA	2027	27	0
-Forecast	FRAMBUESA	2027	28	0
-Forecast	ZARZAMORA	2026	27	0
-Forecast	ZARZAMORA	2026	28	0
-Forecast	ZARZAMORA	2026	29	0
-Forecast	ZARZAMORA	2026	30	0
-Forecast	ZARZAMORA	2026	31	0
-Forecast	ZARZAMORA	2026	32	0
-Forecast	ZARZAMORA	2026	33	0
-Forecast	ZARZAMORA	2026	34	0
-Forecast	ZARZAMORA	2026	35	0
-Forecast	ZARZAMORA	2026	36	0
-Forecast	ZARZAMORA	2026	37	0
-Forecast	ZARZAMORA	2026	38	0
-Forecast	ZARZAMORA	2026	39	0
-Forecast	ZARZAMORA	2026	40	0
-Forecast	ZARZAMORA	2026	41	0
-Forecast	ZARZAMORA	2026	42	0
-Forecast	ZARZAMORA	2026	43	0
-Forecast	ZARZAMORA	2026	44	0
-Forecast	ZARZAMORA	2026	45	0
-Forecast	ZARZAMORA	2026	46	0
-Forecast	ZARZAMORA	2026	47	0
-Forecast	ZARZAMORA	2026	48	0
-Forecast	ZARZAMORA	2026	49	0
-Forecast	ZARZAMORA	2026	50	0
-Forecast	ZARZAMORA	2026	51	0
-Forecast	ZARZAMORA	2026	52	0
-Forecast	ZARZAMORA	2027	1	0
-Forecast	ZARZAMORA	2027	2	0
-Forecast	ZARZAMORA	2027	3	0
-Forecast	ZARZAMORA	2027	4	0
-Forecast	ZARZAMORA	2027	5	0
-Forecast	ZARZAMORA	2027	6	0
-Forecast	ZARZAMORA	2027	7	0
-Forecast	ZARZAMORA	2027	8	0
-Forecast	ZARZAMORA	2027	9	0
-Forecast	ZARZAMORA	2027	10	0
-Forecast	ZARZAMORA	2027	11	0
-Forecast	ZARZAMORA	2027	12	0
-Forecast	ZARZAMORA	2027	13	0
-Forecast	ZARZAMORA	2027	14	0
-Forecast	ZARZAMORA	2027	15	0
-Forecast	ZARZAMORA	2027	16	0
-Forecast	ZARZAMORA	2027	17	0
-Forecast	ZARZAMORA	2027	18	0
-Forecast	ZARZAMORA	2027	19	0
-Forecast	ZARZAMORA	2027	20	0
-Forecast	ZARZAMORA	2027	21	0
-Forecast	ZARZAMORA	2027	22	0
-Forecast	ZARZAMORA	2027	23	0
-Forecast	ZARZAMORA	2027	24	0
-Forecast	ZARZAMORA	2027	25	0
-Forecast	ZARZAMORA	2027	26	0
-Forecast	ZARZAMORA	2027	27	0
-Forecast	ZARZAMORA	2027	28	0
-Forecast	ZARZAMORA	2027	29	0
-Forecast	ZARZAMORA	2027	30	0
-Forecast	AGUACATE	2026	21	0
-Forecast	AGUACATE	2026	22	0
-Forecast	AGUACATE	2026	23	0
-Forecast	AGUACATE	2026	24	0
-Forecast	AGUACATE	2026	25	0
-Forecast	AGUACATE	2026	26	0
-Forecast	AGUACATE	2026	27	984466
-Forecast	AGUACATE	2026	28	182395
-Forecast	AGUACATE	2026	29	248825
-Forecast	AGUACATE	2026	30	246345
-Forecast	AGUACATE	2026	31	248245
-Forecast	AGUACATE	2026	32	66690
-Forecast	AGUACATE	2026	33	134060
-Forecast	AGUACATE	2026	34	287000
-Forecast	AGUACATE	2026	35	221880
-Forecast	AGUACATE	2026	36	259520
-Forecast	AGUACATE	2026	37	352820
-Forecast	AGUACATE	2026	38	194051.00000000003
-Forecast	AGUACATE	2026	39	273611.91000000003
-Forecast	AGUACATE	2026	40	311917.57740000007
-Forecast	AGUACATE	2026	41	452280.4872300001
-Forecast	AGUACATE	2026	42	131161.34129670003
-Forecast	AGUACATE	2026	43	312163.99228614604
-Forecast	AGUACATE	2026	44	181055.11552596473
-Forecast	AGUACATE	2026	45	0
-Forecast	AGUACATE	2026	46	0
-Forecast	AGUACATE	2026	47	0
-Forecast	AGUACATE	2026	48	0
-Forecast	AGUACATE	2026	49	0
-Forecast	AGUACATE	2026	50	0
-Forecast	AGUACATE	2026	51	0
-Forecast	AGUACATE	2026	52	0
-Forecast	AGUACATE	2027	1	0
-Forecast	AGUACATE	2027	2	0
-Forecast	AGUACATE	2027	3	0
-Forecast	AGUACATE	2027	4	0
-Forecast	AGUACATE	2027	5	0
-Forecast	AGUACATE	2027	6	0
-Forecast	AGUACATE	2027	7	0
-Forecast	AGUACATE	2027	8	0
-Forecast	AGUACATE	2027	9	0
-Forecast	AGUACATE	2027	10	0
-Forecast	AGUACATE	2027	11	0
-Forecast	AGUACATE	2027	12	0
-Forecast	AGUACATE	2027	13	0
-Forecast	AGUACATE	2027	14	0
-Forecast	AGUACATE	2027	15	0
-Forecast	AGUACATE	2027	16	0
-Forecast	AGUACATE	2027	17	0
-Forecast	AGUACATE	2027	18	0
-Forecast	AGUACATE	2027	19	0
-Forecast	AGUACATE	2027	20	0
-Forecast	AGUACATE	2027	21	0
-Forecast	AGUACATE	2027	22	0
-Forecast	AGUACATE	2027	23	0
-Forecast	AGUACATE	2027	24	0
-Forecast	AGUACATE	2027	25	0
-Forecast	AGUACATE	2027	26	0
-Forecast	AGUACATE	2027	27	0
-Forecast	AGUACATE	2027	28	0
-Forecast	PAPA	2026	27	0
-Forecast	PAPA	2026	28	0
-Forecast	PAPA	2026	29	0
-Forecast	PAPA	2026	30	0
-Forecast	PAPA	2026	31	0
-Forecast	PAPA	2026	32	0
-Forecast	PAPA	2026	33	0
-Forecast	PAPA	2026	34	0
-Forecast	PAPA	2026	35	0
-Forecast	PAPA	2026	36	0
-Forecast	PAPA	2026	37	0
-Forecast	PAPA	2026	38	0
-Forecast	PAPA	2026	39	0
-Forecast	PAPA	2026	40	0
-Forecast	PAPA	2026	41	0
-Forecast	PAPA	2026	42	0
-Forecast	PAPA	2026	43	0
-Forecast	PAPA	2026	44	0
-Forecast	PAPA	2026	45	0
-Forecast	PAPA	2026	46	0
-Forecast	PAPA	2026	47	0
-Forecast	PAPA	2026	48	0
-Forecast	PAPA	2026	49	0
-Forecast	PAPA	2026	50	0
-Forecast	PAPA	2026	51	0
-Forecast	PAPA	2026	52	0
-Forecast	PAPA	2027	1	0
-Forecast	PAPA	2027	2	0
-Forecast	PAPA	2027	3	0
-Forecast	PAPA	2027	4	0
-Forecast	PAPA	2027	5	0
-Forecast	PAPA	2027	6	0
-Forecast	PAPA	2027	7	0
-Forecast	PAPA	2027	8	0
-Forecast	PAPA	2027	9	0
-Forecast	PAPA	2027	10	0
-Forecast	PAPA	2027	11	0
-Forecast	PAPA	2027	12	0
-Forecast	PAPA	2027	13	0
-Forecast	PAPA	2027	14	0
-Forecast	PAPA	2027	15	0
-Forecast	PAPA	2027	16	0
-Forecast	PAPA	2027	17	0
-Forecast	PAPA	2027	18	0
-Forecast	PAPA	2027	19	0
-Forecast	PAPA	2027	20	0
-Forecast	PAPA	2027	21	0
-Forecast	PAPA	2027	22	0
-Forecast	PAPA	2027	23	0
-Forecast	PAPA	2027	24	0
-Forecast	PAPA	2027	25	0
-Forecast	PAPA	2027	26	0
-Forecast	ESPARRAGO	2026	27	306
-Forecast	ESPARRAGO	2026	28	186.66
-Forecast	ESPARRAGO	2026	29	143.7282
-Forecast	ESPARRAGO	2026	30	99.17245799999998
-Forecast	ESPARRAGO	2026	31	121.98212333999997
-Forecast	ESPARRAGO	2026	32	117.10283840639997
-Forecast	ESPARRAGO	2026	33	107.73461133388797
-Forecast	ESPARRAGO	2026	34	79117
-Forecast	ESPARRAGO	2026	35	127484
-Forecast	ESPARRAGO	2026	36	113129
-Forecast	ESPARRAGO	2026	37	135692
-Forecast	ESPARRAGO	2026	38	77344.44
-Forecast	ESPARRAGO	2026	39	48726.997200000005
-Forecast	ESPARRAGO	2026	40	42879.757536000005
-Forecast	ESPARRAGO	2026	41	51884.50661856
-Forecast	ESPARRAGO	2026	42	63299.098074643196
-Forecast	ESPARRAGO	2026	43	72160.97180509326
-Forecast	ESPARRAGO	2026	44	98138.92165492682
-Forecast	ESPARRAGO	2026	45	0
-Forecast	ESPARRAGO	2026	46	0
-Forecast	ESPARRAGO	2026	47	0
-Forecast	ESPARRAGO	2026	48	0
-Forecast	ESPARRAGO	2026	49	0
-Forecast	ESPARRAGO	2026	50	0
-Forecast	ESPARRAGO	2026	51	0
-Forecast	ESPARRAGO	2026	52	0
-Forecast	ESPARRAGO	2027	1	0
-Forecast	ESPARRAGO	2027	2	0
-Forecast	ESPARRAGO	2027	3	0
-Forecast	ESPARRAGO	2027	4	0
-Forecast	ESPARRAGO	2027	5	0
-Forecast	ESPARRAGO	2027	6	0
-Forecast	ESPARRAGO	2027	7	0
-Forecast	ESPARRAGO	2027	8	0
-Forecast	ESPARRAGO	2027	9	0
-Forecast	ESPARRAGO	2027	10	0
-Forecast	ESPARRAGO	2027	11	0
-Forecast	ESPARRAGO	2027	12	0
-Forecast	ESPARRAGO	2027	13	0
-Forecast	ESPARRAGO	2027	14	0
-Forecast	ESPARRAGO	2027	15	0
-Forecast	ESPARRAGO	2027	16	0
-Forecast	ESPARRAGO	2027	17	0
-Forecast	ESPARRAGO	2027	18	0
-Forecast	ESPARRAGO	2027	19	0
-Forecast	ESPARRAGO	2027	20	0
-Forecast	ESPARRAGO	2027	21	0
-Forecast	ESPARRAGO	2027	22	0
-Forecast	ESPARRAGO	2027	23	0
-Forecast	ESPARRAGO	2027	24	0
-Forecast	ESPARRAGO	2027	25	0
-Forecast	ESPARRAGO	2027	26	0
-Forecast	ESPARRAGO	2027	27	0
-Forecast	ESPARRAGO	2027	28	0`
+  proyeccion: `Producción	Cultivo	ejercicio	semana	Producción kg
+Proyección	FRESA	2026	27	0
+Proyección	FRESA	2026	28	0
+Proyección	FRESA	2026	29	0
+Proyección	FRESA	2026	30	0
+Proyección	FRESA	2026	31	0
+Proyección	FRESA	2026	32	0
+Proyección	FRESA	2026	33	0
+Proyección	FRESA	2026	34	0
+Proyección	FRESA	2026	35	0
+Proyección	FRESA	2026	36	0
+Proyección	FRESA	2026	37	0
+Proyección	FRESA	2026	38	0
+Proyección	FRESA	2026	39	0
+Proyección	FRESA	2026	40	0
+Proyección	FRESA	2026	41	0
+Proyección	FRESA	2026	42	0
+Proyección	FRESA	2026	43	0
+Proyección	FRESA	2026	44	0
+Proyección	FRESA	2026	45	0
+Proyección	FRESA	2026	46	0
+Proyección	FRESA	2026	47	0
+Proyección	FRESA	2026	48	0
+Proyección	FRESA	2026	49	0
+Proyección	FRESA	2026	50	0
+Proyección	FRESA	2026	51	0
+Proyección	FRESA	2026	52	0
+Proyección	FRESA	2027	1	0
+Proyección	FRESA	2027	2	0
+Proyección	FRESA	2027	3	0
+Proyección	FRESA	2027	4	0
+Proyección	FRESA	2027	5	0
+Proyección	FRESA	2027	6	0
+Proyección	FRESA	2027	7	0
+Proyección	FRESA	2027	8	0
+Proyección	FRESA	2027	9	0
+Proyección	FRESA	2027	10	0
+Proyección	FRESA	2027	11	0
+Proyección	FRESA	2027	12	0
+Proyección	FRESA	2027	13	0
+Proyección	FRESA	2027	14	0
+Proyección	FRESA	2027	15	0
+Proyección	FRESA	2027	16	0
+Proyección	FRESA	2027	17	0
+Proyección	FRESA	2027	18	0
+Proyección	FRESA	2027	19	0
+Proyección	FRESA	2027	20	0
+Proyección	FRESA	2027	21	0
+Proyección	FRESA	2027	22	0
+Proyección	FRESA	2027	23	0
+Proyección	FRESA	2027	24	0
+Proyección	FRESA	2027	25	0
+Proyección	FRESA	2027	26	0
+Proyección	FRESA	2027	27	0
+Proyección	FRESA	2027	28	0
+Proyección	ARANDANO	2026	27	0
+Proyección	ARANDANO	2026	28	0
+Proyección	ARANDANO	2026	29	0
+Proyección	ARANDANO	2026	30	0
+Proyección	ARANDANO	2026	31	0
+Proyección	ARANDANO	2026	32	0
+Proyección	ARANDANO	2026	33	0
+Proyección	ARANDANO	2026	34	0
+Proyección	ARANDANO	2026	35	0
+Proyección	ARANDANO	2026	36	0
+Proyección	ARANDANO	2026	37	0
+Proyección	ARANDANO	2026	38	0
+Proyección	ARANDANO	2026	39	0
+Proyección	ARANDANO	2026	40	0
+Proyección	ARANDANO	2026	41	0
+Proyección	ARANDANO	2026	42	0
+Proyección	ARANDANO	2026	43	0
+Proyección	ARANDANO	2026	44	0
+Proyección	ARANDANO	2026	45	0
+Proyección	ARANDANO	2026	46	0
+Proyección	ARANDANO	2026	47	0
+Proyección	ARANDANO	2026	48	0
+Proyección	ARANDANO	2026	49	0
+Proyección	ARANDANO	2026	50	0
+Proyección	ARANDANO	2026	51	0
+Proyección	ARANDANO	2026	52	0
+Proyección	ARANDANO	2027	1	0
+Proyección	ARANDANO	2027	2	0
+Proyección	ARANDANO	2027	3	0
+Proyección	ARANDANO	2027	4	0
+Proyección	ARANDANO	2027	5	0
+Proyección	ARANDANO	2027	6	0
+Proyección	ARANDANO	2027	7	0
+Proyección	ARANDANO	2027	8	0
+Proyección	ARANDANO	2027	9	0
+Proyección	ARANDANO	2027	10	0
+Proyección	ARANDANO	2027	11	0
+Proyección	ARANDANO	2027	12	0
+Proyección	ARANDANO	2027	13	0
+Proyección	ARANDANO	2027	14	0
+Proyección	ARANDANO	2027	15	0
+Proyección	ARANDANO	2027	16	0
+Proyección	ARANDANO	2027	17	0
+Proyección	ARANDANO	2027	18	0
+Proyección	ARANDANO	2027	19	0
+Proyección	ARANDANO	2027	20	0
+Proyección	ARANDANO	2027	21	0
+Proyección	ARANDANO	2027	22	0
+Proyección	ARANDANO	2027	23	0
+Proyección	ARANDANO	2027	24	0
+Proyección	ARANDANO	2027	25	0
+Proyección	ARANDANO	2027	26	0
+Proyección	ARANDANO	2027	27	0
+Proyección	ARANDANO	2027	28	0
+Proyección	ARANDANO	2027	29	0
+Proyección	FRAMBUESA	2026	27	0
+Proyección	FRAMBUESA	2026	28	0
+Proyección	FRAMBUESA	2026	29	0
+Proyección	FRAMBUESA	2026	30	0
+Proyección	FRAMBUESA	2026	31	0
+Proyección	FRAMBUESA	2026	32	0
+Proyección	FRAMBUESA	2026	33	0
+Proyección	FRAMBUESA	2026	34	0
+Proyección	FRAMBUESA	2026	35	0
+Proyección	FRAMBUESA	2026	36	0
+Proyección	FRAMBUESA	2026	37	0
+Proyección	FRAMBUESA	2026	38	0
+Proyección	FRAMBUESA	2026	39	0
+Proyección	FRAMBUESA	2026	40	0
+Proyección	FRAMBUESA	2026	41	0
+Proyección	FRAMBUESA	2026	42	0
+Proyección	FRAMBUESA	2026	43	0
+Proyección	FRAMBUESA	2026	44	0
+Proyección	FRAMBUESA	2026	45	0
+Proyección	FRAMBUESA	2026	46	0
+Proyección	FRAMBUESA	2026	47	0
+Proyección	FRAMBUESA	2026	48	0
+Proyección	FRAMBUESA	2026	49	0
+Proyección	FRAMBUESA	2026	50	0
+Proyección	FRAMBUESA	2026	51	0
+Proyección	FRAMBUESA	2026	52	0
+Proyección	FRAMBUESA	2027	1	0
+Proyección	FRAMBUESA	2027	2	0
+Proyección	FRAMBUESA	2027	3	0
+Proyección	FRAMBUESA	2027	4	0
+Proyección	FRAMBUESA	2027	5	0
+Proyección	FRAMBUESA	2027	6	0
+Proyección	FRAMBUESA	2027	7	0
+Proyección	FRAMBUESA	2027	8	0
+Proyección	FRAMBUESA	2027	9	0
+Proyección	FRAMBUESA	2027	10	0
+Proyección	FRAMBUESA	2027	11	0
+Proyección	FRAMBUESA	2027	12	0
+Proyección	FRAMBUESA	2027	13	0
+Proyección	FRAMBUESA	2027	14	0
+Proyección	FRAMBUESA	2027	15	0
+Proyección	FRAMBUESA	2027	16	0
+Proyección	FRAMBUESA	2027	17	0
+Proyección	FRAMBUESA	2027	18	0
+Proyección	FRAMBUESA	2027	19	0
+Proyección	FRAMBUESA	2027	20	0
+Proyección	FRAMBUESA	2027	21	0
+Proyección	FRAMBUESA	2027	22	0
+Proyección	FRAMBUESA	2027	23	0
+Proyección	FRAMBUESA	2027	24	0
+Proyección	FRAMBUESA	2027	25	0
+Proyección	FRAMBUESA	2027	26	0
+Proyección	FRAMBUESA	2027	27	0
+Proyección	FRAMBUESA	2027	28	0
+Proyección	ZARZAMORA	2026	27	0
+Proyección	ZARZAMORA	2026	28	0
+Proyección	ZARZAMORA	2026	29	0
+Proyección	ZARZAMORA	2026	30	0
+Proyección	ZARZAMORA	2026	31	0
+Proyección	ZARZAMORA	2026	32	0
+Proyección	ZARZAMORA	2026	33	0
+Proyección	ZARZAMORA	2026	34	0
+Proyección	ZARZAMORA	2026	35	0
+Proyección	ZARZAMORA	2026	36	0
+Proyección	ZARZAMORA	2026	37	0
+Proyección	ZARZAMORA	2026	38	0
+Proyección	ZARZAMORA	2026	39	0
+Proyección	ZARZAMORA	2026	40	0
+Proyección	ZARZAMORA	2026	41	0
+Proyección	ZARZAMORA	2026	42	0
+Proyección	ZARZAMORA	2026	43	0
+Proyección	ZARZAMORA	2026	44	0
+Proyección	ZARZAMORA	2026	45	0
+Proyección	ZARZAMORA	2026	46	0
+Proyección	ZARZAMORA	2026	47	0
+Proyección	ZARZAMORA	2026	48	0
+Proyección	ZARZAMORA	2026	49	0
+Proyección	ZARZAMORA	2026	50	0
+Proyección	ZARZAMORA	2026	51	0
+Proyección	ZARZAMORA	2026	52	0
+Proyección	ZARZAMORA	2027	1	0
+Proyección	ZARZAMORA	2027	2	0
+Proyección	ZARZAMORA	2027	3	0
+Proyección	ZARZAMORA	2027	4	0
+Proyección	ZARZAMORA	2027	5	0
+Proyección	ZARZAMORA	2027	6	0
+Proyección	ZARZAMORA	2027	7	0
+Proyección	ZARZAMORA	2027	8	0
+Proyección	ZARZAMORA	2027	9	0
+Proyección	ZARZAMORA	2027	10	0
+Proyección	ZARZAMORA	2027	11	0
+Proyección	ZARZAMORA	2027	12	0
+Proyección	ZARZAMORA	2027	13	0
+Proyección	ZARZAMORA	2027	14	0
+Proyección	ZARZAMORA	2027	15	0
+Proyección	ZARZAMORA	2027	16	0
+Proyección	ZARZAMORA	2027	17	0
+Proyección	ZARZAMORA	2027	18	0
+Proyección	ZARZAMORA	2027	19	0
+Proyección	ZARZAMORA	2027	20	0
+Proyección	ZARZAMORA	2027	21	0
+Proyección	ZARZAMORA	2027	22	0
+Proyección	ZARZAMORA	2027	23	0
+Proyección	ZARZAMORA	2027	24	0
+Proyección	ZARZAMORA	2027	25	0
+Proyección	ZARZAMORA	2027	26	0
+Proyección	ZARZAMORA	2027	27	0
+Proyección	ZARZAMORA	2027	28	0
+Proyección	ZARZAMORA	2027	29	0
+Proyección	ZARZAMORA	2027	30	0
+Proyección	AGUACATE	2026	21	0
+Proyección	AGUACATE	2026	22	0
+Proyección	AGUACATE	2026	23	0
+Proyección	AGUACATE	2026	24	0
+Proyección	AGUACATE	2026	25	0
+Proyección	AGUACATE	2026	26	0
+Proyección	AGUACATE	2026	27	984467
+Proyección	AGUACATE	2026	28	182395
+Proyección	AGUACATE	2026	29	248825
+Proyección	AGUACATE	2026	30	246345
+Proyección	AGUACATE	2026	31	248245
+Proyección	AGUACATE	2026	32	66690
+Proyección	AGUACATE	2026	33	134060
+Proyección	AGUACATE	2026	34	287000
+Proyección	AGUACATE	2026	35	221880
+Proyección	AGUACATE	2026	36	155690
+Proyección	AGUACATE	2026	37	348746
+Proyección	AGUACATE	2026	38	191810
+Proyección	AGUACATE	2026	39	270452
+Proyección	AGUACATE	2026	40	308316
+Proyección	AGUACATE	2026	41	447058
+Proyección	AGUACATE	2026	42	129647
+Proyección	AGUACATE	2026	43	308559
+Proyección	AGUACATE	2026	44	178964
+Proyección	AGUACATE	2026	45	0
+Proyección	AGUACATE	2026	46	0
+Proyección	AGUACATE	2026	47	0
+Proyección	AGUACATE	2026	48	0
+Proyección	AGUACATE	2026	49	0
+Proyección	AGUACATE	2026	50	0
+Proyección	AGUACATE	2026	51	0
+Proyección	AGUACATE	2026	52	0
+Proyección	AGUACATE	2027	1	0
+Proyección	AGUACATE	2027	2	0
+Proyección	AGUACATE	2027	3	0
+Proyección	AGUACATE	2027	4	0
+Proyección	AGUACATE	2027	5	0
+Proyección	AGUACATE	2027	6	0
+Proyección	AGUACATE	2027	7	0
+Proyección	AGUACATE	2027	8	0
+Proyección	AGUACATE	2027	9	0
+Proyección	AGUACATE	2027	10	0
+Proyección	AGUACATE	2027	11	0
+Proyección	AGUACATE	2027	12	0
+Proyección	AGUACATE	2027	13	0
+Proyección	AGUACATE	2027	14	0
+Proyección	AGUACATE	2027	15	0
+Proyección	AGUACATE	2027	16	0
+Proyección	AGUACATE	2027	17	0
+Proyección	AGUACATE	2027	18	0
+Proyección	AGUACATE	2027	19	0
+Proyección	AGUACATE	2027	20	0
+Proyección	AGUACATE	2027	21	0
+Proyección	AGUACATE	2027	22	0
+Proyección	AGUACATE	2027	23	0
+Proyección	AGUACATE	2027	24	0
+Proyección	AGUACATE	2027	25	0
+Proyección	AGUACATE	2027	26	0
+Proyección	AGUACATE	2027	27	0
+Proyección	AGUACATE	2027	28	0
+Proyección	PAPA	2026	27	0
+Proyección	PAPA	2026	28	0
+Proyección	PAPA	2026	29	0
+Proyección	PAPA	2026	30	0
+Proyección	PAPA	2026	31	0
+Proyección	PAPA	2026	32	0
+Proyección	PAPA	2026	33	0
+Proyección	PAPA	2026	34	0
+Proyección	PAPA	2026	35	0
+Proyección	PAPA	2026	36	0
+Proyección	PAPA	2026	37	0
+Proyección	PAPA	2026	38	0
+Proyección	PAPA	2026	39	0
+Proyección	PAPA	2026	40	0
+Proyección	PAPA	2026	41	0
+Proyección	PAPA	2026	42	0
+Proyección	PAPA	2026	43	0
+Proyección	PAPA	2026	44	0
+Proyección	PAPA	2026	45	0
+Proyección	PAPA	2026	46	0
+Proyección	PAPA	2026	47	0
+Proyección	PAPA	2026	48	0
+Proyección	PAPA	2026	49	0
+Proyección	PAPA	2026	50	0
+Proyección	PAPA	2026	51	0
+Proyección	PAPA	2026	52	0
+Proyección	PAPA	2027	1	0
+Proyección	PAPA	2027	2	0
+Proyección	PAPA	2027	3	0
+Proyección	PAPA	2027	4	0
+Proyección	PAPA	2027	5	0
+Proyección	PAPA	2027	6	0
+Proyección	PAPA	2027	7	0
+Proyección	PAPA	2027	8	0
+Proyección	PAPA	2027	9	0
+Proyección	PAPA	2027	10	0
+Proyección	PAPA	2027	11	0
+Proyección	PAPA	2027	12	0
+Proyección	PAPA	2027	13	0
+Proyección	PAPA	2027	14	0
+Proyección	PAPA	2027	15	0
+Proyección	PAPA	2027	16	0
+Proyección	PAPA	2027	17	0
+Proyección	PAPA	2027	18	0
+Proyección	PAPA	2027	19	0
+Proyección	PAPA	2027	20	0
+Proyección	PAPA	2027	21	0
+Proyección	PAPA	2027	22	0
+Proyección	PAPA	2027	23	0
+Proyección	PAPA	2027	24	0
+Proyección	PAPA	2027	25	0
+Proyección	PAPA	2027	26	0
+Proyección	ESPARRAGO	2026	27	311
+Proyección	ESPARRAGO	2026	28	190
+Proyección	ESPARRAGO	2026	29	146
+Proyección	ESPARRAGO	2026	30	101
+Proyección	ESPARRAGO	2026	31	124
+Proyección	ESPARRAGO	2026	32	119
+Proyección	ESPARRAGO	2026	33	109
+Proyección	ESPARRAGO	2026	34	79117
+Proyección	ESPARRAGO	2026	35	127484
+Proyección	ESPARRAGO	2026	36	78535
+Proyección	ESPARRAGO	2026	37	116232
+Proyección	ESPARRAGO	2026	38	66252
+Proyección	ESPARRAGO	2026	39	41739
+Proyección	ESPARRAGO	2026	40	36730
+Proyección	ESPARRAGO	2026	41	44444
+Proyección	ESPARRAGO	2026	42	54221
+Proyección	ESPARRAGO	2026	43	61812
+Proyección	ESPARRAGO	2026	44	84064
+Proyección	ESPARRAGO	2026	45	0
+Proyección	ESPARRAGO	2026	46	0
+Proyección	ESPARRAGO	2026	47	0
+Proyección	ESPARRAGO	2026	48	0
+Proyección	ESPARRAGO	2026	49	0
+Proyección	ESPARRAGO	2026	50	0
+Proyección	ESPARRAGO	2026	51	0
+Proyección	ESPARRAGO	2026	52	0
+Proyección	ESPARRAGO	2027	1	0
+Proyección	ESPARRAGO	2027	2	0
+Proyección	ESPARRAGO	2027	3	0
+Proyección	ESPARRAGO	2027	4	0
+Proyección	ESPARRAGO	2027	5	0
+Proyección	ESPARRAGO	2027	6	0
+Proyección	ESPARRAGO	2027	7	0
+Proyección	ESPARRAGO	2027	8	0
+Proyección	ESPARRAGO	2027	9	0
+Proyección	ESPARRAGO	2027	10	0
+Proyección	ESPARRAGO	2027	11	0
+Proyección	ESPARRAGO	2027	12	0
+Proyección	ESPARRAGO	2027	13	0
+Proyección	ESPARRAGO	2027	14	0
+Proyección	ESPARRAGO	2027	15	0
+Proyección	ESPARRAGO	2027	16	0
+Proyección	ESPARRAGO	2027	17	0
+Proyección	ESPARRAGO	2027	18	0
+Proyección	ESPARRAGO	2027	19	0
+Proyección	ESPARRAGO	2027	20	0
+Proyección	ESPARRAGO	2027	21	0
+Proyección	ESPARRAGO	2027	22	0
+Proyección	ESPARRAGO	2027	23	0
+Proyección	ESPARRAGO	2027	24	0
+Proyección	ESPARRAGO	2027	25	0
+Proyección	ESPARRAGO	2027	26	0
+Proyección	ESPARRAGO	2027	27	0
+Proyección	ESPARRAGO	2027	28	0`
  }
 };
 
