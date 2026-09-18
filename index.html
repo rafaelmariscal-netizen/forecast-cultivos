@@ -906,8 +906,15 @@ function buildSeasonalCarryforwardModel(sortedRecords, crop, variable){
     if(cache[target]!=null) return cache[target];
     while(cursorTime < target){
       const nextTime = cursorTime + 7*DAY_MS;
-      if(proyeccionByTime[nextTime]!=null){
-        cursorValue = proyeccionByTime[nextTime];
+      // Igual que en la serie Real, un $0 en la hoja de Proyección para una semana futura casi
+      // siempre es un relleno de "todavía no la calculo/capturo", no un $0 real — si se tomara tal
+      // cual, esa semana (y todo lo que se arrastre desde ahí) se quedaría en $0 hasta que una
+      // semana posterior de la hoja SÍ traiga un número, causando un hueco a $0 en medio de la
+      // curva (visible primero en el mes en el que cae esa semana) antes de "recuperarse" en el
+      // siguiente mes con datos. Por eso solo se confía en el valor de Proyección cuando es > 0.
+      const proyVal = proyeccionByTime[nextTime];
+      if(proyVal!=null && proyVal>0){
+        cursorValue = proyVal;
       } else {
         const {y,w} = dateToWeekYear(new Date(nextTime));
         const rate = cropRates ? cropRates[y+'-'+w] : undefined;
