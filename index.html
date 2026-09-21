@@ -1,9 +1,4 @@
-<!doctype html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Forecast de Cultivos</title>
+<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Forecast de Cultivos</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -931,13 +926,23 @@ function buildSeasonalCarryforwardModel(sortedRecords, crop, variable){
   const anchorTime = sortedRecords[anchorIdx].date.getTime();
   const anchorValue = sortedRecords[anchorIdx].importe;
 
-  // Orden de prioridad de las tasas (21 sep, a pedido de Rafael): en vivo desde 2 temporadas reales
-  // (la más fiel, hoy casi nunca disponible) → desde la curva de Presupuesto de la temporada en
-  // curso (nueva, disponible siempre que haya Presupuesto cargado, refleja la estacionalidad que el
-  // propio equipo ya presupuestó) → tabla fija extraída del Excel viejo (último respaldo).
+  // Orden de prioridad de las tasas (corregido 22 sep, instrucción explícita de Rafael: "los datos
+  // que se ocupen para ese método no se sacarán de otro lado más que de la base de datos de
+  // forecast... ppto egreso y proyección egreso"). Ya NO se usa `VARIACION_SEASONAL_RATES_DEFAULT`
+  // (la tabla fija extraída de un Excel de control aparte, fuera de las 9 casillas de la pestaña
+  // Datos) — aunque esa tabla reproducía fielmente el "método aparte" de Rafael, viene de un
+  // archivo distinto al que se pega en el forecast, así que deja de ser una fuente válida. Las
+  // únicas dos fuentes de tasa permitidas ahora, ambas alimentadas por las hojas que sí se pegan en
+  // la pestaña Datos: 1) en vivo desde 2 temporadas reales (`computeSeasonalRatesFromHistory`, lee
+  // `tipo==='real'`, que sale de Proyección Egreso reclasificada) — la más fiel, hoy casi nunca
+  // disponible porque solo hay una temporada cargada; 2) desde la curva de Presupuesto de la
+  // temporada en curso (`computeSeasonalRatesFromBudget`, lee `tipo==='presupuesto'` = PPTO Egreso)
+  // — hoy es, en la práctica, la que se usa casi siempre. Si ninguna de las dos está disponible, el
+  // carry-forward no tiene con qué crecer y simplemente arrastra el último valor conocido sin
+  // cambio (no se inventa una tasa de ningún lado externo).
   const liveRates = computeSeasonalRatesFromHistory(variable, crop);
   const budgetRates = computeSeasonalRatesFromBudget(variable, crop);
-  const cropRates = liveRates || budgetRates || VARIACION_SEASONAL_RATES_DEFAULT[crop] || null;
+  const cropRates = liveRates || budgetRates || null;
   const cache = {};
 
   return d => {
@@ -1060,14 +1065,13 @@ function baseForecastFor(variable, crop, method){
   const out = Object.fromEntries(PROJECTION_MONTHS.map(m=>[m,0]));
   if(series.length){
     const model = computeMethodModel(series, method, crop, variable);
-    // Decisión de Rafael (22 sep): para las semanas que todavía no han pasado, si el equipo YA
-    // dejó su propio número en la hoja Proyección, se usa ese valor tal cual en vez de recalcularlo
-    // con el método seleccionado — el método (polinomial/móvil/promedio/estacional) solo rellena
-    // las semanas que ni siquiera el equipo ha proyectado todavía (p.ej. meses muy adelante donde
-    // la hoja Proyección sigue en blanco). Antes esta función ignoraba por completo la hoja
-    // Proyección y recalculaba TODO desde el ancla real, lo que hacía que octubre/noviembre/
-    // diciembre se alejaran del cálculo aparte de Rafael aunque su Proyección ya tuviera esas
-    // semanas resueltas.
+    // Decisión de Rafael (22 sep, revertido en la misma fecha): los 4 métodos de proyección
+    // (polinomial/móvil/promedio/estacional) SIGUEN funcionando y calculando las semanas futuras.
+    // Prioridad por semana futura: 1) si el equipo YA dejó su propio número en la hoja Proyección
+    // (importe>0), se usa ese valor tal cual; 2) si Proyección todavía no la tiene, se calcula con
+    // el método seleccionado. (Se probó brevemente una variante que usaba Presupuesto en vez del
+    // método para las semanas sin Proyección — Rafael pidió mantener los métodos activos, así que
+    // se revirtió a este comportamiento.)
     const teamProy = {};
     state.raw[variable].forEach(r=>{
       if(r.tipo==='proyeccion' && r.cultivo===crop && r.importe>0) teamProy[r.date.getTime()] = r.importe;
