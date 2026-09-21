@@ -1,4 +1,5 @@
-<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Forecast de Cultivos</title>
+<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forecast de Cultivos</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -697,6 +698,17 @@ function looksNumeric(v){
   return Number.isFinite(n) && /\d/.test(String(v));
 }
 function detectLayout(row){
+  // Formato nativo exportado de Google Sheets + columna "Mes" agregada al final (22 sep, a pedido
+  // de Rafael para el método "Variación estacional"): tipo, cultivo, ejercicio, semana, importe, mes.
+  // Se revisa ANTES que el formato nativo sin mes (más abajo) para no perder esa 6ª columna.
+  if(row.length>=6 && looksNumeric(row[2]) && looksNumeric(row[3]) && !looksNumeric(row[1]) && !looksNumeric(row[5])){
+    return { cultivoIdx:1, ejercicioIdx:2, semanaIdx:3, importeIdx:4, mesIdx:5 };
+  }
+  // Formato simple pegado a mano + columna "Mes": cultivo, ejercicio, semana, importe, mes.
+  // Se revisa ANTES que el formato simple sin mes para no perder esa 5ª columna.
+  if(row.length>=5 && looksNumeric(row[1]) && looksNumeric(row[2]) && !looksNumeric(row[0]) && !looksNumeric(row[4])){
+    return { cultivoIdx:0, ejercicioIdx:1, semanaIdx:2, importeIdx:3, mesIdx:4 };
+  }
   // Formato simple pegado a mano: cultivo, ejercicio, semana, importe
   if(row.length>=4 && looksNumeric(row[1]) && looksNumeric(row[2]) && !looksNumeric(row[0])){
     return { cultivoIdx:0, ejercicioIdx:1, semanaIdx:2, importeIdx:3 };
@@ -782,6 +794,10 @@ function parseSlot(text, tipo){
     const ejercicioRaw = row[layout.ejercicioIdx];
     const semana = parseInt(row[layout.semanaIdx],10);
     const importe = parseMoney(row[layout.importeIdx]);
+    // Columna "Mes" opcional (22 sep, a pedido de Rafael): el nombre del mes que él le asigna a esa
+    // semana según su propia regla (semanas domingo-sábado, con la semana de traslape asignada al
+    // mes siguiente) — solo la usa el método "Variación estacional" (ver estacionalMonthKeyFor).
+    const mes = layout.mesIdx!=null ? String(row[layout.mesIdx]||'').trim() || null : null;
     const date = resolveRowDate(ejercicioRaw, semana);
     if(!date){ errors.push(`Fila ${rownum}: ejercicio/semana inválido ("${ejercicioRaw}" / "${row[layout.semanaIdx]}")`); continue; }
     if(!Number.isFinite(importe)){ errors.push(`Fila ${rownum}: importe inválido ("${row[layout.importeIdx]}")`); continue; }
@@ -792,7 +808,7 @@ function parseSlot(text, tipo){
       cultivo = OTHER_LABEL;
       notes.push(`Fila ${rownum}: "${cleaned}" no es uno de los 7 cultivos — se agrupó como Otros/Overhead (queda fuera del EBITDA por cultivo).`);
     }
-    records.push({ tipo, cultivo, ejercicio:String(ejercicioRaw).trim(), semana, importe, date });
+    records.push({ tipo, cultivo, ejercicio:String(ejercicioRaw).trim(), semana, importe, date, mes });
   }
   const finalRecords = cumulative ? decumulate(records) : records;
   return { records: finalRecords, errors, notes };
@@ -1093,7 +1109,82 @@ function baseForecastFor(variable, crop, method){
 }
 function clearForecastCache(){ Object.keys(baseForecastCache).forEach(k=>delete baseForecastCache[k]); }
 
+// Método "Variación estacional (método Excel)" — instrucción explícita de Rafael (22 sep): "los
+// datos que se ocupen para ese método no se sacarán de otro lado más que de la base de datos de
+// forecast... ppto egreso y proyección egreso". Además, Rafael aclaró que agrupa las semanas en
+// meses con SU PROPIA regla (semanas de domingo a sábado; la semana que cae a caballo entre dos
+// meses se le asigna al mes SIGUIENTE) — regla que no coincide con el mes calendario que usa el
+// resto de la herramienta (`monthKeyFromDate`, que trabaja con el lunes de cada semana ISO). Para no
+// reimplementar esa regla a ciegas, Rafael agregó una columna "Mes" a la hoja Proyección Egreso con
+// el nombre del mes que le corresponde a cada fila — este método la lee directo de ahí.
+// Con esto, "Variación estacional" deja de ser un método de PROYECCIÓN en el sentido de los otros 3
+// (polinomial/móvil/promedio, que sí calculan con `computeMethodModel`/`baseForecastFor`): ya NO
+// ancla en la última semana real ni arrastra con ninguna tasa — simplemente suma lo que ya existe en
+// Proyección Egreso (semanas pasadas, re-etiquetadas tipo:'real', y semanas futuras que el equipo ya
+// capturó, tipo:'proyeccion'), agrupado por esa columna "Mes". Presupuesto NUNCA es fuente para este
+// método. Un mes sin ninguna fila en Proyección Egreso (como diciembre, mientras no se capture) da
+// $0 — nunca se completa con ningún cálculo.
+const MES_NOMBRE_A_NUM = {
+  enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6, julio:7, agosto:8,
+  septiembre:9, setiembre:9, octubre:10, noviembre:11, diciembre:12
+};
+function estacionalMonthKeyFor(record){
+  if(!record.mes) return monthKeyFromDate(record.date);
+  const norm = String(record.mes).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  const mesNum = MES_NOMBRE_A_NUM[norm];
+  if(!mesNum) return monthKeyFromDate(record.date);
+  const dateMonth = record.date.getUTCMonth()+1;
+  let year = record.date.getUTCFullYear();
+  // La columna "Mes" de Rafael puede correr un mes adelante o atrás de la fecha calculada (p.ej. una
+  // semana de finales de diciembre que él etiqueta "Enero") — se ajusta el año para esos casos de
+  // frontera, nunca el mes.
+  if(dateMonth - mesNum >= 6) year += 1;
+  else if(mesNum - dateMonth >= 6) year -= 1;
+  return year + '-' + String(mesNum).padStart(2,'0');
+}
+function estacionalDirectMonthly(variable, crop, monthsList){
+  const out = Object.fromEntries(monthsList.map(m=>[m,0]));
+  state.raw[variable].forEach(r=>{
+    if(r.tipo==='presupuesto' || r.cultivo!==crop) return;
+    const mk = estacionalMonthKeyFor(r);
+    if(mk in out) out[mk] += r.importe;
+  });
+  return out;
+}
+function estacionalScenarioFor(variable, crop, scenario, monthsList){
+  const base = estacionalDirectMonthly(variable, crop, monthsList);
+  const s = state.scenarios[scenario];
+  const out = {};
+  monthsList.forEach(mk=>{
+    let v = base[mk];
+    // El % de escenario (Base/Optimista/Pesimista) solo se aplica a los meses del horizonte de
+    // forecast -- los meses ya transcurridos siguen siendo el dato tal cual, sin ningún ajuste.
+    if(s && FORECAST_MONTHS.includes(mk)){
+      if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
+      else if(variable==='egreso'){ v *= (1+s.egreso/100); }
+      else if(variable==='produccion'){ v *= (1+s.produccion/100); }
+    }
+    out[mk] = v;
+  });
+  return out;
+}
+function estacionalConsolidated(variable, scenario, crops, monthsList){
+  monthsList = monthsList || FORECAST_MONTHS;
+  const out = Object.fromEntries(monthsList.map(m=>[m,0]));
+  crops.forEach(c=>{
+    const f = estacionalScenarioFor(variable, c, scenario, monthsList);
+    monthsList.forEach(mk=> out[mk]+=(f[mk]||0));
+  });
+  return out;
+}
+
 function scenarioForecastFor(variable, crop, method, scenario){
+  // "Variación estacional" no calcula nada: se desvía aquí también (además de en
+  // scenarioForecastConsolidated) para que el desglose por cultivo (pestaña Comparativo:
+  // "Comparación de los siete cultivos" y "Participación de cada cultivo") use la misma
+  // fuente directa de Proyección Egreso agrupada por la columna Mes, en vez del modelo viejo
+  // de baseForecastFor/computeMethodModel.
+  if(method==='estacional') return estacionalScenarioFor(variable, crop, scenario, PROJECTION_MONTHS);
   const base = baseForecastFor(variable, crop, method);
   const s = state.scenarios[scenario];
   const out = {};
@@ -1108,6 +1199,10 @@ function scenarioForecastFor(variable, crop, method, scenario){
 }
 function scenarioForecastConsolidated(variable, method, scenario, crops, monthsList){
   monthsList = monthsList || FORECAST_MONTHS;
+  // "Variación estacional" ya no pasa por baseForecastFor/computeMethodModel (ver
+  // estacionalConsolidated más arriba) -- se desvía aquí para que TODO lo que consuma esta función
+  // (bandas Optimista/Pesimista, EBITDA, la tabla histórica) use la misma fuente directa.
+  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList);
   const out = Object.fromEntries(monthsList.map(m=>[m,0]));
   crops.forEach(c=>{
     const f = scenarioForecastFor(variable, c, method, scenario);
@@ -1147,6 +1242,11 @@ function realOrProjectedMonthly(variable, crops, method, scenario, monthsList){
   // cuando el equipo ya la tiene, o calculado con el método seleccionado cuando no) — para un mes
   // totalmente en el pasado (ya no le queda ninguna semana futura) la segunda parte da 0 sola, así
   // que el resultado no cambia; para un mes totalmente futuro, la primera parte da 0 sola.
+  // "Variación estacional" ya no separa "real" + "parte proyectada": estacionalConsolidated suma
+  // en un solo paso TODO lo que ya existe en Proyección Egreso (pasado y futuro, agrupado por su
+  // columna "Mes") -- sumar `real[mk]` aquí encima lo duplicaría, porque estacionalConsolidated ya
+  // incluye esas mismas semanas pasadas.
+  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList);
   const real = historicalMonthly(variable, 'real', crops, monthsList);
   const forecastPart = scenarioForecastConsolidated(variable, method, scenario, crops, monthsList);
   const out = {};
