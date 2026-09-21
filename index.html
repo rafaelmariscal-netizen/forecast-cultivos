@@ -1060,12 +1060,27 @@ function baseForecastFor(variable, crop, method){
   const out = Object.fromEntries(PROJECTION_MONTHS.map(m=>[m,0]));
   if(series.length){
     const model = computeMethodModel(series, method, crop, variable);
+    // Decisión de Rafael (22 sep): para las semanas que todavía no han pasado, si el equipo YA
+    // dejó su propio número en la hoja Proyección, se usa ese valor tal cual en vez de recalcularlo
+    // con el método seleccionado — el método (polinomial/móvil/promedio/estacional) solo rellena
+    // las semanas que ni siquiera el equipo ha proyectado todavía (p.ej. meses muy adelante donde
+    // la hoja Proyección sigue en blanco). Antes esta función ignoraba por completo la hoja
+    // Proyección y recalculaba TODO desde el ancla real, lo que hacía que octubre/noviembre/
+    // diciembre se alejaran del cálculo aparte de Rafael aunque su Proyección ya tuviera esas
+    // semanas resueltas.
+    const teamProy = {};
+    state.raw[variable].forEach(r=>{
+      if(r.tipo==='proyeccion' && r.cultivo===crop && r.importe>0) teamProy[r.date.getTime()] = r.importe;
+    });
     const lastDate = series[series.length-1].date;
     const horizonEnd = monthEndDate(FORECAST_MONTHS[FORECAST_MONTHS.length-1]);
     let cursor = new Date(lastDate.getTime()+7*DAY_MS);
     while(cursor<=horizonEnd){
       const mk = monthKeyFromDate(cursor);
-      if(mk in out) out[mk] += Math.max(0, model(cursor));
+      if(mk in out){
+        const known = teamProy[cursor.getTime()];
+        out[mk] += known!=null ? known : Math.max(0, model(cursor));
+      }
       cursor = new Date(cursor.getTime()+7*DAY_MS);
     }
   }
@@ -1118,12 +1133,21 @@ function historicalMonthly(variable, tipo, crops, monthsList){
 // "se calcula" en vez de quedar en blanco, y en cuanto llegue el dato Real real de esa hoja lo
 // reemplaza automáticamente.
 function realOrProjectedMonthly(variable, crops, method, scenario, monthsList){
+  // Corrección (22 sep, a pedido de Rafael): antes, un mes con AL MENOS una semana real capturada
+  // se mostraba SOLO con esa suma (`real[mk]`), descartando por completo lo que `baseForecastFor`
+  // ya calculaba para las semanas restantes de ese mismo mes (fueran del método seleccionado o —
+  // desde el cambio de arriba — de la propia hoja Proyección). Eso era exactamente el bug de "mes a
+  // medias" que hacía que septiembre saliera corto: sus semanas ya capturadas se sumaban bien, pero
+  // las que faltaban se perdían en vez de completarse. Ahora se SUMAN las dos partes para cualquier
+  // mes: lo ya real (semanas pasadas) + lo proyectado (semanas futuras, tomado de la hoja Proyección
+  // cuando el equipo ya la tiene, o calculado con el método seleccionado cuando no) — para un mes
+  // totalmente en el pasado (ya no le queda ninguna semana futura) la segunda parte da 0 sola, así
+  // que el resultado no cambia; para un mes totalmente futuro, la primera parte da 0 sola.
   const real = historicalMonthly(variable, 'real', crops, monthsList);
+  const forecastPart = scenarioForecastConsolidated(variable, method, scenario, crops, monthsList);
   const out = {};
   monthsList.forEach(mk=>{
-    out[mk] = monthHasReal(variable, crops, mk)
-      ? (real[mk]||0)
-      : (scenarioForecastConsolidated(variable, method, scenario, crops, [mk])[mk] || 0);
+    out[mk] = (real[mk]||0) + (forecastPart[mk]||0);
   });
   return out;
 }
