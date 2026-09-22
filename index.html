@@ -123,6 +123,20 @@
   .segmented button.on.pesimista{ background:var(--critical); color:#fff; }
   .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.5; }
 
+  /* Tabla compacta de % por escenario, debajo de los botones de Escenario en el panel de
+     Filtros -- misma data (state.scenarios) que la tabla grande de la pestaña Escenarios, solo
+     que aquí siempre está a la vista sin cambiar de pestaña. */
+  .scenario-mini{ width:100%; border-collapse:collapse; margin-top:8px; table-layout:fixed; }
+  .scenario-mini th{ font-size:9px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; text-align:center; padding:0 0 4px; }
+  .scenario-mini th:first-child{ text-align:left; }
+  .scenario-mini td{ padding:2px 2px; text-align:center; vertical-align:middle; }
+  .scenario-mini td:first-child{ text-align:left; font-size:11px; font-weight:600; color:var(--text-secondary); padding-right:2px; }
+  .scenario-mini input{
+    width:100%; padding:4px 1px; font-size:10.5px; text-align:center; border:1px solid var(--border-strong);
+    border-radius:5px; background:var(--surface); color:var(--text-primary); font-family:'IBM Plex Mono',monospace;
+  }
+  .scenario-mini input:disabled{ opacity:.55; }
+
   /* ---------- content ---------- */
   .view{ display:flex; flex-direction:column; gap:20px; }
   .view[hidden]{ display:none; }
@@ -254,37 +268,17 @@
         <select id="mesFiltro"></select>
       </div>
       <div class="field">
-        <h3>Escenario · Ingreso</h3>
-        <div class="segmented" id="escenarioIngresoSeg">
+        <h3>Escenario</h3>
+        <div class="segmented" id="escenarioSeg">
           <button data-sc="pesimista">Pesimista</button>
           <button data-sc="base" class="on base">Base</button>
           <button data-sc="optimista">Optimista</button>
         </div>
-      </div>
-      <div class="field">
-        <h3>Escenario · Egreso</h3>
-        <div class="segmented" id="escenarioEgresoSeg">
-          <button data-sc="pesimista">Pesimista</button>
-          <button data-sc="base" class="on base">Base</button>
-          <button data-sc="optimista">Optimista</button>
-        </div>
-      </div>
-      <div class="field">
-        <h3>Escenario · Producción</h3>
-        <div class="segmented" id="escenarioProduccionSeg">
-          <button data-sc="pesimista">Pesimista</button>
-          <button data-sc="base" class="on base">Base</button>
-          <button data-sc="optimista">Optimista</button>
-        </div>
-      </div>
-      <div class="field">
-        <h3>Escenario · Tipo de cambio</h3>
-        <div class="segmented" id="escenarioTCSeg">
-          <button data-sc="pesimista">Pesimista</button>
-          <button data-sc="base" class="on base">Base</button>
-          <button data-sc="optimista">Optimista</button>
-        </div>
-        <p class="hint">Cada variable tiene su propio escenario — puedes mover Egreso a Pesimista sin que le afecte a Ingreso, por ejemplo. Los % de cada escenario se ajustan en la pestaña 🧭 Escenarios.</p>
+        <table class="scenario-mini">
+          <thead><tr><th></th><th>Ing.</th><th>Egr.</th><th>Prod.</th><th>TC</th></tr></thead>
+          <tbody id="scenarioMiniBody"></tbody>
+        </table>
+        <p class="hint">% que aplica cada escenario a cada variable — el de Base siempre es 0.</p>
       </div>
       <div class="field">
         <h3>Método de proyección</h3>
@@ -618,11 +612,7 @@ const state = {
   monthly: null,                                    // built index
   // 'OTROS' (Empaque) se incluye por default: es egreso real que ya viene en la base de datos y
   // debe contar en el EBITDA/KPIs consolidados salvo que el usuario lo desmarque.
-  // Antes había un solo "escenario" global. A pedido de Rafael (22 sep) ahora Ingreso, Egreso,
-  // Producción y Tipo de cambio tienen cada uno su propio dial Base/Optimista/Pesimista
-  // independiente -- así se puede, por ejemplo, ver Egreso en Pesimista mientras Ingreso sigue
-  // en Base, o mover el Tipo de cambio solo sin que le afecte al resto.
-  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat(['OTROS'])), mes: 'TOTAL3', escenarioIngreso:'base', escenarioEgreso:'base', escenarioProduccion:'base', escenarioTC:'base', metodo:'polinomial' },
+  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat(['OTROS'])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial' },
   scenarios: {
     base:      { ingreso:0, egreso:0, produccion:0, tc:0 },
     optimista: { ingreso:8, egreso:-5, produccion:5, tc:5 },
@@ -1179,21 +1169,16 @@ function estacionalDirectMonthly(variable, crop, monthsList){
   });
   return out;
 }
-// `tcScenario` (opcional, quinto/cuarto parámetro según la función) es el nombre del escenario
-// que se usa SOLO para el % de tipo de cambio del ingreso -- si no se pasa, se usa el mismo
-// `scenario` (comportamiento "todo se mueve junto", el de antes). Esto permite que Ingreso y
-// Tipo de cambio tengan cada uno su propio dial Base/Optimista/Pesimista sin acoplarse.
-function estacionalScenarioFor(variable, crop, scenario, monthsList, tcScenario){
+function estacionalScenarioFor(variable, crop, scenario, monthsList){
   const base = estacionalDirectMonthly(variable, crop, monthsList);
   const s = state.scenarios[scenario];
-  const sTC = state.scenarios[tcScenario || scenario];
   const out = {};
   monthsList.forEach(mk=>{
     let v = base[mk];
     // El % de escenario (Base/Optimista/Pesimista) solo se aplica a los meses del horizonte de
     // forecast -- los meses ya transcurridos siguen siendo el dato tal cual, sin ningún ajuste.
     if(s && FORECAST_MONTHS.includes(mk)){
-      if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop) && sTC) v *= (1+sTC.tc/100); }
+      if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
       else if(variable==='egreso'){ v *= (1+s.egreso/100); }
       else if(variable==='produccion'){ v *= (1+s.produccion/100); }
     }
@@ -1201,52 +1186,51 @@ function estacionalScenarioFor(variable, crop, scenario, monthsList, tcScenario)
   });
   return out;
 }
-function estacionalConsolidated(variable, scenario, crops, monthsList, tcScenario){
+function estacionalConsolidated(variable, scenario, crops, monthsList){
   monthsList = monthsList || FORECAST_MONTHS;
   const out = Object.fromEntries(monthsList.map(m=>[m,0]));
   crops.forEach(c=>{
-    const f = estacionalScenarioFor(variable, c, scenario, monthsList, tcScenario);
+    const f = estacionalScenarioFor(variable, c, scenario, monthsList);
     monthsList.forEach(mk=> out[mk]+=(f[mk]||0));
   });
   return out;
 }
 
-function scenarioForecastFor(variable, crop, method, scenario, tcScenario){
+function scenarioForecastFor(variable, crop, method, scenario){
   // "Variación estacional" no calcula nada: se desvía aquí también (además de en
   // scenarioForecastConsolidated) para que el desglose por cultivo (pestaña Comparativo:
   // "Comparación de los siete cultivos" y "Participación de cada cultivo") use la misma
   // fuente directa de Proyección Egreso agrupada por la columna Mes, en vez del modelo viejo
   // de baseForecastFor/computeMethodModel.
-  if(method==='estacional') return estacionalScenarioFor(variable, crop, scenario, PROJECTION_MONTHS, tcScenario);
+  if(method==='estacional') return estacionalScenarioFor(variable, crop, scenario, PROJECTION_MONTHS);
   const base = baseForecastFor(variable, crop, method);
   const s = state.scenarios[scenario];
-  const sTC = state.scenarios[tcScenario || scenario];
   const out = {};
   Object.keys(base).forEach(mk=>{
     let v = base[mk];
-    if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop) && sTC) v *= (1+sTC.tc/100); }
+    if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
     else if(variable==='egreso'){ v *= (1+s.egreso/100); }
     else if(variable==='produccion'){ v *= (1+s.produccion/100); }
     out[mk] = v;
   });
   return out;
 }
-function scenarioForecastConsolidated(variable, method, scenario, crops, monthsList, tcScenario){
+function scenarioForecastConsolidated(variable, method, scenario, crops, monthsList){
   monthsList = monthsList || FORECAST_MONTHS;
   // "Variación estacional" ya no pasa por baseForecastFor/computeMethodModel (ver
   // estacionalConsolidated más arriba) -- se desvía aquí para que TODO lo que consuma esta función
   // (bandas Optimista/Pesimista, EBITDA, la tabla histórica) use la misma fuente directa.
-  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList, tcScenario);
+  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList);
   const out = Object.fromEntries(monthsList.map(m=>[m,0]));
   crops.forEach(c=>{
-    const f = scenarioForecastFor(variable, c, method, scenario, tcScenario);
+    const f = scenarioForecastFor(variable, c, method, scenario);
     monthsList.forEach(mk=> out[mk]+=(f[mk]||0));
   });
   return out;
 }
-function ebitdaSet(method, scenarioIngreso, scenarioEgreso, crops, scenarioTC){
-  const ingreso = scenarioForecastConsolidated('ingreso', method, scenarioIngreso, crops, undefined, scenarioTC || scenarioIngreso);
-  const egreso  = scenarioForecastConsolidated('egreso', method, scenarioEgreso, crops);
+function ebitdaSet(method, scenario, crops){
+  const ingreso = scenarioForecastConsolidated('ingreso', method, scenario, crops);
+  const egreso  = scenarioForecastConsolidated('egreso', method, scenario, crops);
   const ebitda = {}; FORECAST_MONTHS.forEach(mk=> ebitda[mk]=ingreso[mk]-egreso[mk]);
   return { ingreso, egreso, ebitda };
 }
@@ -1265,7 +1249,7 @@ function historicalMonthly(variable, tipo, crops, monthsList){
 // método de proyección seleccionado (regresión/promedio/móvil) bajo el escenario activo — así ya
 // "se calcula" en vez de quedar en blanco, y en cuanto llegue el dato Real real de esa hoja lo
 // reemplaza automáticamente.
-function realOrProjectedMonthly(variable, crops, method, scenario, monthsList, tcScenario){
+function realOrProjectedMonthly(variable, crops, method, scenario, monthsList){
   // Corrección (22 sep, a pedido de Rafael): antes, un mes con AL MENOS una semana real capturada
   // se mostraba SOLO con esa suma (`real[mk]`), descartando por completo lo que `baseForecastFor`
   // ya calculaba para las semanas restantes de ese mismo mes (fueran del método seleccionado o —
@@ -1280,9 +1264,9 @@ function realOrProjectedMonthly(variable, crops, method, scenario, monthsList, t
   // en un solo paso TODO lo que ya existe en Proyección Egreso (pasado y futuro, agrupado por su
   // columna "Mes") -- sumar `real[mk]` aquí encima lo duplicaría, porque estacionalConsolidated ya
   // incluye esas mismas semanas pasadas.
-  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList, tcScenario);
+  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList);
   const real = historicalMonthly(variable, 'real', crops, monthsList);
-  const forecastPart = scenarioForecastConsolidated(variable, method, scenario, crops, monthsList, tcScenario);
+  const forecastPart = scenarioForecastConsolidated(variable, method, scenario, crops, monthsList);
   const out = {};
   monthsList.forEach(mk=>{
     out[mk] = (real[mk]||0) + (forecastPart[mk]||0);
@@ -1365,8 +1349,8 @@ function focalLabel(){
 
 function renderKpis(){
   const crops = currentCropsSelection();
-  const method = state.filters.metodo;
-  const { ingreso, egreso, ebitda } = ebitdaSet(method, state.filters.escenarioIngreso, state.filters.escenarioEgreso, crops, state.filters.escenarioTC);
+  const method = state.filters.metodo, sc = state.filters.escenario;
+  const { ingreso, egreso, ebitda } = ebitdaSet(method, sc, crops);
   const ingresoTotal = sum3(ingreso), egresoTotal = sum3(egreso), ebitdaTotal = sum3(ebitda);
   const margen = ingresoTotal>0 ? (ebitdaTotal/ingresoTotal*100) : 0;
 
@@ -1399,43 +1383,34 @@ function renderKpis(){
   document.getElementById('kpiMargenPill').innerHTML = `<span class="pill ${cls}">${label}</span>`;
 }
 
-// Con 4 dials independientes, ya no hay un solo "escenario activo" que nombrar en la leyenda --
-// cada gráfica (Ingreso/Egreso/Producción/EBITDA/Margen) muestra el nombre del dial que realmente
-// la afecta. EBITDA y Margen dependen de Ingreso Y Egreso a la vez: si ambos dials coinciden se
-// muestra un solo nombre, si no se muestran los dos.
-function cap(s){ return s ? s[0].toUpperCase()+s.slice(1) : s; }
-function centralScenarioLabelFor(valueFn){
-  if(valueFn===valueIngreso) return cap(state.filters.escenarioIngreso);
-  if(valueFn===valueEgreso) return cap(state.filters.escenarioEgreso);
-  if(valueFn===valueProduccion) return cap(state.filters.escenarioProduccion);
-  if(valueFn===valueEbitda || valueFn===valueMargen){
-    const i = state.filters.escenarioIngreso, e = state.filters.escenarioEgreso;
-    return i===e ? cap(i) : `Ing. ${cap(i)} / Egr. ${cap(e)}`;
-  }
-  return cap(state.filters.escenarioIngreso);
+// Color de la línea "Real + Forecast" según el escenario activo (22 sep, a pedido de Rafael):
+// Base = verde bosque (el acento normal de la herramienta), Optimista = verde más fuerte/saturado
+// (el mismo tono que ya se usaba para las señales "bien"/Optimista en el resto del tablero),
+// Pesimista = rojo (el mismo tono "crítico" que ya se usaba en la banda Pesimista). Así, con solo
+// ver el color de la línea en cualquier gráfica, se sabe en qué escenario está parado el tablero.
+function scenarioLineColor(sc){
+  if(sc==='optimista') return CH.good;
+  if(sc==='pesimista') return CH.critical;
+  return CH.accent; // base
 }
 
 function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
   destroyChart(canvasId);
   if(!chartsAvailable()){ chartFallback(canvasId); return; }
   const crops = currentCropsSelection();
-  const method = state.filters.metodo;
+  const method = state.filters.metodo, sc = state.filters.escenario;
   const histMonths = recentHistoricalMonths(6);
   const allMonths = histMonths.concat(FORECAST_MONTHS);
 
   const real = valueFn('real', null, histMonths, crops, method);
   const presupuesto = historicalCombinedForValue(valueFn, crops, allMonths, method);
-  const base = ['base','optimista','pesimista'].reduce((acc,sc)=>{ acc[sc]=valueFn('scenario', sc, FORECAST_MONTHS, crops, method); return acc; },{});
-  // "central" = lo que realmente refleja los dials independientes que el usuario tiene activos
-  // ahora mismo (Ingreso/Egreso/Producción/TC cada uno con su propio Base/Optimista/Pesimista),
-  // a diferencia de `base.optimista`/`base.pesimista` que son la banda de referencia "todo junto".
-  const centralForecast = valueFn('central', null, FORECAST_MONTHS, crops, method);
+  const base = ['base','optimista','pesimista'].reduce((acc,s)=>{ acc[s]=valueFn('scenario', s, FORECAST_MONTHS, crops, method); return acc; },{});
 
-  const central = histMonths.map(mk=>real[mk]).concat(FORECAST_MONTHS.map(mk=>centralForecast[mk]));
+  const central = histMonths.map(mk=>real[mk]).concat(FORECAST_MONTHS.map(mk=>base[sc][mk]));
   const optimista = allMonths.map(mk=> FORECAST_MONTHS.includes(mk) ? base.optimista[mk] : null);
   const pesimista = allMonths.map(mk=> FORECAST_MONTHS.includes(mk) ? base.pesimista[mk] : null);
   const presupuestoArr = allMonths.map(mk=> presupuesto[mk] ?? null);
-  const centralLabel = centralScenarioLabelFor(valueFn);
+  const lineColor = scenarioLineColor(sc);
 
   const ctx = document.getElementById(canvasId).getContext('2d');
   charts[canvasId] = new Chart(ctx, {
@@ -1446,7 +1421,7 @@ function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
         { label:'Presupuesto', data:presupuestoArr, borderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.25 },
         { label:'Pesimista', data:pesimista, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.14), pointRadius:0, fill:false, tension:0.25 },
         { label:'Optimista', data:optimista, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
-        { label: centralLabel+' (real + forecast)', data: central, borderColor: CH.accent, backgroundColor: CH.accent, borderWidth:2.5, pointRadius:3, pointBackgroundColor:CH.accent, tension:0.25, fill:false }
+        { label: sc[0].toUpperCase()+sc.slice(1)+' (real + forecast)', data: central, borderColor: lineColor, backgroundColor: lineColor, borderWidth:2.5, pointRadius:3, pointBackgroundColor:lineColor, tension:0.25, fill:false }
       ]
     },
     options:{
@@ -1460,7 +1435,7 @@ function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
   });
 
   document.getElementById(legendId).innerHTML = `
-    <span class="sw" style="color:${CH.accent}"><span class="line" style="background:${CH.accent}"></span>Real + Forecast (${centralLabel})</span>
+    <span class="sw" style="color:${lineColor}"><span class="line" style="background:${lineColor}"></span>Real + Forecast (${sc})</span>
     <span class="sw" style="color:${CH.muted}"><span class="dashed"></span>Presupuesto</span>
     <span class="sw" style="color:${CH.good}"><span class="dot" style="background:${hexA(CH.good,0.5)}"></span>Optimista</span>
     <span class="sw" style="color:${CH.critical}"><span class="dot" style="background:${hexA(CH.critical,0.5)}"></span>Pesimista</span>`;
@@ -1490,13 +1465,7 @@ function valueEbitda(mode, scenario, months, crops, method){
     const e = valueEgreso('real', scenario, months, crops, method);
     const out={}; months.forEach(mk=> out[mk]=(i[mk]||0)-(e[mk]||0)); return out;
   }
-  if(mode==='central'){
-    const set = ebitdaSet(method, state.filters.escenarioIngreso, state.filters.escenarioEgreso, crops, state.filters.escenarioTC);
-    return set.ebitda;
-  }
-  // mode es un nombre de escenario ('base'/'optimista'/'pesimista'): banda de referencia donde
-  // ingreso y egreso (y su TC) se mueven juntos bajo ese mismo nombre.
-  const set = ebitdaSet(method, scenario, scenario, crops);
+  const set = ebitdaSet(method, scenario, crops);
   return set.ebitda;
 }
 function valueMargen(mode, scenario, months, crops, method){
@@ -1505,26 +1474,19 @@ function valueMargen(mode, scenario, months, crops, method){
     const e = valueEgreso('real', scenario, months, crops, method);
     const out={}; months.forEach(mk=> out[mk] = i[mk]>0 ? (i[mk]-e[mk])/i[mk]*100 : 0); return out;
   }
-  if(mode==='central'){
-    const set = ebitdaSet(method, state.filters.escenarioIngreso, state.filters.escenarioEgreso, crops, state.filters.escenarioTC);
-    const out={}; months.forEach(mk=> out[mk] = set.ingreso[mk]>0 ? set.ebitda[mk]/set.ingreso[mk]*100 : 0); return out;
-  }
-  const set = ebitdaSet(method, scenario, scenario, crops);
+  const set = ebitdaSet(method, scenario, crops);
   const out={}; months.forEach(mk=> out[mk] = set.ingreso[mk]>0 ? set.ebitda[mk]/set.ingreso[mk]*100 : 0); return out;
 }
 function valueIngreso(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('ingreso', crops, method, scenario||state.filters.escenarioIngreso, months, state.filters.escenarioTC);
-  if(mode==='central') return scenarioForecastConsolidated('ingreso', method, state.filters.escenarioIngreso, crops, months, state.filters.escenarioTC);
+  if(mode==='real') return realOrProjectedMonthly('ingreso', crops, method, scenario||state.filters.escenario, months);
   return scenarioForecastConsolidated('ingreso', method, scenario, crops, months);
 }
 function valueEgreso(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('egreso', crops, method, scenario||state.filters.escenarioEgreso, months);
-  if(mode==='central') return scenarioForecastConsolidated('egreso', method, state.filters.escenarioEgreso, crops, months);
+  if(mode==='real') return realOrProjectedMonthly('egreso', crops, method, scenario||state.filters.escenario, months);
   return scenarioForecastConsolidated('egreso', method, scenario, crops, months);
 }
 function valueProduccion(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('produccion', crops, method, scenario||state.filters.escenarioProduccion, months);
-  if(mode==='central') return scenarioForecastConsolidated('produccion', method, state.filters.escenarioProduccion, crops, months);
+  if(mode==='real') return realOrProjectedMonthly('produccion', crops, method, scenario||state.filters.escenario, months);
   return scenarioForecastConsolidated('produccion', method, scenario, crops, months);
 }
 
@@ -1534,24 +1496,22 @@ function valueProduccion(mode, scenario, months, crops, method){
 
 function renderHistoricoTable(){
   const crops = currentCropsSelection();
-  const method = state.filters.metodo;
-  const scI = state.filters.escenarioIngreso, scE = state.filters.escenarioEgreso, scTC = state.filters.escenarioTC;
+  const method = state.filters.metodo, sc = state.filters.escenario;
   document.getElementById('tableCropLabel').textContent = focalLabel();
   const months = recentHistoricalMonths(6).concat(FORECAST_MONTHS);
-  const realE = realOrProjectedMonthly('egreso', crops, method, scE, months);
-  const realI = realOrProjectedMonthly('ingreso', crops, method, scI, months, scTC);
+  const realE = realOrProjectedMonthly('egreso', crops, method, sc, months);
+  const realI = realOrProjectedMonthly('ingreso', crops, method, sc, months);
   const presE = historicalMonthly('egreso','presupuesto',crops,months), presI = historicalMonthly('ingreso','presupuesto',crops,months);
   const proyE = historicalMonthly('egreso','proyeccion',crops,months), proyI = historicalMonthly('ingreso','proyeccion',crops,months);
-  const fcI = scenarioForecastConsolidated('ingreso', method, scI, crops, FORECAST_MONTHS, scTC);
-  const fcE = scenarioForecastConsolidated('egreso', method, scE, crops, FORECAST_MONTHS);
+  const fcI = scenarioForecastConsolidated('ingreso', method, sc, crops, FORECAST_MONTHS);
+  const fcE = scenarioForecastConsolidated('egreso', method, sc, crops, FORECAST_MONTHS);
   const hasIngresoReal = state.raw.ingreso.some(r=>r.tipo==='real');
   const hasIngresoPres = state.raw.ingreso.some(r=>r.tipo==='presupuesto');
   const hasIngresoProy = state.raw.ingreso.some(r=>r.tipo==='proyeccion');
 
-  const scLabel = scI===scE ? scI : `Ing. ${scI} / Egr. ${scE}`;
   const thead = document.getElementById('tablaHistorico').querySelector('thead');
   const tbody = document.getElementById('tablaHistorico').querySelector('tbody');
-  thead.innerHTML = '<tr><th>Mes</th><th>Ingreso real</th><th>Egreso real</th><th>EBITDA real</th><th>Presupuesto EBITDA</th><th>Proyección equipo</th><th>Forecast ('+scLabel+')</th></tr>';
+  thead.innerHTML = '<tr><th>Mes</th><th>Ingreso real</th><th>Egreso real</th><th>EBITDA real</th><th>Presupuesto EBITDA</th><th>Proyección equipo</th><th>Forecast ('+sc+')</th></tr>';
   tbody.innerHTML = '';
   let anyEstimated = false;
   months.forEach(mk=>{
@@ -1590,10 +1550,14 @@ function renderForecastTab(){
 /* ============================================================
    10. RENDER — ESCENARIOS TAB
    ============================================================ */
-function renderScenarioTable(){
-  const tbody = document.getElementById('scenarioBody');
+// Las dos tablas de % de escenario (la grande de la pestaña 🧭 Escenarios y la compacta del panel
+// de Filtros, debajo de los botones de Escenario) muestran y editan exactamente los mismos datos
+// (`state.scenarios`) -- esta función arma las filas para cualquiera de las dos, y `renderAll()`
+// (más abajo) refresca ambas cada vez que algo cambia, para que nunca queden desincronizadas.
+function renderScenarioRowsInto(tbodyId, labels){
+  const tbody = document.getElementById(tbodyId);
+  if(!tbody) return;
   tbody.innerHTML = '';
-  const labels = { base:'Base', optimista:'Optimista', pesimista:'Pesimista' };
   ['base','optimista','pesimista'].forEach(sc=>{
     const s = state.scenarios[sc];
     const disabled = sc==='base' ? 'disabled' : '';
@@ -1613,16 +1577,19 @@ function renderScenarioTable(){
     });
   });
 }
+function renderScenarioTable(){
+  renderScenarioRowsInto('scenarioBody', { base:'Base', optimista:'Optimista', pesimista:'Pesimista' });
+}
+function renderScenarioMiniTable(){
+  renderScenarioRowsInto('scenarioMiniBody', { base:'Base', optimista:'Optim.', pesimista:'Pesim.' });
+}
 
 function renderEscenariosChart(){
   destroyChart('chartEscenarios');
   if(!chartsAvailable()){ chartFallback('chartEscenarios'); return; }
   const crops = currentCropsSelection();
   const method = state.filters.metodo;
-  // Esta pestaña compara los 3 escenarios "todo junto" (Ingreso/Egreso/TC moviéndose con el mismo
-  // nombre) -- es la vista clásica de comparación, distinta de los 4 dials independientes de la
-  // pestaña Forecast.
-  const sets = { base:ebitdaSet(method,'base','base',crops), optimista:ebitdaSet(method,'optimista','optimista',crops), pesimista:ebitdaSet(method,'pesimista','pesimista',crops) };
+  const sets = { base:ebitdaSet(method,'base',crops), optimista:ebitdaSet(method,'optimista',crops), pesimista:ebitdaSet(method,'pesimista',crops) };
   const ctx = document.getElementById('chartEscenarios').getContext('2d');
   charts.chartEscenarios = new Chart(ctx, {
     type:'bar',
@@ -1645,7 +1612,7 @@ function renderEscenariosChart(){
 function renderScenarioTableNumbers(){
   const crops = currentCropsSelection();
   const method = state.filters.metodo;
-  const sets = { base:ebitdaSet(method,'base','base',crops), optimista:ebitdaSet(method,'optimista','optimista',crops), pesimista:ebitdaSet(method,'pesimista','pesimista',crops) };
+  const sets = { base:ebitdaSet(method,'base',crops), optimista:ebitdaSet(method,'optimista',crops), pesimista:ebitdaSet(method,'pesimista',crops) };
   const thead = document.getElementById('tablaEscenarios').querySelector('thead');
   const tbody = document.getElementById('tablaEscenarios').querySelector('tbody');
   thead.innerHTML = '<tr><th>Escenario</th><th>Ingreso 3m</th><th>Egreso 3m</th><th>EBITDA 3m</th><th>Margen</th></tr>';
@@ -1672,13 +1639,12 @@ function periodMonths(){
   return state.filters.mes==='TOTAL3' ? FORECAST_MONTHS : [state.filters.mes];
 }
 function perCropTotals(){
-  const method = state.filters.metodo;
-  const scI = state.filters.escenarioIngreso, scE = state.filters.escenarioEgreso, scTC = state.filters.escenarioTC;
+  const method = state.filters.metodo, sc = state.filters.escenario;
   const months = periodMonths();
   const crops = includedCropsOrdered();
   return crops.map(crop=>{
-    const ing = scenarioForecastFor('ingreso', crop, method, scI, scTC);
-    const egr = scenarioForecastFor('egreso', crop, method, scE);
+    const ing = scenarioForecastFor('ingreso', crop, method, sc);
+    const egr = scenarioForecastFor('egreso', crop, method, sc);
     const ingT = months.reduce((a,mk)=>a+(ing[mk]||0),0);
     const egrT = months.reduce((a,mk)=>a+(egr[mk]||0),0);
     return { crop, ingreso: ingT, egreso: egrT, ebitda: ingT-egrT };
@@ -1686,10 +1652,8 @@ function perCropTotals(){
 }
 
 function renderComparativoTab(){
-  const scI = state.filters.escenarioIngreso, scE = state.filters.escenarioEgreso;
-  const scLabel = scI===scE ? scI : `Ing. ${scI} / Egr. ${scE}`;
   document.getElementById('comparativoSub').textContent =
-    `Escenario ${scLabel} · ${state.filters.mes==='TOTAL3' ? 'Total de los 3 meses proyectados' : monthLabel(state.filters.mes)}`;
+    `Escenario ${state.filters.escenario} · ${state.filters.mes==='TOTAL3' ? 'Total de los 3 meses proyectados' : monthLabel(state.filters.mes)}`;
   const totals = perCropTotals();
 
   destroyChart('chartCultivos');
@@ -4429,22 +4393,12 @@ function buildFilterUI(){
   mes.innerHTML = '<option value="TOTAL3">Total próximos 3 meses</option>' + FORECAST_MONTHS.map(mk=>`<option value="${mk}">${monthLabel(mk)}</option>`).join('');
   mes.addEventListener('change', ()=>{ state.filters.mes = mes.value; renderAll(); });
 
-  // 4 dials independientes (Ingreso/Egreso/Producción/Tipo de cambio) en vez de un solo
-  // "Escenario" global -- cada segmented control escribe solo en su propio campo de state.filters.
-  const SCENARIO_SEGS = [
-    { id:'escenarioIngresoSeg', field:'escenarioIngreso' },
-    { id:'escenarioEgresoSeg', field:'escenarioEgreso' },
-    { id:'escenarioProduccionSeg', field:'escenarioProduccion' },
-    { id:'escenarioTCSeg', field:'escenarioTC' },
-  ];
-  SCENARIO_SEGS.forEach(({id, field})=>{
-    document.getElementById(id).querySelectorAll('button').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        state.filters[field] = btn.dataset.sc;
-        document.querySelectorAll('#'+id+' button').forEach(b=>b.classList.remove('on'));
-        btn.classList.add('on', btn.dataset.sc);
-        renderAll();
-      });
+  document.getElementById('escenarioSeg').querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.filters.escenario = btn.dataset.sc;
+      document.querySelectorAll('#escenarioSeg button').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on', btn.dataset.sc);
+      renderAll();
     });
   });
 
@@ -4485,6 +4439,10 @@ function syncIngresoBanners(){
 function renderAll(){
   refreshThemeColors();
   syncIngresoBanners();
+  // La tabla mini de % en el panel de Filtros está siempre a la vista (no importa qué pestaña esté
+  // activa), así que se refresca aquí siempre -- distinto de renderScenarioTable(), que solo se
+  // llama cuando la pestaña Escenarios está activa (dentro de renderEscenariosTab).
+  renderScenarioMiniTable();
   const activeTab = document.querySelector('.tabbtn.active').dataset.tab;
   if(activeTab==='forecast') renderForecastTab();
   else if(activeTab==='escenarios') renderEscenariosTab();
