@@ -100,12 +100,25 @@
   .filters{ padding:16px; display:flex; flex-direction:column; gap:16px; position:sticky; top:16px; }
   .filters h3{ font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; margin:0; color:var(--text-muted); font-family:'Public Sans'; }
   .field{ display:flex; flex-direction:column; gap:6px; }
+  .field[hidden]{ display:none; }
   .field label{ font-size:12px; font-weight:600; color:var(--text-secondary); }
   select, .textinput{
     width:100%; padding:8px 10px; border-radius:7px; border:1px solid var(--border-strong); background:var(--surface);
     color:var(--text-primary); font-size:13px;
   }
   .chipgrid{ display:flex; flex-wrap:wrap; gap:6px; }
+  /* La sección de "¿cuáles cultivos entran al consolidado?" solo tiene efecto cuando "Cultivo
+     enfocado" está en Consolidado -- se muestra sangrada, con una guía vertical a la izquierda,
+     para que se lea como dependiente del selector de arriba en vez de como un segundo selector de
+     cultivo aparte (fuente de confusión reportada por Rafael el 22 sep). */
+  .field.indented{ margin-left:10px; padding-left:12px; border-left:2px solid var(--border); }
+  .chip-quickrow{ display:flex; align-items:center; gap:6px; margin:-2px 0 2px; }
+  .chip-quickrow button{
+    appearance:none; border:none; background:none; padding:0; font-size:11px; font-weight:700;
+    color:var(--accent-strong); text-decoration:underline; cursor:pointer; font-family:inherit;
+  }
+  .chip-quickrow button:hover{ opacity:.75; }
+  .chip-quickrow .dotsep{ color:var(--text-muted); font-size:11px; }
   .chip{
     display:flex; align-items:center; gap:5px; padding:5px 10px 5px 8px; border-radius:999px; border:1px solid var(--border-strong);
     background:var(--surface); font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; user-select:none;
@@ -122,6 +135,8 @@
   .segmented button.on.optimista{ background:var(--good); color:#06280a; }
   .segmented button.on.pesimista{ background:var(--critical); color:#fff; }
   .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.5; }
+  .chartband-hint{ display:flex; align-items:flex-start; gap:7px; margin:2px 0 4px; }
+  .chartband-swatch{ flex:none; width:11px; height:11px; margin-top:1px; border-radius:3px; background:var(--good-soft); border:1px solid var(--good); }
 
   /* Tabla compacta de % por escenario, debajo de los botones de Escenario en el panel de
      Filtros -- misma data (state.scenarios) que la tabla grande de la pestaña Escenarios, solo
@@ -258,8 +273,11 @@
         <h3>Cultivo enfocado</h3>
         <select id="focalCrop"></select>
       </div>
-      <div class="field">
-        <h3>Cultivos incluidos en consolidado</h3>
+      <div class="field indented" id="includedField">
+        <h3>¿Cuáles cultivos entran al consolidado?</h3>
+        <div class="chip-quickrow">
+          <button type="button" id="btnIncludedAll">Todos</button><span class="dotsep">·</span><button type="button" id="btnIncludedNone">Ninguno</button>
+        </div>
         <div class="chipgrid" id="includedChips"></div>
         <p class="hint">📦 Empaque no es un cultivo (no tiene tipo de cambio ni aparece en "Comparativo de cultivos"), pero su egreso real sí existe en la base de datos — al incluirlo aquí se suma al Ingreso/Egreso/EBITDA consolidado.</p>
       </div>
@@ -305,6 +323,8 @@
           <div class="kpi"><span class="label">EBITDA proyectado · 3 meses</span><span class="value" id="kpiEbitda">—</span><span class="delta" id="kpiEbitdaDelta"></span></div>
           <div class="kpi"><span class="label">Margen EBITDA</span><span class="value" id="kpiMargen">—</span><span class="delta" id="kpiMargenPill"></span></div>
         </div>
+
+        <p class="hint chartband-hint"><span class="chartband-swatch"></span>El área verde es el espacio entre el escenario Pesimista y el Optimista — su función es mostrarte qué tan grande es el rango entre el peor caso y el mejor caso. La línea sólida de color sí es tu escenario activo (verde bosque = Base, verde fuerte = Optimista, rojo = Pesimista).</p>
 
         <div class="cardgrid">
           <div class="card">
@@ -4366,12 +4386,28 @@ function renderStatus(){
 /* ============================================================
    13. FILTER UI + WIRING
    ============================================================ */
+// La sección "¿Cuáles cultivos entran al consolidado?" solo tiene efecto cuando "Cultivo enfocado"
+// está en Consolidado (ver currentCropsSelection()) -- mientras esté en un cultivo específico, esos
+// chips no hacen nada, así que se esconden para no aparentar ser un segundo selector de cultivo
+// (fuente de confusión reportada por Rafael el 22 sep, décima primera iteración del día).
+function syncIncludedFieldVisibility(){
+  document.getElementById('includedField').hidden = state.filters.focalCrop!=='CONSOLIDADO';
+}
+
 function buildFilterUI(){
   const focal = document.getElementById('focalCrop');
   focal.innerHTML = '<option value="CONSOLIDADO">🧺 Consolidado (todos)</option>' +
-    CROPS.map(c=>`<option value="${c}">${ICONS[c]} ${DISPLAY[c]}</option>`).join('');
+    '<optgroup label="Cultivos">' +
+    CROPS.map(c=>`<option value="${c}">${ICONS[c]} ${DISPLAY[c]}</option>`).join('') +
+    '</optgroup>' +
+    `<optgroup label="Otros conceptos"><option value="${OTHER_LABEL}">${ICONS[OTHER_LABEL]} ${DISPLAY[OTHER_LABEL]}</option></optgroup>`;
   focal.value = state.filters.focalCrop;
-  focal.addEventListener('change', ()=>{ state.filters.focalCrop = focal.value; renderAll(); });
+  focal.addEventListener('change', ()=>{
+    state.filters.focalCrop = focal.value;
+    syncIncludedFieldVisibility();
+    renderAll();
+  });
+  syncIncludedFieldVisibility();
 
   const chipwrap = document.getElementById('includedChips');
   const chipItems = CROPS.concat([OTHER_LABEL]);
@@ -4387,6 +4423,16 @@ function buildFilterUI(){
       else { state.filters.included.delete(c); chip.classList.remove('on'); }
       renderAll();
     });
+  });
+  document.getElementById('btnIncludedAll').addEventListener('click', ()=>{
+    chipItems.forEach(c=>state.filters.included.add(c));
+    chipwrap.querySelectorAll('.chip').forEach(chip=>{ chip.classList.add('on'); chip.querySelector('input').checked = true; });
+    renderAll();
+  });
+  document.getElementById('btnIncludedNone').addEventListener('click', ()=>{
+    chipItems.forEach(c=>state.filters.included.delete(c));
+    chipwrap.querySelectorAll('.chip').forEach(chip=>{ chip.classList.remove('on'); chip.querySelector('input').checked = false; });
+    renderAll();
   });
 
   const mes = document.getElementById('mesFiltro');
