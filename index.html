@@ -1,5 +1,4 @@
-<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Forecast de Cultivos</title>
+<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Forecast de Cultivos</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -255,12 +254,37 @@
         <select id="mesFiltro"></select>
       </div>
       <div class="field">
-        <h3>Escenario</h3>
-        <div class="segmented" id="escenarioSeg">
+        <h3>Escenario · Ingreso</h3>
+        <div class="segmented" id="escenarioIngresoSeg">
           <button data-sc="pesimista">Pesimista</button>
-          <button data-sc="base" class="on">Base</button>
+          <button data-sc="base" class="on base">Base</button>
           <button data-sc="optimista">Optimista</button>
         </div>
+      </div>
+      <div class="field">
+        <h3>Escenario · Egreso</h3>
+        <div class="segmented" id="escenarioEgresoSeg">
+          <button data-sc="pesimista">Pesimista</button>
+          <button data-sc="base" class="on base">Base</button>
+          <button data-sc="optimista">Optimista</button>
+        </div>
+      </div>
+      <div class="field">
+        <h3>Escenario · Producción</h3>
+        <div class="segmented" id="escenarioProduccionSeg">
+          <button data-sc="pesimista">Pesimista</button>
+          <button data-sc="base" class="on base">Base</button>
+          <button data-sc="optimista">Optimista</button>
+        </div>
+      </div>
+      <div class="field">
+        <h3>Escenario · Tipo de cambio</h3>
+        <div class="segmented" id="escenarioTCSeg">
+          <button data-sc="pesimista">Pesimista</button>
+          <button data-sc="base" class="on base">Base</button>
+          <button data-sc="optimista">Optimista</button>
+        </div>
+        <p class="hint">Cada variable tiene su propio escenario — puedes mover Egreso a Pesimista sin que le afecte a Ingreso, por ejemplo. Los % de cada escenario se ajustan en la pestaña 🧭 Escenarios.</p>
       </div>
       <div class="field">
         <h3>Método de proyección</h3>
@@ -594,7 +618,11 @@ const state = {
   monthly: null,                                    // built index
   // 'OTROS' (Empaque) se incluye por default: es egreso real que ya viene en la base de datos y
   // debe contar en el EBITDA/KPIs consolidados salvo que el usuario lo desmarque.
-  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat(['OTROS'])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial' },
+  // Antes había un solo "escenario" global. A pedido de Rafael (22 sep) ahora Ingreso, Egreso,
+  // Producción y Tipo de cambio tienen cada uno su propio dial Base/Optimista/Pesimista
+  // independiente -- así se puede, por ejemplo, ver Egreso en Pesimista mientras Ingreso sigue
+  // en Base, o mover el Tipo de cambio solo sin que le afecte al resto.
+  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat(['OTROS'])), mes: 'TOTAL3', escenarioIngreso:'base', escenarioEgreso:'base', escenarioProduccion:'base', escenarioTC:'base', metodo:'polinomial' },
   scenarios: {
     base:      { ingreso:0, egreso:0, produccion:0, tc:0 },
     optimista: { ingreso:8, egreso:-5, produccion:5, tc:5 },
@@ -1151,16 +1179,21 @@ function estacionalDirectMonthly(variable, crop, monthsList){
   });
   return out;
 }
-function estacionalScenarioFor(variable, crop, scenario, monthsList){
+// `tcScenario` (opcional, quinto/cuarto parámetro según la función) es el nombre del escenario
+// que se usa SOLO para el % de tipo de cambio del ingreso -- si no se pasa, se usa el mismo
+// `scenario` (comportamiento "todo se mueve junto", el de antes). Esto permite que Ingreso y
+// Tipo de cambio tengan cada uno su propio dial Base/Optimista/Pesimista sin acoplarse.
+function estacionalScenarioFor(variable, crop, scenario, monthsList, tcScenario){
   const base = estacionalDirectMonthly(variable, crop, monthsList);
   const s = state.scenarios[scenario];
+  const sTC = state.scenarios[tcScenario || scenario];
   const out = {};
   monthsList.forEach(mk=>{
     let v = base[mk];
     // El % de escenario (Base/Optimista/Pesimista) solo se aplica a los meses del horizonte de
     // forecast -- los meses ya transcurridos siguen siendo el dato tal cual, sin ningún ajuste.
     if(s && FORECAST_MONTHS.includes(mk)){
-      if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
+      if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop) && sTC) v *= (1+sTC.tc/100); }
       else if(variable==='egreso'){ v *= (1+s.egreso/100); }
       else if(variable==='produccion'){ v *= (1+s.produccion/100); }
     }
@@ -1168,51 +1201,52 @@ function estacionalScenarioFor(variable, crop, scenario, monthsList){
   });
   return out;
 }
-function estacionalConsolidated(variable, scenario, crops, monthsList){
+function estacionalConsolidated(variable, scenario, crops, monthsList, tcScenario){
   monthsList = monthsList || FORECAST_MONTHS;
   const out = Object.fromEntries(monthsList.map(m=>[m,0]));
   crops.forEach(c=>{
-    const f = estacionalScenarioFor(variable, c, scenario, monthsList);
+    const f = estacionalScenarioFor(variable, c, scenario, monthsList, tcScenario);
     monthsList.forEach(mk=> out[mk]+=(f[mk]||0));
   });
   return out;
 }
 
-function scenarioForecastFor(variable, crop, method, scenario){
+function scenarioForecastFor(variable, crop, method, scenario, tcScenario){
   // "Variación estacional" no calcula nada: se desvía aquí también (además de en
   // scenarioForecastConsolidated) para que el desglose por cultivo (pestaña Comparativo:
   // "Comparación de los siete cultivos" y "Participación de cada cultivo") use la misma
   // fuente directa de Proyección Egreso agrupada por la columna Mes, en vez del modelo viejo
   // de baseForecastFor/computeMethodModel.
-  if(method==='estacional') return estacionalScenarioFor(variable, crop, scenario, PROJECTION_MONTHS);
+  if(method==='estacional') return estacionalScenarioFor(variable, crop, scenario, PROJECTION_MONTHS, tcScenario);
   const base = baseForecastFor(variable, crop, method);
   const s = state.scenarios[scenario];
+  const sTC = state.scenarios[tcScenario || scenario];
   const out = {};
   Object.keys(base).forEach(mk=>{
     let v = base[mk];
-    if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
+    if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop) && sTC) v *= (1+sTC.tc/100); }
     else if(variable==='egreso'){ v *= (1+s.egreso/100); }
     else if(variable==='produccion'){ v *= (1+s.produccion/100); }
     out[mk] = v;
   });
   return out;
 }
-function scenarioForecastConsolidated(variable, method, scenario, crops, monthsList){
+function scenarioForecastConsolidated(variable, method, scenario, crops, monthsList, tcScenario){
   monthsList = monthsList || FORECAST_MONTHS;
   // "Variación estacional" ya no pasa por baseForecastFor/computeMethodModel (ver
   // estacionalConsolidated más arriba) -- se desvía aquí para que TODO lo que consuma esta función
   // (bandas Optimista/Pesimista, EBITDA, la tabla histórica) use la misma fuente directa.
-  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList);
+  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList, tcScenario);
   const out = Object.fromEntries(monthsList.map(m=>[m,0]));
   crops.forEach(c=>{
-    const f = scenarioForecastFor(variable, c, method, scenario);
+    const f = scenarioForecastFor(variable, c, method, scenario, tcScenario);
     monthsList.forEach(mk=> out[mk]+=(f[mk]||0));
   });
   return out;
 }
-function ebitdaSet(method, scenario, crops){
-  const ingreso = scenarioForecastConsolidated('ingreso', method, scenario, crops);
-  const egreso  = scenarioForecastConsolidated('egreso', method, scenario, crops);
+function ebitdaSet(method, scenarioIngreso, scenarioEgreso, crops, scenarioTC){
+  const ingreso = scenarioForecastConsolidated('ingreso', method, scenarioIngreso, crops, undefined, scenarioTC || scenarioIngreso);
+  const egreso  = scenarioForecastConsolidated('egreso', method, scenarioEgreso, crops);
   const ebitda = {}; FORECAST_MONTHS.forEach(mk=> ebitda[mk]=ingreso[mk]-egreso[mk]);
   return { ingreso, egreso, ebitda };
 }
@@ -1231,7 +1265,7 @@ function historicalMonthly(variable, tipo, crops, monthsList){
 // método de proyección seleccionado (regresión/promedio/móvil) bajo el escenario activo — así ya
 // "se calcula" en vez de quedar en blanco, y en cuanto llegue el dato Real real de esa hoja lo
 // reemplaza automáticamente.
-function realOrProjectedMonthly(variable, crops, method, scenario, monthsList){
+function realOrProjectedMonthly(variable, crops, method, scenario, monthsList, tcScenario){
   // Corrección (22 sep, a pedido de Rafael): antes, un mes con AL MENOS una semana real capturada
   // se mostraba SOLO con esa suma (`real[mk]`), descartando por completo lo que `baseForecastFor`
   // ya calculaba para las semanas restantes de ese mismo mes (fueran del método seleccionado o —
@@ -1246,9 +1280,9 @@ function realOrProjectedMonthly(variable, crops, method, scenario, monthsList){
   // en un solo paso TODO lo que ya existe en Proyección Egreso (pasado y futuro, agrupado por su
   // columna "Mes") -- sumar `real[mk]` aquí encima lo duplicaría, porque estacionalConsolidated ya
   // incluye esas mismas semanas pasadas.
-  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList);
+  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList, tcScenario);
   const real = historicalMonthly(variable, 'real', crops, monthsList);
-  const forecastPart = scenarioForecastConsolidated(variable, method, scenario, crops, monthsList);
+  const forecastPart = scenarioForecastConsolidated(variable, method, scenario, crops, monthsList, tcScenario);
   const out = {};
   monthsList.forEach(mk=>{
     out[mk] = (real[mk]||0) + (forecastPart[mk]||0);
@@ -1331,8 +1365,8 @@ function focalLabel(){
 
 function renderKpis(){
   const crops = currentCropsSelection();
-  const method = state.filters.metodo, sc = state.filters.escenario;
-  const { ingreso, egreso, ebitda } = ebitdaSet(method, sc, crops);
+  const method = state.filters.metodo;
+  const { ingreso, egreso, ebitda } = ebitdaSet(method, state.filters.escenarioIngreso, state.filters.escenarioEgreso, crops, state.filters.escenarioTC);
   const ingresoTotal = sum3(ingreso), egresoTotal = sum3(egreso), ebitdaTotal = sum3(ebitda);
   const margen = ingresoTotal>0 ? (ebitdaTotal/ingresoTotal*100) : 0;
 
@@ -1365,6 +1399,22 @@ function renderKpis(){
   document.getElementById('kpiMargenPill').innerHTML = `<span class="pill ${cls}">${label}</span>`;
 }
 
+// Con 4 dials independientes, ya no hay un solo "escenario activo" que nombrar en la leyenda --
+// cada gráfica (Ingreso/Egreso/Producción/EBITDA/Margen) muestra el nombre del dial que realmente
+// la afecta. EBITDA y Margen dependen de Ingreso Y Egreso a la vez: si ambos dials coinciden se
+// muestra un solo nombre, si no se muestran los dos.
+function cap(s){ return s ? s[0].toUpperCase()+s.slice(1) : s; }
+function centralScenarioLabelFor(valueFn){
+  if(valueFn===valueIngreso) return cap(state.filters.escenarioIngreso);
+  if(valueFn===valueEgreso) return cap(state.filters.escenarioEgreso);
+  if(valueFn===valueProduccion) return cap(state.filters.escenarioProduccion);
+  if(valueFn===valueEbitda || valueFn===valueMargen){
+    const i = state.filters.escenarioIngreso, e = state.filters.escenarioEgreso;
+    return i===e ? cap(i) : `Ing. ${cap(i)} / Egr. ${cap(e)}`;
+  }
+  return cap(state.filters.escenarioIngreso);
+}
+
 function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
   destroyChart(canvasId);
   if(!chartsAvailable()){ chartFallback(canvasId); return; }
@@ -1376,11 +1426,16 @@ function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
   const real = valueFn('real', null, histMonths, crops, method);
   const presupuesto = historicalCombinedForValue(valueFn, crops, allMonths, method);
   const base = ['base','optimista','pesimista'].reduce((acc,sc)=>{ acc[sc]=valueFn('scenario', sc, FORECAST_MONTHS, crops, method); return acc; },{});
+  // "central" = lo que realmente refleja los dials independientes que el usuario tiene activos
+  // ahora mismo (Ingreso/Egreso/Producción/TC cada uno con su propio Base/Optimista/Pesimista),
+  // a diferencia de `base.optimista`/`base.pesimista` que son la banda de referencia "todo junto".
+  const centralForecast = valueFn('central', null, FORECAST_MONTHS, crops, method);
 
-  const central = histMonths.map(mk=>real[mk]).concat(FORECAST_MONTHS.map(mk=>base[state.filters.escenario][mk]));
+  const central = histMonths.map(mk=>real[mk]).concat(FORECAST_MONTHS.map(mk=>centralForecast[mk]));
   const optimista = allMonths.map(mk=> FORECAST_MONTHS.includes(mk) ? base.optimista[mk] : null);
   const pesimista = allMonths.map(mk=> FORECAST_MONTHS.includes(mk) ? base.pesimista[mk] : null);
   const presupuestoArr = allMonths.map(mk=> presupuesto[mk] ?? null);
+  const centralLabel = centralScenarioLabelFor(valueFn);
 
   const ctx = document.getElementById(canvasId).getContext('2d');
   charts[canvasId] = new Chart(ctx, {
@@ -1391,7 +1446,7 @@ function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
         { label:'Presupuesto', data:presupuestoArr, borderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.25 },
         { label:'Pesimista', data:pesimista, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.14), pointRadius:0, fill:false, tension:0.25 },
         { label:'Optimista', data:optimista, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
-        { label: state.filters.escenario[0].toUpperCase()+state.filters.escenario.slice(1)+' (real + forecast)', data: central, borderColor: CH.accent, backgroundColor: CH.accent, borderWidth:2.5, pointRadius:3, pointBackgroundColor:CH.accent, tension:0.25, fill:false }
+        { label: centralLabel+' (real + forecast)', data: central, borderColor: CH.accent, backgroundColor: CH.accent, borderWidth:2.5, pointRadius:3, pointBackgroundColor:CH.accent, tension:0.25, fill:false }
       ]
     },
     options:{
@@ -1405,7 +1460,7 @@ function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
   });
 
   document.getElementById(legendId).innerHTML = `
-    <span class="sw" style="color:${CH.accent}"><span class="line" style="background:${CH.accent}"></span>Real + Forecast (${state.filters.escenario})</span>
+    <span class="sw" style="color:${CH.accent}"><span class="line" style="background:${CH.accent}"></span>Real + Forecast (${centralLabel})</span>
     <span class="sw" style="color:${CH.muted}"><span class="dashed"></span>Presupuesto</span>
     <span class="sw" style="color:${CH.good}"><span class="dot" style="background:${hexA(CH.good,0.5)}"></span>Optimista</span>
     <span class="sw" style="color:${CH.critical}"><span class="dot" style="background:${hexA(CH.critical,0.5)}"></span>Pesimista</span>`;
@@ -1435,7 +1490,13 @@ function valueEbitda(mode, scenario, months, crops, method){
     const e = valueEgreso('real', scenario, months, crops, method);
     const out={}; months.forEach(mk=> out[mk]=(i[mk]||0)-(e[mk]||0)); return out;
   }
-  const set = ebitdaSet(method, scenario, crops);
+  if(mode==='central'){
+    const set = ebitdaSet(method, state.filters.escenarioIngreso, state.filters.escenarioEgreso, crops, state.filters.escenarioTC);
+    return set.ebitda;
+  }
+  // mode es un nombre de escenario ('base'/'optimista'/'pesimista'): banda de referencia donde
+  // ingreso y egreso (y su TC) se mueven juntos bajo ese mismo nombre.
+  const set = ebitdaSet(method, scenario, scenario, crops);
   return set.ebitda;
 }
 function valueMargen(mode, scenario, months, crops, method){
@@ -1444,19 +1505,26 @@ function valueMargen(mode, scenario, months, crops, method){
     const e = valueEgreso('real', scenario, months, crops, method);
     const out={}; months.forEach(mk=> out[mk] = i[mk]>0 ? (i[mk]-e[mk])/i[mk]*100 : 0); return out;
   }
-  const set = ebitdaSet(method, scenario, crops);
+  if(mode==='central'){
+    const set = ebitdaSet(method, state.filters.escenarioIngreso, state.filters.escenarioEgreso, crops, state.filters.escenarioTC);
+    const out={}; months.forEach(mk=> out[mk] = set.ingreso[mk]>0 ? set.ebitda[mk]/set.ingreso[mk]*100 : 0); return out;
+  }
+  const set = ebitdaSet(method, scenario, scenario, crops);
   const out={}; months.forEach(mk=> out[mk] = set.ingreso[mk]>0 ? set.ebitda[mk]/set.ingreso[mk]*100 : 0); return out;
 }
 function valueIngreso(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('ingreso', crops, method, scenario||state.filters.escenario, months);
+  if(mode==='real') return realOrProjectedMonthly('ingreso', crops, method, scenario||state.filters.escenarioIngreso, months, state.filters.escenarioTC);
+  if(mode==='central') return scenarioForecastConsolidated('ingreso', method, state.filters.escenarioIngreso, crops, months, state.filters.escenarioTC);
   return scenarioForecastConsolidated('ingreso', method, scenario, crops, months);
 }
 function valueEgreso(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('egreso', crops, method, scenario||state.filters.escenario, months);
+  if(mode==='real') return realOrProjectedMonthly('egreso', crops, method, scenario||state.filters.escenarioEgreso, months);
+  if(mode==='central') return scenarioForecastConsolidated('egreso', method, state.filters.escenarioEgreso, crops, months);
   return scenarioForecastConsolidated('egreso', method, scenario, crops, months);
 }
 function valueProduccion(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('produccion', crops, method, scenario||state.filters.escenario, months);
+  if(mode==='real') return realOrProjectedMonthly('produccion', crops, method, scenario||state.filters.escenarioProduccion, months);
+  if(mode==='central') return scenarioForecastConsolidated('produccion', method, state.filters.escenarioProduccion, crops, months);
   return scenarioForecastConsolidated('produccion', method, scenario, crops, months);
 }
 
@@ -1466,22 +1534,24 @@ function valueProduccion(mode, scenario, months, crops, method){
 
 function renderHistoricoTable(){
   const crops = currentCropsSelection();
-  const method = state.filters.metodo, sc = state.filters.escenario;
+  const method = state.filters.metodo;
+  const scI = state.filters.escenarioIngreso, scE = state.filters.escenarioEgreso, scTC = state.filters.escenarioTC;
   document.getElementById('tableCropLabel').textContent = focalLabel();
   const months = recentHistoricalMonths(6).concat(FORECAST_MONTHS);
-  const realE = realOrProjectedMonthly('egreso', crops, method, sc, months);
-  const realI = realOrProjectedMonthly('ingreso', crops, method, sc, months);
+  const realE = realOrProjectedMonthly('egreso', crops, method, scE, months);
+  const realI = realOrProjectedMonthly('ingreso', crops, method, scI, months, scTC);
   const presE = historicalMonthly('egreso','presupuesto',crops,months), presI = historicalMonthly('ingreso','presupuesto',crops,months);
   const proyE = historicalMonthly('egreso','proyeccion',crops,months), proyI = historicalMonthly('ingreso','proyeccion',crops,months);
-  const fcI = scenarioForecastConsolidated('ingreso', method, sc, crops, FORECAST_MONTHS);
-  const fcE = scenarioForecastConsolidated('egreso', method, sc, crops, FORECAST_MONTHS);
+  const fcI = scenarioForecastConsolidated('ingreso', method, scI, crops, FORECAST_MONTHS, scTC);
+  const fcE = scenarioForecastConsolidated('egreso', method, scE, crops, FORECAST_MONTHS);
   const hasIngresoReal = state.raw.ingreso.some(r=>r.tipo==='real');
   const hasIngresoPres = state.raw.ingreso.some(r=>r.tipo==='presupuesto');
   const hasIngresoProy = state.raw.ingreso.some(r=>r.tipo==='proyeccion');
 
+  const scLabel = scI===scE ? scI : `Ing. ${scI} / Egr. ${scE}`;
   const thead = document.getElementById('tablaHistorico').querySelector('thead');
   const tbody = document.getElementById('tablaHistorico').querySelector('tbody');
-  thead.innerHTML = '<tr><th>Mes</th><th>Ingreso real</th><th>Egreso real</th><th>EBITDA real</th><th>Presupuesto EBITDA</th><th>Proyección equipo</th><th>Forecast ('+sc+')</th></tr>';
+  thead.innerHTML = '<tr><th>Mes</th><th>Ingreso real</th><th>Egreso real</th><th>EBITDA real</th><th>Presupuesto EBITDA</th><th>Proyección equipo</th><th>Forecast ('+scLabel+')</th></tr>';
   tbody.innerHTML = '';
   let anyEstimated = false;
   months.forEach(mk=>{
@@ -1549,7 +1619,10 @@ function renderEscenariosChart(){
   if(!chartsAvailable()){ chartFallback('chartEscenarios'); return; }
   const crops = currentCropsSelection();
   const method = state.filters.metodo;
-  const sets = { base:ebitdaSet(method,'base',crops), optimista:ebitdaSet(method,'optimista',crops), pesimista:ebitdaSet(method,'pesimista',crops) };
+  // Esta pestaña compara los 3 escenarios "todo junto" (Ingreso/Egreso/TC moviéndose con el mismo
+  // nombre) -- es la vista clásica de comparación, distinta de los 4 dials independientes de la
+  // pestaña Forecast.
+  const sets = { base:ebitdaSet(method,'base','base',crops), optimista:ebitdaSet(method,'optimista','optimista',crops), pesimista:ebitdaSet(method,'pesimista','pesimista',crops) };
   const ctx = document.getElementById('chartEscenarios').getContext('2d');
   charts.chartEscenarios = new Chart(ctx, {
     type:'bar',
@@ -1572,7 +1645,7 @@ function renderEscenariosChart(){
 function renderScenarioTableNumbers(){
   const crops = currentCropsSelection();
   const method = state.filters.metodo;
-  const sets = { base:ebitdaSet(method,'base',crops), optimista:ebitdaSet(method,'optimista',crops), pesimista:ebitdaSet(method,'pesimista',crops) };
+  const sets = { base:ebitdaSet(method,'base','base',crops), optimista:ebitdaSet(method,'optimista','optimista',crops), pesimista:ebitdaSet(method,'pesimista','pesimista',crops) };
   const thead = document.getElementById('tablaEscenarios').querySelector('thead');
   const tbody = document.getElementById('tablaEscenarios').querySelector('tbody');
   thead.innerHTML = '<tr><th>Escenario</th><th>Ingreso 3m</th><th>Egreso 3m</th><th>EBITDA 3m</th><th>Margen</th></tr>';
@@ -1599,12 +1672,13 @@ function periodMonths(){
   return state.filters.mes==='TOTAL3' ? FORECAST_MONTHS : [state.filters.mes];
 }
 function perCropTotals(){
-  const method = state.filters.metodo, sc = state.filters.escenario;
+  const method = state.filters.metodo;
+  const scI = state.filters.escenarioIngreso, scE = state.filters.escenarioEgreso, scTC = state.filters.escenarioTC;
   const months = periodMonths();
   const crops = includedCropsOrdered();
   return crops.map(crop=>{
-    const ing = scenarioForecastFor('ingreso', crop, method, sc);
-    const egr = scenarioForecastFor('egreso', crop, method, sc);
+    const ing = scenarioForecastFor('ingreso', crop, method, scI, scTC);
+    const egr = scenarioForecastFor('egreso', crop, method, scE);
     const ingT = months.reduce((a,mk)=>a+(ing[mk]||0),0);
     const egrT = months.reduce((a,mk)=>a+(egr[mk]||0),0);
     return { crop, ingreso: ingT, egreso: egrT, ebitda: ingT-egrT };
@@ -1612,8 +1686,10 @@ function perCropTotals(){
 }
 
 function renderComparativoTab(){
+  const scI = state.filters.escenarioIngreso, scE = state.filters.escenarioEgreso;
+  const scLabel = scI===scE ? scI : `Ing. ${scI} / Egr. ${scE}`;
   document.getElementById('comparativoSub').textContent =
-    `Escenario ${state.filters.escenario} · ${state.filters.mes==='TOTAL3' ? 'Total de los 3 meses proyectados' : monthLabel(state.filters.mes)}`;
+    `Escenario ${scLabel} · ${state.filters.mes==='TOTAL3' ? 'Total de los 3 meses proyectados' : monthLabel(state.filters.mes)}`;
   const totals = perCropTotals();
 
   destroyChart('chartCultivos');
@@ -1693,7 +1769,7 @@ const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción'
 // el Google Sheet — cada actualización solo tiene que reescribir este bloque.
 const BAKED_DATA = {
  egreso: {
-  real: `Egreso	Cultivo	ejercicio	semana	Importe
+  real: `Egreso	Cultivo	ejercicio	semana	Importe 
 Real	AGUACATE	2026	26	0
 Real	AGUACATE	2026	27	174937256
 Real	AGUACATE	2026	28	2371571
@@ -2076,18 +2152,18 @@ Real	ZARZAMORA	2027	26	0
 Real	ZARZAMORA	2027	27	0
 Real	ZARZAMORA	2027	28	0
 Real	EMPAQUE	2026	26	0
-Real	EMPAQUE	2026	27	120449
-Real	EMPAQUE	2026	28	420738
+Real	EMPAQUE	2026	27	120450
+Real	EMPAQUE	2026	28	420740
 Real	EMPAQUE	2026	29	339804
 Real	EMPAQUE	2026	30	222040
-Real	EMPAQUE	2026	31	1045543
-Real	EMPAQUE	2026	32	327605
-Real	EMPAQUE	2026	33	366123
-Real	EMPAQUE	2026	34	3820233
-Real	EMPAQUE	2026	35	1094196
-Real	EMPAQUE	2026	36	2091821
-Real	EMPAQUE	2026	37	1327173
-Real	EMPAQUE	2026	38	102646
+Real	EMPAQUE	2026	31	1045542
+Real	EMPAQUE	2026	32	327604
+Real	EMPAQUE	2026	33	366122
+Real	EMPAQUE	2026	34	3820231
+Real	EMPAQUE	2026	35	1094195
+Real	EMPAQUE	2026	36	2091820
+Real	EMPAQUE	2026	37	1327171
+Real	EMPAQUE	2026	38	0
 Real	EMPAQUE	2026	39	0
 Real	EMPAQUE	2026	40	0
 Real	EMPAQUE	2026	41	0
@@ -2567,443 +2643,443 @@ Presupuesto	ZARZAMORA	2027	25	3365892
 Presupuesto	ZARZAMORA	2027	26	1348037
 Presupuesto	ZARZAMORA	2027	27	2581442
 Presupuesto	ZARZAMORA	2027	28	669`,
-  proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe	Mes	1360952483.7580535
-Proyección	AGUACATE	2026	26	0	junio	
-Proyección	AGUACATE	2026	27	174937256	julio	
-Proyección	AGUACATE	2026	28	2371571	julio	
-Proyección	AGUACATE	2026	29	3223080	julio	
-Proyección	AGUACATE	2026	30	10619357	julio	
-Proyección	AGUACATE	2026	31	12153942	agosto	
-Proyección	AGUACATE	2026	32	3489155	agosto	
-Proyección	AGUACATE	2026	33	6151725	agosto	
-Proyección	AGUACATE	2026	34	5319971	agosto	
-Proyección	AGUACATE	2026	35	10406527	agosto	
-Proyección	AGUACATE	2026	36	4132519	septiembre	
-Proyección	AGUACATE	2026	37	2651255	septiembre	
-Proyección	AGUACATE	2026	38	2942893.0500000003	septiembre	
-Proyección	AGUACATE	2026	39	3266611.2855000007	septiembre	
-Proyección	AGUACATE	2026	40	3691270.7526150006	octubre	
-Proyección	AGUACATE	2026	41	4134223.242928801	octubre	
-Proyección	AGUACATE	2026	42	4464961.102363106	octubre	
-Proyección	AGUACATE	2026	43	4866807.601575785	octubre	
-Proyección	AGUACATE	2026	44	5353488.361733364	octubre	
-Proyección	AGUACATE	2026	45	5674697.6634373665	noviembre	
-Proyección	AGUACATE	2026	46	5958432.546609235	noviembre	
-Proyección	AGUACATE	2026	47	6256354.173939697	noviembre	
-Proyección	AGUACATE	2026	48	6569171.882636682	noviembre	
-Proyección	AGUACATE	2026	49		diciembre	
-Proyección	AGUACATE	2026	50		diciembre	
-Proyección	AGUACATE	2026	51		diciembre	
-Proyección	AGUACATE	2026	52		diciembre	
-Proyección	AGUACATE	2027	1		enero	
-Proyección	AGUACATE	2027	2		enero	
-Proyección	AGUACATE	2027	3		enero	
-Proyección	AGUACATE	2027	4		enero	
-Proyección	AGUACATE	2027	5		enero	
-Proyección	AGUACATE	2027	6		febrero	
-Proyección	AGUACATE	2027	7		febrero	
-Proyección	AGUACATE	2027	8		febrero	
-Proyección	AGUACATE	2027	9		febrero	
-Proyección	AGUACATE	2027	10		marzo	
-Proyección	AGUACATE	2027	11		marzo	
-Proyección	AGUACATE	2027	12		marzo	
-Proyección	AGUACATE	2027	13		marzo	
-Proyección	AGUACATE	2027	14		abril	
-Proyección	AGUACATE	2027	15		abril	
-Proyección	AGUACATE	2027	16		abril	
-Proyección	AGUACATE	2027	17		abril	
-Proyección	AGUACATE	2027	18		mayo	
-Proyección	AGUACATE	2027	19		mayo	
-Proyección	AGUACATE	2027	20		mayo	
-Proyección	AGUACATE	2027	21		mayo	
-Proyección	AGUACATE	2027	22		mayo	
-Proyección	AGUACATE	2027	23		junio	
-Proyección	AGUACATE	2027	24		junio	
-Proyección	AGUACATE	2027	25		junio	
-Proyección	AGUACATE	2027	26		junio	
-Proyección	ARANDANO	2026	26	0	junio	
-Proyección	ARANDANO	2026	27	4799906	julio	
-Proyección	ARANDANO	2026	28	1360606	julio	
-Proyección	ARANDANO	2026	29	2248386	julio	
-Proyección	ARANDANO	2026	30	6683481	julio	
-Proyección	ARANDANO	2026	31	9520206	agosto	
-Proyección	ARANDANO	2026	32	1096454	agosto	
-Proyección	ARANDANO	2026	33	5950670	agosto	
-Proyección	ARANDANO	2026	34	899701	agosto	
-Proyección	ARANDANO	2026	35	6501001	agosto	
-Proyección	ARANDANO	2026	36	4306725	septiembre	
-Proyección	ARANDANO	2026	37	5905080	septiembre	
-Proyección	ARANDANO	2026	38	6082232.4	septiembre	
-Proyección	ARANDANO	2026	39	6629633.316000001	septiembre	
-Proyección	ARANDANO	2026	40	6894818.648640001	octubre	
-Proyección	ARANDANO	2026	41	7101663.208099201	octubre	
-Proyección	ARANDANO	2026	42	7314713.1043421775	octubre	
-Proyección	ARANDANO	2026	43	7899890.152689552	octubre	
-Proyección	ARANDANO	2026	44	8215885.758797134	octubre	
-Proyección	ARANDANO	2026	45	8380203.473973077	noviembre	
-Proyección	ARANDANO	2026	46	8547807.543452539	noviembre	
-Proyección	ARANDANO	2026	47	9146154.071494216	noviembre	
-Proyección	ARANDANO	2026	48	9329077.1529241	noviembre	
-Proyección	ARANDANO	2026	49		diciembre	
-Proyección	ARANDANO	2026	50		diciembre	
-Proyección	ARANDANO	2026	51		diciembre	
-Proyección	ARANDANO	2026	52		diciembre	
-Proyección	ARANDANO	2027	1		enero	
-Proyección	ARANDANO	2027	2		enero	
-Proyección	ARANDANO	2027	3		enero	
-Proyección	ARANDANO	2027	4		enero	
-Proyección	ARANDANO	2027	5		enero	
-Proyección	ARANDANO	2027	6		febrero	
-Proyección	ARANDANO	2027	7		febrero	
-Proyección	ARANDANO	2027	8		febrero	
-Proyección	ARANDANO	2027	9		febrero	
-Proyección	ARANDANO	2027	10		marzo	
-Proyección	ARANDANO	2027	11		marzo	
-Proyección	ARANDANO	2027	12		marzo	
-Proyección	ARANDANO	2027	13		marzo	
-Proyección	ARANDANO	2027	14		abril	
-Proyección	ARANDANO	2027	15		abril	
-Proyección	ARANDANO	2027	16		abril	
-Proyección	ARANDANO	2027	17		abril	
-Proyección	ARANDANO	2027	18		mayo	
-Proyección	ARANDANO	2027	19		mayo	
-Proyección	ARANDANO	2027	20		mayo	
-Proyección	ARANDANO	2027	21		mayo	
-Proyección	ARANDANO	2027	22		mayo	
-Proyección	ARANDANO	2027	23		junio	
-Proyección	ARANDANO	2027	24		junio	
-Proyección	ARANDANO	2027	25		junio	
-Proyección	ARANDANO	2027	26		junio	
-Proyección	ARANDANO	2027	27		julio	
-Proyección	ARANDANO	2027	28	0	julio	
-Proyección	ESPARRAGO	2026	26	0	junio	
-Proyección	ESPARRAGO	2026	27	109927366	julio	
-Proyección	ESPARRAGO	2026	28	3677980	julio	
-Proyección	ESPARRAGO	2026	29	5005817	julio	
-Proyección	ESPARRAGO	2026	30	7596454	julio	
-Proyección	ESPARRAGO	2026	31	7267964	agosto	
-Proyección	ESPARRAGO	2026	32	7209569	agosto	
-Proyección	ESPARRAGO	2026	33	8862046	agosto	
-Proyección	ESPARRAGO	2026	34	5215117	agosto	
-Proyección	ESPARRAGO	2026	35	5442217	agosto	
-Proyección	ESPARRAGO	2026	36	7105484	septiembre	
-Proyección	ESPARRAGO	2026	37	4521230	septiembre	
-Proyección	ESPARRAGO	2026	38	4792503.8	septiembre	
-Proyección	ESPARRAGO	2026	39	4984203.952	septiembre	
-Proyección	ESPARRAGO	2026	40	5183572.11008	octubre	
-Proyección	ESPARRAGO	2026	41	5339079.2733824	octubre	
-Proyección	ESPARRAGO	2026	42	5552642.444317697	octubre	
-Proyección	ESPARRAGO	2026	43	5774748.142090404	octubre	
-Proyección	ESPARRAGO	2026	44	5890243.104932212	octubre	
-Proyección	ESPARRAGO	2026	45	6066950.398080179	noviembre	
-Proyección	ESPARRAGO	2026	46	6248958.910022584	noviembre	
-Proyección	ESPARRAGO	2026	47	6436427.677323261	noviembre	
-Proyección	ESPARRAGO	2026	48	6565156.230869726	noviembre	
-Proyección	ESPARRAGO	2026	49		diciembre	
-Proyección	ESPARRAGO	2026	50		diciembre	
-Proyección	ESPARRAGO	2026	51		diciembre	
-Proyección	ESPARRAGO	2026	52		diciembre	
-Proyección	ESPARRAGO	2027	1		enero	
-Proyección	ESPARRAGO	2027	2		enero	
-Proyección	ESPARRAGO	2027	3		enero	
-Proyección	ESPARRAGO	2027	4		enero	
-Proyección	ESPARRAGO	2027	5		enero	
-Proyección	ESPARRAGO	2027	6		febrero	
-Proyección	ESPARRAGO	2027	7		febrero	
-Proyección	ESPARRAGO	2027	8		febrero	
-Proyección	ESPARRAGO	2027	9		febrero	
-Proyección	ESPARRAGO	2027	10		marzo	
-Proyección	ESPARRAGO	2027	11		marzo	
-Proyección	ESPARRAGO	2027	12		marzo	
-Proyección	ESPARRAGO	2027	13		marzo	
-Proyección	ESPARRAGO	2027	14		abril	
-Proyección	ESPARRAGO	2027	15		abril	
-Proyección	ESPARRAGO	2027	16		abril	
-Proyección	ESPARRAGO	2027	17		abril	
-Proyección	ESPARRAGO	2027	18		mayo	
-Proyección	ESPARRAGO	2027	19		mayo	
-Proyección	ESPARRAGO	2027	20		mayo	
-Proyección	ESPARRAGO	2027	21		mayo	
-Proyección	ESPARRAGO	2027	22		mayo	
-Proyección	ESPARRAGO	2027	23		junio	
-Proyección	ESPARRAGO	2027	24		junio	
-Proyección	ESPARRAGO	2027	25		junio	
-Proyección	ESPARRAGO	2027	26		junio	
-Proyección	ESPARRAGO	2027	27		julio	
-Proyección	ESPARRAGO	2027	28	0	julio	
-Proyección	FRAMBUESA	2026	26	0	junio	
-Proyección	FRAMBUESA	2026	27	22070424	julio	
-Proyección	FRAMBUESA	2026	28	1983118	julio	
-Proyección	FRAMBUESA	2026	29	1512561	julio	
-Proyección	FRAMBUESA	2026	30	7945792	julio	
-Proyección	FRAMBUESA	2026	31	7962106	agosto	
-Proyección	FRAMBUESA	2026	32	2221586	agosto	
-Proyección	FRAMBUESA	2026	33	8597470	agosto	
-Proyección	FRAMBUESA	2026	34	5772626	agosto	
-Proyección	FRAMBUESA	2026	35	6837542	agosto	
-Proyección	FRAMBUESA	2026	36	6806748	septiembre	
-Proyección	FRAMBUESA	2026	37	7332511	septiembre	
-Proyección	FRAMBUESA	2026	38	8065762.100000001	septiembre	
-Proyección	FRAMBUESA	2026	39	8872338.31	septiembre	
-Proyección	FRAMBUESA	2026	40	9670848.757900001	octubre	
-Proyección	FRAMBUESA	2026	41	10251099.683374003	octubre	
-Proyección	FRAMBUESA	2026	42	10763654.667542703	octubre	
-Proyección	FRAMBUESA	2026	43	11409473.947595267	octubre	
-Proyección	FRAMBUESA	2026	44	12208137.123926936	octubre	
-Proyección	FRAMBUESA	2026	45	12696462.608884014	noviembre	
-Proyección	FRAMBUESA	2026	46	13204321.113239376	noviembre	
-Proyección	FRAMBUESA	2026	47	13996580.380033739	noviembre	
-Proyección	FRAMBUESA	2026	48	14836375.202835765	noviembre	
-Proyección	FRAMBUESA	2026	49		diciembre	
-Proyección	FRAMBUESA	2026	50		diciembre	
-Proyección	FRAMBUESA	2026	51		diciembre	
-Proyección	FRAMBUESA	2026	52		diciembre	
-Proyección	FRAMBUESA	2027	1		enero	
-Proyección	FRAMBUESA	2027	2		enero	
-Proyección	FRAMBUESA	2027	3		enero	
-Proyección	FRAMBUESA	2027	4		enero	
-Proyección	FRAMBUESA	2027	5		enero	
-Proyección	FRAMBUESA	2027	6		febrero	
-Proyección	FRAMBUESA	2027	7		febrero	
-Proyección	FRAMBUESA	2027	8		febrero	
-Proyección	FRAMBUESA	2027	9		febrero	
-Proyección	FRAMBUESA	2027	10		marzo	
-Proyección	FRAMBUESA	2027	11		marzo	
-Proyección	FRAMBUESA	2027	12		marzo	
-Proyección	FRAMBUESA	2027	13		marzo	
-Proyección	FRAMBUESA	2027	14		abril	
-Proyección	FRAMBUESA	2027	15		abril	
-Proyección	FRAMBUESA	2027	16		abril	
-Proyección	FRAMBUESA	2027	17		abril	
-Proyección	FRAMBUESA	2027	18		mayo	
-Proyección	FRAMBUESA	2027	19		mayo	
-Proyección	FRAMBUESA	2027	20		mayo	
-Proyección	FRAMBUESA	2027	21		mayo	
-Proyección	FRAMBUESA	2027	22		mayo	
-Proyección	FRAMBUESA	2027	23		junio	
-Proyección	FRAMBUESA	2027	24		junio	
-Proyección	FRAMBUESA	2027	25		junio	
-Proyección	FRAMBUESA	2027	26		junio	
-Proyección	FRAMBUESA	2027	27		julio	
-Proyección	FRESA	2026	26	0	junio	
-Proyección	FRESA	2026	27	55044916	julio	
-Proyección	FRESA	2026	28	6561940	julio	
-Proyección	FRESA	2026	29	3953203	julio	
-Proyección	FRESA	2026	30	20459935	julio	
-Proyección	FRESA	2026	31	9015767	agosto	
-Proyección	FRESA	2026	32	5825288	agosto	
-Proyección	FRESA	2026	33	9613622	agosto	
-Proyección	FRESA	2026	34	3613694	agosto	
-Proyección	FRESA	2026	35	7621321	agosto	
-Proyección	FRESA	2026	36	15220093	septiembre	
-Proyección	FRESA	2026	37	14351353	septiembre	
-Proyección	FRESA	2026	38	14925407.120000001	septiembre	
-Proyección	FRESA	2026	39	15671677.476000002	septiembre	
-Proyección	FRESA	2026	40	16298544.575040001	octubre	
-Proyección	FRESA	2026	41	16950486.358041603	octubre	
-Proyección	FRESA	2026	42	17628505.812363267	octubre	
-Proyección	FRESA	2026	43	18333646.0448578	octubre	
-Proyección	FRESA	2026	44	21450365.872483626	octubre	
-Proyección	FRESA	2026	45	21879373.1899333	noviembre	
-Proyección	FRESA	2026	46	22535754.3856313	noviembre	
-Proyección	FRESA	2026	47	23211827.01720024	noviembre	
-Proyección	FRESA	2026	48	24140300.09788825	noviembre	
-Proyección	FRESA	2026	49		diciembre	
-Proyección	FRESA	2026	50		diciembre	
-Proyección	FRESA	2026	51		diciembre	
-Proyección	FRESA	2026	52		diciembre	
-Proyección	FRESA	2027	1		enero	
-Proyección	FRESA	2027	2		enero	
-Proyección	FRESA	2027	3		enero	
-Proyección	FRESA	2027	4		enero	
-Proyección	FRESA	2027	5		enero	
-Proyección	FRESA	2027	6		febrero	
-Proyección	FRESA	2027	7		febrero	
-Proyección	FRESA	2027	8		febrero	
-Proyección	FRESA	2027	9		febrero	
-Proyección	FRESA	2027	10		marzo	
-Proyección	FRESA	2027	11		marzo	
-Proyección	FRESA	2027	12		marzo	
-Proyección	FRESA	2027	13		marzo	
-Proyección	FRESA	2027	14		abril	
-Proyección	FRESA	2027	15		abril	
-Proyección	FRESA	2027	16		abril	
-Proyección	FRESA	2027	17		abril	
-Proyección	FRESA	2027	18		mayo	
-Proyección	FRESA	2027	19		mayo	
-Proyección	FRESA	2027	20		mayo	
-Proyección	FRESA	2027	21		mayo	
-Proyección	FRESA	2027	22		mayo	
-Proyección	FRESA	2027	23		junio	
-Proyección	FRESA	2027	24		junio	
-Proyección	FRESA	2027	25		junio	
-Proyección	FRESA	2027	26		junio	
-Proyección	FRESA	2027	27		julio	
-Proyección	FRESA	2027	28	0	julio	
-Proyección	PAPA	2026	26	0	junio	
-Proyección	PAPA	2026	27	12226222	julio	
-Proyección	PAPA	2026	28	2591432	julio	
-Proyección	PAPA	2026	29	1275774	julio	
-Proyección	PAPA	2026	30	3607352	julio	
-Proyección	PAPA	2026	31	1570988	agosto	
-Proyección	PAPA	2026	32	-616502	agosto	
-Proyección	PAPA	2026	33	1931787	agosto	
-Proyección	PAPA	2026	34	1244530	agosto	
-Proyección	PAPA	2026	35	2245538	agosto	
-Proyección	PAPA	2026	36	1550035	septiembre	
-Proyección	PAPA	2026	37	1022828	septiembre	
-Proyección	PAPA	2026	38	1135339.08	septiembre	
-Proyección	PAPA	2026	39	1180752.6432	septiembre	
-Proyección	PAPA	2026	40	1239790.27536	octubre	
-Proyección	PAPA	2026	41	1314177.6918816	octubre	
-Proyección	PAPA	2026	42	1379886.57647568	octubre	
-Proyección	PAPA	2026	43	1531674.099888005	octubre	
-Proyección	PAPA	2026	44	1654208.0278790456	octubre	
-Proyección	PAPA	2026	45	1770002.5898305788	noviembre	
-Proyección	PAPA	2026	46	1947002.8488136367	noviembre	
-Proyección	PAPA	2026	47	2024882.9627661821	noviembre	
-Proyección	PAPA	2026	48	2166624.770159815	noviembre	
-Proyección	PAPA	2026	49		diciembre	
-Proyección	PAPA	2026	50		diciembre	
-Proyección	PAPA	2026	51		diciembre	
-Proyección	PAPA	2026	52		diciembre	
-Proyección	PAPA	2027	1		enero	
-Proyección	PAPA	2027	2		enero	
-Proyección	PAPA	2027	3		enero	
-Proyección	PAPA	2027	4		enero	
-Proyección	PAPA	2027	5		enero	
-Proyección	PAPA	2027	6		febrero	
-Proyección	PAPA	2027	7		febrero	
-Proyección	PAPA	2027	8		febrero	
-Proyección	PAPA	2027	9		febrero	
-Proyección	PAPA	2027	10		marzo	
-Proyección	PAPA	2027	11		marzo	
-Proyección	PAPA	2027	12		marzo	
-Proyección	PAPA	2027	13		marzo	
-Proyección	PAPA	2027	14		abril	
-Proyección	PAPA	2027	15		abril	
-Proyección	PAPA	2027	16		abril	
-Proyección	PAPA	2027	17		abril	
-Proyección	PAPA	2027	18		mayo	
-Proyección	PAPA	2027	19		mayo	
-Proyección	PAPA	2027	20		mayo	
-Proyección	PAPA	2027	21		mayo	
-Proyección	PAPA	2027	22		mayo	
-Proyección	PAPA	2027	23		junio	
-Proyección	PAPA	2027	24		junio	
-Proyección	PAPA	2027	25		junio	
-Proyección	PAPA	2027	26		junio	
-Proyección	PAPA	2027	27		julio	
-Proyección	ZARZAMORA	2026	26	0	junio	
-Proyección	ZARZAMORA	2026	27	7021162	julio	
-Proyección	ZARZAMORA	2026	28	909856	julio	
-Proyección	ZARZAMORA	2026	29	1982028	julio	
-Proyección	ZARZAMORA	2026	30	4054404	julio	
-Proyección	ZARZAMORA	2026	31	4210491	agosto	
-Proyección	ZARZAMORA	2026	32	1035807	agosto	
-Proyección	ZARZAMORA	2026	33	3372313	agosto	
-Proyección	ZARZAMORA	2026	34	1287315	agosto	
-Proyección	ZARZAMORA	2026	35	3332619	agosto	
-Proyección	ZARZAMORA	2026	36	2460472	septiembre	
-Proyección	ZARZAMORA	2026	37	3263244	septiembre	
-Proyección	ZARZAMORA	2026	38	3328508.88	septiembre	
-Proyección	ZARZAMORA	2026	39	3361793.9688	septiembre	
-Proyección	ZARZAMORA	2026	40	3429029.848176	octubre	
-Proyección	ZARZAMORA	2026	41	3497610.4451395203	octubre	
-Proyección	ZARZAMORA	2026	42	3567562.654042311	octubre	
-Proyección	ZARZAMORA	2026	43	3745940.786744427	octubre	
-Proyección	ZARZAMORA	2026	44	3895778.4182142043	octubre	
-Proyección	ZARZAMORA	2026	45	3973693.9865784883	noviembre	
-Proyección	ZARZAMORA	2026	46	4053167.866310058	noviembre	
-Proyección	ZARZAMORA	2026	47	4134231.2236362593	noviembre	
-Proyección	ZARZAMORA	2026	48	4340942.784818073	noviembre	
-Proyección	ZARZAMORA	2026	49		diciembre	
-Proyección	ZARZAMORA	2026	50		diciembre	
-Proyección	ZARZAMORA	2026	51		diciembre	
-Proyección	ZARZAMORA	2026	52		diciembre	
-Proyección	ZARZAMORA	2027	1		enero	
-Proyección	ZARZAMORA	2027	2		enero	
-Proyección	ZARZAMORA	2027	3		enero	
-Proyección	ZARZAMORA	2027	4		enero	
-Proyección	ZARZAMORA	2027	5		enero	
-Proyección	ZARZAMORA	2027	6		febrero	
-Proyección	ZARZAMORA	2027	7		febrero	
-Proyección	ZARZAMORA	2027	8		febrero	
-Proyección	ZARZAMORA	2027	9		febrero	
-Proyección	ZARZAMORA	2027	10		marzo	
-Proyección	ZARZAMORA	2027	11		marzo	
-Proyección	ZARZAMORA	2027	12		marzo	
-Proyección	ZARZAMORA	2027	13		marzo	
-Proyección	ZARZAMORA	2027	14		abril	
-Proyección	ZARZAMORA	2027	15		abril	
-Proyección	ZARZAMORA	2027	16		abril	
-Proyección	ZARZAMORA	2027	17		abril	
-Proyección	ZARZAMORA	2027	18		mayo	
-Proyección	ZARZAMORA	2027	19		mayo	
-Proyección	ZARZAMORA	2027	20		mayo	
-Proyección	ZARZAMORA	2027	21		mayo	
-Proyección	ZARZAMORA	2027	22		mayo	
-Proyección	ZARZAMORA	2027	23		junio	
-Proyección	ZARZAMORA	2027	24		junio	
-Proyección	ZARZAMORA	2027	25		junio	
-Proyección	ZARZAMORA	2027	26		junio	
-Proyección	ZARZAMORA	2027	27		julio	
-Proyección	ZARZAMORA	2027	28	0	julio	
-Proyección	EMPAQUE	2026	26	0	junio	
-Proyección	EMPAQUE	2026	27	120449	julio	
-Proyección	EMPAQUE	2026	28	420738	julio	
-Proyección	EMPAQUE	2026	29	339804	julio	
-Proyección	EMPAQUE	2026	30	222040	julio	
-Proyección	EMPAQUE	2026	31	1045543	agosto	
-Proyección	EMPAQUE	2026	32	327605	agosto	
-Proyección	EMPAQUE	2026	33	366123	agosto	
-Proyección	EMPAQUE	2026	34	3820233	agosto	
-Proyección	EMPAQUE	2026	35	1094196	agosto	
-Proyección	EMPAQUE	2026	36	2091821	septiembre	
-Proyección	EMPAQUE	2026	37	1327173	septiembre	
-Proyección	EMPAQUE	2026	38	102646	septiembre	
-Proyección	EMPAQUE	2026	39	107778.3	septiembre	
-Proyección	EMPAQUE	2026	40	137956.22400000002	octubre	
-Proyección	EMPAQUE	2026	41	143474.47296	octubre	
-Proyección	EMPAQUE	2026	42	163560.89917440002	octubre	
-Proyección	EMPAQUE	2026	43	139026.76429824	octubre	
-Proyección	EMPAQUE	2026	44	180734.79358771202	octubre	
-Proyección	EMPAQUE	2026	45	271102.19038156804	noviembre	
-Proyección	EMPAQUE	2026	46	290079.3437082778	noviembre	
-Proyección	EMPAQUE	2026	47	304583.3108936917	noviembre	
-Proyección	EMPAQUE	2026	48	243666.6487149534	noviembre	
-Proyección	EMPAQUE	2026	49		diciembre	
-Proyección	EMPAQUE	2026	50		diciembre	
-Proyección	EMPAQUE	2026	51		diciembre	
-Proyección	EMPAQUE	2026	52		diciembre	
-Proyección	EMPAQUE	2027	1		enero	
-Proyección	EMPAQUE	2027	2		enero	
-Proyección	EMPAQUE	2027	3		enero	
-Proyección	EMPAQUE	2027	4		enero	
-Proyección	EMPAQUE	2027	5		enero	
-Proyección	EMPAQUE	2027	6		febrero	
-Proyección	EMPAQUE	2027	7		febrero	
-Proyección	EMPAQUE	2027	8		febrero	
-Proyección	EMPAQUE	2027	9		febrero	
-Proyección	EMPAQUE	2027	10		marzo	
-Proyección	EMPAQUE	2027	11		marzo	
-Proyección	EMPAQUE	2027	12		marzo	
-Proyección	EMPAQUE	2027	13		marzo	
-Proyección	EMPAQUE	2027	14		abril	
-Proyección	EMPAQUE	2027	15		abril	
-Proyección	EMPAQUE	2027	16		abril	
-Proyección	EMPAQUE	2027	17		abril	
-Proyección	EMPAQUE	2027	18		mayo	
-Proyección	EMPAQUE	2027	19		mayo	
-Proyección	EMPAQUE	2027	20		mayo	
-Proyección	EMPAQUE	2027	21		mayo	
-Proyección	EMPAQUE	2027	22		mayo	
-Proyección	EMPAQUE	2027	23		junio	
-Proyección	EMPAQUE	2027	24		junio	
-Proyección	EMPAQUE	2027	25		junio	
-Proyección	EMPAQUE	2027	26		junio	
-Proyección	EMPAQUE	2027	27		julio	
-Proyección	EMPAQUE	2027	28	0	julio	`
+  proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe 
+Proyección	AGUACATE	2026	26	0
+Proyección	AGUACATE	2026	27	174937256
+Proyección	AGUACATE	2026	28	2371571
+Proyección	AGUACATE	2026	29	3223080
+Proyección	AGUACATE	2026	30	10619357
+Proyección	AGUACATE	2026	31	12153942
+Proyección	AGUACATE	2026	32	3489155
+Proyección	AGUACATE	2026	33	6151725
+Proyección	AGUACATE	2026	34	5319971
+Proyección	AGUACATE	2026	35	10406527
+Proyección	AGUACATE	2026	36	4132519
+Proyección	AGUACATE	2026	37	2651255
+Proyección	AGUACATE	2026	38	2704280
+Proyección	AGUACATE	2026	39	2731323
+Proyección	AGUACATE	2026	40	2785949
+Proyección	AGUACATE	2026	41	2841668
+Proyección	AGUACATE	2026	42	2898502
+Proyección	AGUACATE	2026	43	3043427
+Proyección	AGUACATE	2026	44	3165164
+Proyección	AGUACATE	2026	45	3228467
+Proyección	AGUACATE	2026	46	3293036
+Proyección	AGUACATE	2026	47	3358897
+Proyección	AGUACATE	2026	48	3526842
+Proyección	AGUACATE	2026	49	0
+Proyección	AGUACATE	2026	50	0
+Proyección	AGUACATE	2026	51	0
+Proyección	AGUACATE	2026	52	0
+Proyección	AGUACATE	2027	1	0
+Proyección	AGUACATE	2027	2	0
+Proyección	AGUACATE	2027	3	0
+Proyección	AGUACATE	2027	4	0
+Proyección	AGUACATE	2027	5	0
+Proyección	AGUACATE	2027	6	0
+Proyección	AGUACATE	2027	7	0
+Proyección	AGUACATE	2027	8	0
+Proyección	AGUACATE	2027	9	0
+Proyección	AGUACATE	2027	10	0
+Proyección	AGUACATE	2027	11	0
+Proyección	AGUACATE	2027	12	0
+Proyección	AGUACATE	2027	13	0
+Proyección	AGUACATE	2027	14	0
+Proyección	AGUACATE	2027	15	0
+Proyección	AGUACATE	2027	16	0
+Proyección	AGUACATE	2027	17	0
+Proyección	AGUACATE	2027	18	0
+Proyección	AGUACATE	2027	19	0
+Proyección	AGUACATE	2027	20	0
+Proyección	AGUACATE	2027	21	0
+Proyección	AGUACATE	2027	22	0
+Proyección	AGUACATE	2027	23	0
+Proyección	AGUACATE	2027	24	0
+Proyección	AGUACATE	2027	25	0
+Proyección	AGUACATE	2027	26	0
+Proyección	ARANDANO	2026	26	0
+Proyección	ARANDANO	2026	27	4799906
+Proyección	ARANDANO	2026	28	1360606
+Proyección	ARANDANO	2026	29	2248386
+Proyección	ARANDANO	2026	30	6683481
+Proyección	ARANDANO	2026	31	9520206
+Proyección	ARANDANO	2026	32	1096454
+Proyección	ARANDANO	2026	33	5950670
+Proyección	ARANDANO	2026	34	899701
+Proyección	ARANDANO	2026	35	6501001
+Proyección	ARANDANO	2026	36	4306725
+Proyección	ARANDANO	2026	37	5905080
+Proyección	ARANDANO	2026	38	6082232
+Proyección	ARANDANO	2026	39	6629633
+Proyección	ARANDANO	2026	40	6894819
+Proyección	ARANDANO	2026	41	7101663
+Proyección	ARANDANO	2026	42	7314713
+Proyección	ARANDANO	2026	43	7899890
+Proyección	ARANDANO	2026	44	8215886
+Proyección	ARANDANO	2026	45	8380203
+Proyección	ARANDANO	2026	46	8547808
+Proyección	ARANDANO	2026	47	9146154
+Proyección	ARANDANO	2026	48	9329077
+Proyección	ARANDANO	2026	49	0
+Proyección	ARANDANO	2026	50	0
+Proyección	ARANDANO	2026	51	0
+Proyección	ARANDANO	2026	52	0
+Proyección	ARANDANO	2027	1	0
+Proyección	ARANDANO	2027	2	0
+Proyección	ARANDANO	2027	3	0
+Proyección	ARANDANO	2027	4	0
+Proyección	ARANDANO	2027	5	0
+Proyección	ARANDANO	2027	6	0
+Proyección	ARANDANO	2027	7	0
+Proyección	ARANDANO	2027	8	0
+Proyección	ARANDANO	2027	9	0
+Proyección	ARANDANO	2027	10	0
+Proyección	ARANDANO	2027	11	0
+Proyección	ARANDANO	2027	12	0
+Proyección	ARANDANO	2027	13	0
+Proyección	ARANDANO	2027	14	0
+Proyección	ARANDANO	2027	15	0
+Proyección	ARANDANO	2027	16	0
+Proyección	ARANDANO	2027	17	0
+Proyección	ARANDANO	2027	18	0
+Proyección	ARANDANO	2027	19	0
+Proyección	ARANDANO	2027	20	0
+Proyección	ARANDANO	2027	21	0
+Proyección	ARANDANO	2027	22	0
+Proyección	ARANDANO	2027	23	0
+Proyección	ARANDANO	2027	24	0
+Proyección	ARANDANO	2027	25	0
+Proyección	ARANDANO	2027	26	0
+Proyección	ARANDANO	2027	27	0
+Proyección	ARANDANO	2027	28	0
+Proyección	ESPARRAGO	2026	26	0
+Proyección	ESPARRAGO	2026	27	109927366
+Proyección	ESPARRAGO	2026	28	3677980
+Proyección	ESPARRAGO	2026	29	5005817
+Proyección	ESPARRAGO	2026	30	7596454
+Proyección	ESPARRAGO	2026	31	7267964
+Proyección	ESPARRAGO	2026	32	7209569
+Proyección	ESPARRAGO	2026	33	8862046
+Proyección	ESPARRAGO	2026	34	5215117
+Proyección	ESPARRAGO	2026	35	5442217
+Proyección	ESPARRAGO	2026	36	7105484
+Proyección	ESPARRAGO	2026	37	4521230
+Proyección	ESPARRAGO	2026	38	4792504
+Proyección	ESPARRAGO	2026	39	4984204
+Proyección	ESPARRAGO	2026	40	5183572
+Proyección	ESPARRAGO	2026	41	5339079
+Proyección	ESPARRAGO	2026	42	5552642
+Proyección	ESPARRAGO	2026	43	5774748
+Proyección	ESPARRAGO	2026	44	5890243
+Proyección	ESPARRAGO	2026	45	6066950
+Proyección	ESPARRAGO	2026	46	6248959
+Proyección	ESPARRAGO	2026	47	6436428
+Proyección	ESPARRAGO	2026	48	6565156
+Proyección	ESPARRAGO	2026	49	0
+Proyección	ESPARRAGO	2026	50	0
+Proyección	ESPARRAGO	2026	51	0
+Proyección	ESPARRAGO	2026	52	0
+Proyección	ESPARRAGO	2027	1	0
+Proyección	ESPARRAGO	2027	2	0
+Proyección	ESPARRAGO	2027	3	0
+Proyección	ESPARRAGO	2027	4	0
+Proyección	ESPARRAGO	2027	5	0
+Proyección	ESPARRAGO	2027	6	0
+Proyección	ESPARRAGO	2027	7	0
+Proyección	ESPARRAGO	2027	8	0
+Proyección	ESPARRAGO	2027	9	0
+Proyección	ESPARRAGO	2027	10	0
+Proyección	ESPARRAGO	2027	11	0
+Proyección	ESPARRAGO	2027	12	0
+Proyección	ESPARRAGO	2027	13	0
+Proyección	ESPARRAGO	2027	14	0
+Proyección	ESPARRAGO	2027	15	0
+Proyección	ESPARRAGO	2027	16	0
+Proyección	ESPARRAGO	2027	17	0
+Proyección	ESPARRAGO	2027	18	0
+Proyección	ESPARRAGO	2027	19	0
+Proyección	ESPARRAGO	2027	20	0
+Proyección	ESPARRAGO	2027	21	0
+Proyección	ESPARRAGO	2027	22	0
+Proyección	ESPARRAGO	2027	23	0
+Proyección	ESPARRAGO	2027	24	0
+Proyección	ESPARRAGO	2027	25	0
+Proyección	ESPARRAGO	2027	26	0
+Proyección	ESPARRAGO	2027	27	0
+Proyección	ESPARRAGO	2027	28	0
+Proyección	FRAMBUESA	2026	26	0
+Proyección	FRAMBUESA	2026	27	22070424
+Proyección	FRAMBUESA	2026	28	1983118
+Proyección	FRAMBUESA	2026	29	1512561
+Proyección	FRAMBUESA	2026	30	7945792
+Proyección	FRAMBUESA	2026	31	7962106
+Proyección	FRAMBUESA	2026	32	2221586
+Proyección	FRAMBUESA	2026	33	8597470
+Proyección	FRAMBUESA	2026	34	5772626
+Proyección	FRAMBUESA	2026	35	6837542
+Proyección	FRAMBUESA	2026	36	6806748
+Proyección	FRAMBUESA	2026	37	7332511
+Proyección	FRAMBUESA	2026	38	8139087
+Proyección	FRAMBUESA	2026	39	9034387
+Proyección	FRAMBUESA	2026	40	10208857
+Proyección	FRAMBUESA	2026	41	11433920
+Proyección	FRAMBUESA	2026	42	12348634
+Proyección	FRAMBUESA	2026	43	13460011
+Proyección	FRAMBUESA	2026	44	14806012
+Proyección	FRAMBUESA	2026	45	15694372
+Proyección	FRAMBUESA	2026	46	16479091
+Proyección	FRAMBUESA	2026	47	17303045
+Proyección	FRAMBUESA	2026	48	18168198
+Proyección	FRAMBUESA	2026	49	0
+Proyección	FRAMBUESA	2026	50	0
+Proyección	FRAMBUESA	2026	51	0
+Proyección	FRAMBUESA	2026	52	0
+Proyección	FRAMBUESA	2027	1	0
+Proyección	FRAMBUESA	2027	2	0
+Proyección	FRAMBUESA	2027	3	0
+Proyección	FRAMBUESA	2027	4	0
+Proyección	FRAMBUESA	2027	5	0
+Proyección	FRAMBUESA	2027	6	0
+Proyección	FRAMBUESA	2027	7	0
+Proyección	FRAMBUESA	2027	8	0
+Proyección	FRAMBUESA	2027	9	0
+Proyección	FRAMBUESA	2027	10	0
+Proyección	FRAMBUESA	2027	11	0
+Proyección	FRAMBUESA	2027	12	0
+Proyección	FRAMBUESA	2027	13	0
+Proyección	FRAMBUESA	2027	14	0
+Proyección	FRAMBUESA	2027	15	0
+Proyección	FRAMBUESA	2027	16	0
+Proyección	FRAMBUESA	2027	17	0
+Proyección	FRAMBUESA	2027	18	0
+Proyección	FRAMBUESA	2027	19	0
+Proyección	FRAMBUESA	2027	20	0
+Proyección	FRAMBUESA	2027	21	0
+Proyección	FRAMBUESA	2027	22	0
+Proyección	FRAMBUESA	2027	23	0
+Proyección	FRAMBUESA	2027	24	0
+Proyección	FRAMBUESA	2027	25	0
+Proyección	FRAMBUESA	2027	26	0
+Proyección	FRAMBUESA	2027	27	0
+Proyección	FRESA	2026	26	0
+Proyección	FRESA	2026	27	55044916
+Proyección	FRESA	2026	28	6561940
+Proyección	FRESA	2026	29	3953203
+Proyección	FRESA	2026	30	20459935
+Proyección	FRESA	2026	31	9015767
+Proyección	FRESA	2026	32	5825288
+Proyección	FRESA	2026	33	9613622
+Proyección	FRESA	2026	34	3613694
+Proyección	FRESA	2026	35	7621321
+Proyección	FRESA	2026	36	15220093
+Proyección	FRESA	2026	37	14351353
+Proyección	FRESA	2026	38	14925407
+Proyección	FRESA	2026	39	15671677
+Proyección	FRESA	2026	40	16298545
+Proyección	FRESA	2026	41	16950486
+Proyección	FRESA	2026	42	17628506
+Proyección	FRESA	2026	43	18333646
+Proyección	FRESA	2026	44	21450366
+Proyección	FRESA	2026	45	21879373
+Proyección	FRESA	2026	46	22535754
+Proyección	FRESA	2026	47	23211827
+Proyección	FRESA	2026	48	24140300
+Proyección	FRESA	2026	49	0
+Proyección	FRESA	2026	50	0
+Proyección	FRESA	2026	51	0
+Proyección	FRESA	2026	52	0
+Proyección	FRESA	2027	1	0
+Proyección	FRESA	2027	2	0
+Proyección	FRESA	2027	3	0
+Proyección	FRESA	2027	4	0
+Proyección	FRESA	2027	5	0
+Proyección	FRESA	2027	6	0
+Proyección	FRESA	2027	7	0
+Proyección	FRESA	2027	8	0
+Proyección	FRESA	2027	9	0
+Proyección	FRESA	2027	10	0
+Proyección	FRESA	2027	11	0
+Proyección	FRESA	2027	12	0
+Proyección	FRESA	2027	13	0
+Proyección	FRESA	2027	14	0
+Proyección	FRESA	2027	15	0
+Proyección	FRESA	2027	16	0
+Proyección	FRESA	2027	17	0
+Proyección	FRESA	2027	18	0
+Proyección	FRESA	2027	19	0
+Proyección	FRESA	2027	20	0
+Proyección	FRESA	2027	21	0
+Proyección	FRESA	2027	22	0
+Proyección	FRESA	2027	23	0
+Proyección	FRESA	2027	24	0
+Proyección	FRESA	2027	25	0
+Proyección	FRESA	2027	26	0
+Proyección	FRESA	2027	27	0
+Proyección	FRESA	2027	28	0
+Proyección	PAPA	2026	26	0
+Proyección	PAPA	2026	27	12226222
+Proyección	PAPA	2026	28	2591432
+Proyección	PAPA	2026	29	1275774
+Proyección	PAPA	2026	30	3607352
+Proyección	PAPA	2026	31	1570988
+Proyección	PAPA	2026	32	-616502
+Proyección	PAPA	2026	33	1931787
+Proyección	PAPA	2026	34	1244530
+Proyección	PAPA	2026	35	2245538
+Proyección	PAPA	2026	36	1550035
+Proyección	PAPA	2026	37	1022828
+Proyección	PAPA	2026	38	1135339
+Proyección	PAPA	2026	39	1180753
+Proyección	PAPA	2026	40	1239790
+Proyección	PAPA	2026	41	1314178
+Proyección	PAPA	2026	42	1379887
+Proyección	PAPA	2026	43	1531674
+Proyección	PAPA	2026	44	1654208
+Proyección	PAPA	2026	45	1770003
+Proyección	PAPA	2026	46	1947003
+Proyección	PAPA	2026	47	2024883
+Proyección	PAPA	2026	48	2166625
+Proyección	PAPA	2026	49	0
+Proyección	PAPA	2026	50	0
+Proyección	PAPA	2026	51	0
+Proyección	PAPA	2026	52	0
+Proyección	PAPA	2027	1	0
+Proyección	PAPA	2027	2	0
+Proyección	PAPA	2027	3	0
+Proyección	PAPA	2027	4	0
+Proyección	PAPA	2027	5	0
+Proyección	PAPA	2027	6	0
+Proyección	PAPA	2027	7	0
+Proyección	PAPA	2027	8	0
+Proyección	PAPA	2027	9	0
+Proyección	PAPA	2027	10	0
+Proyección	PAPA	2027	11	0
+Proyección	PAPA	2027	12	0
+Proyección	PAPA	2027	13	0
+Proyección	PAPA	2027	14	0
+Proyección	PAPA	2027	15	0
+Proyección	PAPA	2027	16	0
+Proyección	PAPA	2027	17	0
+Proyección	PAPA	2027	18	0
+Proyección	PAPA	2027	19	0
+Proyección	PAPA	2027	20	0
+Proyección	PAPA	2027	21	0
+Proyección	PAPA	2027	22	0
+Proyección	PAPA	2027	23	0
+Proyección	PAPA	2027	24	0
+Proyección	PAPA	2027	25	0
+Proyección	PAPA	2027	26	0
+Proyección	PAPA	2027	27	0
+Proyección	ZARZAMORA	2026	26	0
+Proyección	ZARZAMORA	2026	27	7021162
+Proyección	ZARZAMORA	2026	28	909856
+Proyección	ZARZAMORA	2026	29	1982028
+Proyección	ZARZAMORA	2026	30	4054404
+Proyección	ZARZAMORA	2026	31	4210491
+Proyección	ZARZAMORA	2026	32	1035807
+Proyección	ZARZAMORA	2026	33	3372313
+Proyección	ZARZAMORA	2026	34	1287315
+Proyección	ZARZAMORA	2026	35	3332619
+Proyección	ZARZAMORA	2026	36	2460472
+Proyección	ZARZAMORA	2026	37	3263244
+Proyección	ZARZAMORA	2026	38	3589568
+Proyección	ZARZAMORA	2026	39	3948525
+Proyección	ZARZAMORA	2026	40	4303893
+Proyección	ZARZAMORA	2026	41	4562126
+Proyección	ZARZAMORA	2026	42	4790232
+Proyección	ZARZAMORA	2026	43	5077646
+Proyección	ZARZAMORA	2026	44	5433082
+Proyección	ZARZAMORA	2026	45	5650405
+Proyección	ZARZAMORA	2026	46	5876421
+Proyección	ZARZAMORA	2026	47	6229006
+Proyección	ZARZAMORA	2026	48	6602747
+Proyección	ZARZAMORA	2026	49	0
+Proyección	ZARZAMORA	2026	50	0
+Proyección	ZARZAMORA	2026	51	0
+Proyección	ZARZAMORA	2026	52	0
+Proyección	ZARZAMORA	2027	1	0
+Proyección	ZARZAMORA	2027	2	0
+Proyección	ZARZAMORA	2027	3	0
+Proyección	ZARZAMORA	2027	4	0
+Proyección	ZARZAMORA	2027	5	0
+Proyección	ZARZAMORA	2027	6	0
+Proyección	ZARZAMORA	2027	7	0
+Proyección	ZARZAMORA	2027	8	0
+Proyección	ZARZAMORA	2027	9	0
+Proyección	ZARZAMORA	2027	10	0
+Proyección	ZARZAMORA	2027	11	0
+Proyección	ZARZAMORA	2027	12	0
+Proyección	ZARZAMORA	2027	13	0
+Proyección	ZARZAMORA	2027	14	0
+Proyección	ZARZAMORA	2027	15	0
+Proyección	ZARZAMORA	2027	16	0
+Proyección	ZARZAMORA	2027	17	0
+Proyección	ZARZAMORA	2027	18	0
+Proyección	ZARZAMORA	2027	19	0
+Proyección	ZARZAMORA	2027	20	0
+Proyección	ZARZAMORA	2027	21	0
+Proyección	ZARZAMORA	2027	22	0
+Proyección	ZARZAMORA	2027	23	0
+Proyección	ZARZAMORA	2027	24	0
+Proyección	ZARZAMORA	2027	25	0
+Proyección	ZARZAMORA	2027	26	0
+Proyección	ZARZAMORA	2027	27	0
+Proyección	ZARZAMORA	2027	28	0
+Proyección	EMPAQUE	2026	26	0
+Proyección	EMPAQUE	2026	27	120450
+Proyección	EMPAQUE	2026	28	420740
+Proyección	EMPAQUE	2026	29	339804
+Proyección	EMPAQUE	2026	30	222040
+Proyección	EMPAQUE	2026	31	1045542
+Proyección	EMPAQUE	2026	32	327604
+Proyección	EMPAQUE	2026	33	366122
+Proyección	EMPAQUE	2026	34	3820231
+Proyección	EMPAQUE	2026	35	1094195
+Proyección	EMPAQUE	2026	36	2091820
+Proyección	EMPAQUE	2026	37	1327171
+Proyección	EMPAQUE	2026	38	1446616
+Proyección	EMPAQUE	2026	39	1518947
+Proyección	EMPAQUE	2026	40	1944252
+Proyección	EMPAQUE	2026	41	2022023
+Proyección	EMPAQUE	2026	42	2305106
+Proyección	EMPAQUE	2026	43	1959340
+Proyección	EMPAQUE	2026	44	2547142
+Proyección	EMPAQUE	2026	45	3820713
+Proyección	EMPAQUE	2026	46	4088163
+Proyección	EMPAQUE	2026	47	4292571
+Proyección	EMPAQUE	2026	48	3434057
+Proyección	EMPAQUE	2026	49	0
+Proyección	EMPAQUE	2026	50	0
+Proyección	EMPAQUE	2026	51	0
+Proyección	EMPAQUE	2026	52	-1717028.5
+Proyección	EMPAQUE	2027	1	-2747245.6
+Proyección	EMPAQUE	2027	2	-3777462.7
+Proyección	EMPAQUE	2027	3	-4807679.8
+Proyección	EMPAQUE	2027	4	-5837896.9
+Proyección	EMPAQUE	2027	5	-6868114
+Proyección	EMPAQUE	2027	6	-7898331.1
+Proyección	EMPAQUE	2027	7	-8928548.2
+Proyección	EMPAQUE	2027	8	-9958765.3
+Proyección	EMPAQUE	2027	9	-10988982.4
+Proyección	EMPAQUE	2027	10	-12019199.5
+Proyección	EMPAQUE	2027	11	-13049416.6
+Proyección	EMPAQUE	2027	12	-14079633.7
+Proyección	EMPAQUE	2027	13	-15109850.8
+Proyección	EMPAQUE	2027	14	-16140067.9
+Proyección	EMPAQUE	2027	15	-17170285
+Proyección	EMPAQUE	2027	16	-18200502.1
+Proyección	EMPAQUE	2027	17	-19230719.2
+Proyección	EMPAQUE	2027	18	-20260936.3
+Proyección	EMPAQUE	2027	19	-21291153.4
+Proyección	EMPAQUE	2027	20	-22321370.5
+Proyección	EMPAQUE	2027	21	-23351587.6
+Proyección	EMPAQUE	2027	22	-24381804.7
+Proyección	EMPAQUE	2027	23	-25412021.8
+Proyección	EMPAQUE	2027	24	-26442238.9
+Proyección	EMPAQUE	2027	25	-27472456
+Proyección	EMPAQUE	2027	26	-28502673.1
+Proyección	EMPAQUE	2027	27	-29532890.2
+Proyección	EMPAQUE	2027	28	0`
  },
  ingreso: {
   real: ``,
@@ -3354,7 +3430,7 @@ Real	ESPARRAGO	2026	34	79117
 Real	ESPARRAGO	2026	35	127484
 Real	ESPARRAGO	2026	36	113129
 Real	ESPARRAGO	2026	37	135692
-Real	ESPARRAGO	2026	38	24556
+Real	ESPARRAGO	2026	38	0
 Real	ESPARRAGO	2026	39	0
 Real	ESPARRAGO	2026	40	0
 Real	ESPARRAGO	2026	41	0
@@ -3783,7 +3859,7 @@ Presupuesto	ESPARRAGO	2027	25	90450
 Presupuesto	ESPARRAGO	2027	26	90450
 Presupuesto	ESPARRAGO	2027	27	90450
 Presupuesto	ESPARRAGO	2027	28	90450`,
-  proyeccion: `Producción	Cultivo	ejercicio	semana	Producción
+  proyeccion: `Producción	Cultivo	ejercicio	semana	Producción kg
 Proyección	FRESA	2026	27	0
 Proyección	FRESA	2026	28	0
 Proyección	FRESA	2026	29	0
@@ -3793,15 +3869,15 @@ Proyección	FRESA	2026	32	0
 Proyección	FRESA	2026	33	0
 Proyección	FRESA	2026	34	0
 Proyección	FRESA	2026	35	0
-Proyección	FRESA	2026	36	440
-Proyección	FRESA	2026	37	440
-Proyección	FRESA	2026	38	440
-Proyección	FRESA	2026	39	7458
-Proyección	FRESA	2026	40	15139.740000000002
-Proyección	FRESA	2026	41	25283.365800000003
-Proyección	FRESA	2026	42	33879.71017200001
-Proyección	FRESA	2026	43	43027.23191844001
-Proyección	FRESA	2026	44	50772.13366375921
+Proyección	FRESA	2026	36	0
+Proyección	FRESA	2026	37	0
+Proyección	FRESA	2026	38	0
+Proyección	FRESA	2026	39	0
+Proyección	FRESA	2026	40	0
+Proyección	FRESA	2026	41	0
+Proyección	FRESA	2026	42	0
+Proyección	FRESA	2026	43	0
+Proyección	FRESA	2026	44	0
 Proyección	FRESA	2026	45	0
 Proyección	FRESA	2026	46	0
 Proyección	FRESA	2026	47	0
@@ -3840,22 +3916,22 @@ Proyección	FRESA	2027	27	0
 Proyección	FRESA	2027	28	0
 Proyección	ARANDANO	2026	27	0
 Proyección	ARANDANO	2026	28	0
-Proyección	ARANDANO	2026	29	1862
-Proyección	ARANDANO	2026	30	1327
-Proyección	ARANDANO	2026	31	1687
-Proyección	ARANDANO	2026	32	1913
-Proyección	ARANDANO	2026	33	3191
-Proyección	ARANDANO	2026	34	3664
-Proyección	ARANDANO	2026	35	4115
-Proyección	ARANDANO	2026	36	1259
-Proyección	ARANDANO	2026	37	426
-Proyección	ARANDANO	2026	38	460.08000000000004
-Proyección	ARANDANO	2026	39	377.26560000000006
-Proyección	ARANDANO	2026	40	437.628096
-Proyección	ARANDANO	2026	41	446.38065792000003
-Proyección	ARANDANO	2026	42	571.3672421376001
-Proyección	ARANDANO	2026	43	491.37582823833606
-Proyección	ARANDANO	2026	44	368.53187117875206
+Proyección	ARANDANO	2026	29	0
+Proyección	ARANDANO	2026	30	0
+Proyección	ARANDANO	2026	31	0
+Proyección	ARANDANO	2026	32	0
+Proyección	ARANDANO	2026	33	0
+Proyección	ARANDANO	2026	34	0
+Proyección	ARANDANO	2026	35	0
+Proyección	ARANDANO	2026	36	0
+Proyección	ARANDANO	2026	37	0
+Proyección	ARANDANO	2026	38	0
+Proyección	ARANDANO	2026	39	0
+Proyección	ARANDANO	2026	40	0
+Proyección	ARANDANO	2026	41	0
+Proyección	ARANDANO	2026	42	0
+Proyección	ARANDANO	2026	43	0
+Proyección	ARANDANO	2026	44	0
 Proyección	ARANDANO	2026	45	0
 Proyección	ARANDANO	2026	46	0
 Proyección	ARANDANO	2026	47	0
@@ -3895,22 +3971,22 @@ Proyección	ARANDANO	2027	28	0
 Proyección	ARANDANO	2027	29	0
 Proyección	FRAMBUESA	2026	27	0
 Proyección	FRAMBUESA	2026	28	0
-Proyección	FRAMBUESA	2026	29	768
-Proyección	FRAMBUESA	2026	30	768
-Proyección	FRAMBUESA	2026	31	768
-Proyección	FRAMBUESA	2026	32	768
-Proyección	FRAMBUESA	2026	33	2987.52
-Proyección	FRAMBUESA	2026	34	4511.1552
-Proyección	FRAMBUESA	2026	35	290
-Proyección	FRAMBUESA	2026	36	498
-Proyección	FRAMBUESA	2026	37	3529
-Proyección	FRAMBUESA	2026	38	5822.849999999999
-Proyección	FRAMBUESA	2026	39	8559.589499999998
-Proyección	FRAMBUESA	2026	40	10785.082769999997
-Proyección	FRAMBUESA	2026	41	11432.187736199998
-Proyección	FRAMBUESA	2026	42	11317.865858837999
-Proyección	FRAMBUESA	2026	43	11883.7591517799
-Proyección	FRAMBUESA	2026	44	12834.459883922293
+Proyección	FRAMBUESA	2026	29	0
+Proyección	FRAMBUESA	2026	30	0
+Proyección	FRAMBUESA	2026	31	0
+Proyección	FRAMBUESA	2026	32	0
+Proyección	FRAMBUESA	2026	33	0
+Proyección	FRAMBUESA	2026	34	0
+Proyección	FRAMBUESA	2026	35	0
+Proyección	FRAMBUESA	2026	36	0
+Proyección	FRAMBUESA	2026	37	0
+Proyección	FRAMBUESA	2026	38	0
+Proyección	FRAMBUESA	2026	39	0
+Proyección	FRAMBUESA	2026	40	0
+Proyección	FRAMBUESA	2026	41	0
+Proyección	FRAMBUESA	2026	42	0
+Proyección	FRAMBUESA	2026	43	0
+Proyección	FRAMBUESA	2026	44	0
 Proyección	FRAMBUESA	2026	45	0
 Proyección	FRAMBUESA	2026	46	0
 Proyección	FRAMBUESA	2026	47	0
@@ -4009,7 +4085,7 @@ Proyección	AGUACATE	2026	23	0
 Proyección	AGUACATE	2026	24	0
 Proyección	AGUACATE	2026	25	0
 Proyección	AGUACATE	2026	26	0
-Proyección	AGUACATE	2026	27	984466
+Proyección	AGUACATE	2026	27	984467
 Proyección	AGUACATE	2026	28	182395
 Proyección	AGUACATE	2026	29	248825
 Proyección	AGUACATE	2026	30	246345
@@ -4018,15 +4094,15 @@ Proyección	AGUACATE	2026	32	66690
 Proyección	AGUACATE	2026	33	134060
 Proyección	AGUACATE	2026	34	287000
 Proyección	AGUACATE	2026	35	221880
-Proyección	AGUACATE	2026	36	259520
-Proyección	AGUACATE	2026	37	352820
-Proyección	AGUACATE	2026	38	194051.00000000003
-Proyección	AGUACATE	2026	39	273611.91000000003
-Proyección	AGUACATE	2026	40	311917.57740000007
-Proyección	AGUACATE	2026	41	452280.4872300001
-Proyección	AGUACATE	2026	42	131161.34129670003
-Proyección	AGUACATE	2026	43	312163.99228614604
-Proyección	AGUACATE	2026	44	181055.11552596473
+Proyección	AGUACATE	2026	36	155690
+Proyección	AGUACATE	2026	37	348746
+Proyección	AGUACATE	2026	38	191810
+Proyección	AGUACATE	2026	39	270452
+Proyección	AGUACATE	2026	40	308316
+Proyección	AGUACATE	2026	41	447058
+Proyección	AGUACATE	2026	42	129647
+Proyección	AGUACATE	2026	43	308559
+Proyección	AGUACATE	2026	44	178964
 Proyección	AGUACATE	2026	45	0
 Proyección	AGUACATE	2026	46	0
 Proyección	AGUACATE	2026	47	0
@@ -4115,24 +4191,24 @@ Proyección	PAPA	2027	23	0
 Proyección	PAPA	2027	24	0
 Proyección	PAPA	2027	25	0
 Proyección	PAPA	2027	26	0
-Proyección	ESPARRAGO	2026	27	306
-Proyección	ESPARRAGO	2026	28	186.66
-Proyección	ESPARRAGO	2026	29	143.7282
-Proyección	ESPARRAGO	2026	30	99.17245799999998
-Proyección	ESPARRAGO	2026	31	121.98212333999997
-Proyección	ESPARRAGO	2026	32	117.10283840639997
-Proyección	ESPARRAGO	2026	33	107.73461133388797
+Proyección	ESPARRAGO	2026	27	311
+Proyección	ESPARRAGO	2026	28	190
+Proyección	ESPARRAGO	2026	29	146
+Proyección	ESPARRAGO	2026	30	101
+Proyección	ESPARRAGO	2026	31	124
+Proyección	ESPARRAGO	2026	32	119
+Proyección	ESPARRAGO	2026	33	109
 Proyección	ESPARRAGO	2026	34	79117
 Proyección	ESPARRAGO	2026	35	127484
-Proyección	ESPARRAGO	2026	36	113129
-Proyección	ESPARRAGO	2026	37	135692
-Proyección	ESPARRAGO	2026	38	24556
-Proyección	ESPARRAGO	2026	39	15470.28
-Proyección	ESPARRAGO	2026	40	13613.8464
-Proyección	ESPARRAGO	2026	41	16472.754144
-Proyección	ESPARRAGO	2026	42	20096.76005568
-Proyección	ESPARRAGO	2026	43	22910.3064634752
-Proyección	ESPARRAGO	2026	44	31158.01679032627
+Proyección	ESPARRAGO	2026	36	78535
+Proyección	ESPARRAGO	2026	37	116232
+Proyección	ESPARRAGO	2026	38	66252
+Proyección	ESPARRAGO	2026	39	41739
+Proyección	ESPARRAGO	2026	40	36730
+Proyección	ESPARRAGO	2026	41	44444
+Proyección	ESPARRAGO	2026	42	54221
+Proyección	ESPARRAGO	2026	43	61812
+Proyección	ESPARRAGO	2026	44	84064
 Proyección	ESPARRAGO	2026	45	0
 Proyección	ESPARRAGO	2026	46	0
 Proyección	ESPARRAGO	2026	47	0
@@ -4353,12 +4429,22 @@ function buildFilterUI(){
   mes.innerHTML = '<option value="TOTAL3">Total próximos 3 meses</option>' + FORECAST_MONTHS.map(mk=>`<option value="${mk}">${monthLabel(mk)}</option>`).join('');
   mes.addEventListener('change', ()=>{ state.filters.mes = mes.value; renderAll(); });
 
-  document.getElementById('escenarioSeg').querySelectorAll('button').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.filters.escenario = btn.dataset.sc;
-      document.querySelectorAll('#escenarioSeg button').forEach(b=>b.classList.remove('on'));
-      btn.classList.add('on', btn.dataset.sc);
-      renderAll();
+  // 4 dials independientes (Ingreso/Egreso/Producción/Tipo de cambio) en vez de un solo
+  // "Escenario" global -- cada segmented control escribe solo en su propio campo de state.filters.
+  const SCENARIO_SEGS = [
+    { id:'escenarioIngresoSeg', field:'escenarioIngreso' },
+    { id:'escenarioEgresoSeg', field:'escenarioEgreso' },
+    { id:'escenarioProduccionSeg', field:'escenarioProduccion' },
+    { id:'escenarioTCSeg', field:'escenarioTC' },
+  ];
+  SCENARIO_SEGS.forEach(({id, field})=>{
+    document.getElementById(id).querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        state.filters[field] = btn.dataset.sc;
+        document.querySelectorAll('#'+id+' button').forEach(b=>b.classList.remove('on'));
+        btn.classList.add('on', btn.dataset.sc);
+        renderAll();
+      });
     });
   });
 
