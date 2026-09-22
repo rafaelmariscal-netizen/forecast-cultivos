@@ -269,19 +269,19 @@
 
   <div class="layout">
     <aside class="panel filters">
-      <div class="field">
+      <div class="field" id="focalCropField">
         <h3>Cultivo enfocado</h3>
         <select id="focalCrop"></select>
       </div>
       <div class="field indented" id="includedField">
-        <h3>¿Cuáles cultivos entran al consolidado?</h3>
+        <h3 id="includedFieldTitle">¿Cuáles cultivos entran al consolidado?</h3>
         <div class="chip-quickrow">
           <button type="button" id="btnIncludedAll">Todos</button><span class="dotsep">·</span><button type="button" id="btnIncludedNone">Ninguno</button>
         </div>
         <div class="chipgrid" id="includedChips"></div>
         <p class="hint">📦 Empaque no es un cultivo (no tiene tipo de cambio ni aparece en "Comparativo de cultivos"), pero su egreso real sí existe en la base de datos — al incluirlo aquí se suma al Ingreso/Egreso/EBITDA consolidado.</p>
       </div>
-      <div class="field">
+      <div class="field" id="mesField">
         <h3>Mes de referencia</h3>
         <select id="mesFiltro"></select>
       </div>
@@ -4386,12 +4386,43 @@ function renderStatus(){
 /* ============================================================
    13. FILTER UI + WIRING
    ============================================================ */
-// La sección "¿Cuáles cultivos entran al consolidado?" solo tiene efecto cuando "Cultivo enfocado"
-// está en Consolidado (ver currentCropsSelection()) -- mientras esté en un cultivo específico, esos
-// chips no hacen nada, así que se esconden para no aparentar ser un segundo selector de cultivo
-// (fuente de confusión reportada por Rafael el 22 sep, décima primera iteración del día).
-function syncIncludedFieldVisibility(){
-  document.getElementById('includedField').hidden = state.filters.focalCrop!=='CONSOLIDADO';
+// No todos los filtros del panel izquierdo aplican en todas las pestañas -- mostrarlos siempre,
+// aunque no muevan nada en la pestaña activa, es justo lo que generó la confusión que Rafael
+// reportó el 22 sep (décima primera y decimocuarta iteración): seleccionar un cultivo en "Cultivo
+// enfocado" no cambia nada en 🏢 Comparativo de cultivos, porque esa pestaña siempre compara los
+// cultivos marcados en "Cultivos incluidos" (`includedCropsOrdered()`) sin importar el valor de
+// `focalCrop` (ver `perCropTotals()`); en cambio "Mes de referencia" (`periodMonths()`) SOLO lo usa
+// esa misma pestaña. Esta función revela/oculta cada control según en qué pestaña está el usuario,
+// para que lo que se ve en el panel siempre pueda mover algo en la vista activa.
+function syncFilterVisibility(){
+  const tab = document.querySelector('.tabbtn.active').dataset.tab;
+  const enComparativo = tab==='comparativo';
+
+  // "Cultivo enfocado": no tiene ningún efecto en Comparativo (esa pestaña siempre compara TODOS
+  // los cultivos incluidos a la vez) -- se oculta ahí, se muestra en Forecast/Escenarios.
+  document.getElementById('focalCropField').hidden = enComparativo;
+
+  // "¿Cuáles cultivos entran al consolidado?": en Forecast/Escenarios solo aplica cuando "Cultivo
+  // enfocado" está en Consolidado (igual que antes). En Comparativo, es el ÚNICO control que decide
+  // qué cultivos aparecen en la comparación (independiente de "Cultivo enfocado", que ahí ni se
+  // muestra), así que se muestra siempre -- con su título y sangría ajustados para no leerse como
+  // "dependiente de un dropdown" que en esa pestaña no está.
+  const includedField = document.getElementById('includedField');
+  const includedTitle = document.getElementById('includedFieldTitle');
+  if(enComparativo){
+    includedField.hidden = false;
+    includedField.classList.remove('indented');
+    includedTitle.textContent = '¿Qué cultivos comparar?';
+  } else {
+    includedField.hidden = state.filters.focalCrop!=='CONSOLIDADO';
+    includedField.classList.add('indented');
+    includedTitle.textContent = '¿Cuáles cultivos entran al consolidado?';
+  }
+
+  // "Mes de referencia": solo lo usa `periodMonths()`, y solo lo consume la pestaña Comparativo
+  // (ver `perCropTotals()`) -- en Forecast/Escenarios los KPIs y gráficas siempre son el total de
+  // los 3 meses de pronóstico sin importar este filtro, así que ahí se esconde.
+  document.getElementById('mesField').hidden = !enComparativo;
 }
 
 function buildFilterUI(){
@@ -4404,10 +4435,10 @@ function buildFilterUI(){
   focal.value = state.filters.focalCrop;
   focal.addEventListener('change', ()=>{
     state.filters.focalCrop = focal.value;
-    syncIncludedFieldVisibility();
+    syncFilterVisibility();
     renderAll();
   });
-  syncIncludedFieldVisibility();
+  syncFilterVisibility();
 
   const chipwrap = document.getElementById('includedChips');
   const chipItems = CROPS.concat([OTHER_LABEL]);
@@ -4485,6 +4516,7 @@ function syncIngresoBanners(){
 function renderAll(){
   refreshThemeColors();
   syncIngresoBanners();
+  syncFilterVisibility();
   // La tabla mini de % en el panel de Filtros está siempre a la vista (no importa qué pestaña esté
   // activa), así que se refresca aquí siempre -- distinto de renderScenarioTable(), que solo se
   // llama cuando la pestaña Escenarios está activa (dentro de renderEscenariosTab).
