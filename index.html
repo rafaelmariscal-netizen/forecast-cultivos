@@ -191,6 +191,7 @@
   td:first-child{ font-family:'Public Sans'; color:var(--text-primary); font-weight:600; }
   tr:last-child td{ border-bottom:none; }
   tr.now td{ background:var(--accent-soft); }
+  tr.total-row td{ border-top:2px solid var(--border-strong); border-bottom:none; background:var(--surface-raised); font-weight:700; color:var(--text-primary); }
   .tablewrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); }
   .tablewrap table{ min-width:640px; }
 
@@ -1536,6 +1537,10 @@ function renderHistoricoTable(){
   thead.innerHTML = '<tr><th>Mes</th><th>Ingreso real</th><th>Egreso real</th><th>EBITDA real</th><th>Presupuesto EBITDA</th><th>Proyección equipo</th><th>Forecast ('+sc+')</th></tr>';
   tbody.innerHTML = '';
   let anyEstimated = false;
+  // Acumuladores para el renglón de totales de abajo -- solo suman los meses YA transcurridos
+  // (sin pronóstico), que son los únicos "reales" de la tabla; el forecast de los 3 meses futuros
+  // no se acumula ahí porque todavía no sucede.
+  let totIngreso=0, totEgreso=0, totEbitdaReal=0, totPres=0, totProy=0;
   months.forEach(mk=>{
     const isForecast = FORECAST_MONTHS.includes(mk);
     const iEstimated = !isForecast && !monthHasReal('ingreso', crops, mk);
@@ -1545,6 +1550,13 @@ function renderHistoricoTable(){
     const ebitdaPres = hasIngresoPres ? (presI[mk]||0)-(presE[mk]||0) : null;
     const ebitdaProy = hasIngresoProy ? (proyI[mk]||0)-(proyE[mk]||0) : null;
     const ebitdaFc = (isForecast && hasIngresoReal) ? (fcI[mk]||0)-(fcE[mk]||0) : null;
+    if(!isForecast){
+      totEgreso += realE[mk]||0;
+      if(hasIngresoReal) totIngreso += realI[mk]||0;
+      if(ebitdaReal!=null) totEbitdaReal += ebitdaReal;
+      if(ebitdaPres!=null) totPres += ebitdaPres;
+      if(ebitdaProy!=null) totProy += ebitdaProy;
+    }
     const tr = document.createElement('tr');
     if(mk===CURRENT_MONTH_KEY) tr.className='now';
     tr.innerHTML = `<td>${monthLabel(mk)}${isForecast?' 🔮':''}</td>
@@ -1556,6 +1568,19 @@ function renderHistoricoTable(){
       <td>${ebitdaFc==null?'—':fmtMXN(ebitdaFc)}</td>`;
     tbody.appendChild(tr);
   });
+  // Renglón de totales: la suma de lo que ya es real (meses transcurridos de la temporada) en
+  // cada columna, para ver de un vistazo cuánto lleva acumulado a la fecha cada indicador --
+  // pedido de Rafael tras revisar la tabla con Ingreso todavía sin cargar.
+  const totalRow = document.createElement('tr');
+  totalRow.className = 'total-row';
+  totalRow.innerHTML = `<td>Total real a la fecha</td>
+    <td>${hasIngresoReal?fmtMXN(totIngreso):'—'}</td>
+    <td>${fmtMXN(totEgreso)}</td>
+    <td>${hasIngresoReal?fmtMXN(totEbitdaReal):'—'}</td>
+    <td>${hasIngresoPres?fmtMXN(totPres):'—'}</td>
+    <td>${hasIngresoProy?fmtMXN(totProy):'—'}</td>
+    <td>—</td>`;
+  tbody.appendChild(totalRow);
   document.getElementById('tablaEstimadoNote').hidden = !anyEstimated;
 }
 
