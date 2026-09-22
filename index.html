@@ -285,18 +285,20 @@
         <h3>Mes de referencia</h3>
         <select id="mesFiltro"></select>
       </div>
-      <div class="field">
+      <div class="field" id="escenarioField">
         <h3>Escenario</h3>
         <div class="segmented" id="escenarioSeg">
           <button data-sc="pesimista">Pesimista</button>
           <button data-sc="base" class="on base">Base</button>
           <button data-sc="optimista">Optimista</button>
         </div>
-        <table class="scenario-mini">
-          <thead><tr><th></th><th>Ing.</th><th>Egr.</th><th>Prod.</th><th>TC</th></tr></thead>
-          <tbody id="scenarioMiniBody"></tbody>
-        </table>
-        <p class="hint">% que aplica cada escenario a cada variable — el de Base siempre es 0.</p>
+        <div id="scenarioMiniWrap">
+          <table class="scenario-mini">
+            <thead><tr><th></th><th>Ing.</th><th>Egr.</th><th>Prod.</th><th>TC</th></tr></thead>
+            <tbody id="scenarioMiniBody"></tbody>
+          </table>
+          <p class="hint">% que aplica cada escenario a cada variable — el de Base siempre es 0.</p>
+        </div>
       </div>
       <div class="field">
         <h3>Método de proyección</h3>
@@ -4423,6 +4425,16 @@ function syncFilterVisibility(){
   // (ver `perCropTotals()`) -- en Forecast/Escenarios los KPIs y gráficas siempre son el total de
   // los 3 meses de pronóstico sin importar este filtro, así que ahí se esconde.
   document.getElementById('mesField').hidden = !enComparativo;
+
+  // Todo el bloque "Escenario" (los 3 botones Pesimista/Base/Optimista + la tabla mini de %) no
+  // mueve NADA en la pestaña Escenarios: `renderEscenariosChart()` y `renderScenarioTableNumbers()`
+  // calculan los 3 escenarios a la vez sin leer `state.filters.escenario` en ningún momento (esa
+  // pestaña siempre los muestra lado a lado), y la tabla mini de % ya es redundante ahí frente a
+  // "Supuestos por escenario" (misma `state.scenarios`, decimoquinta iteración). Rafael lo confirmó
+  // señalando que ya tiene la tabla grande arriba (decimosexta iteración) -- se oculta el campo
+  // completo en Escenarios; en Forecast/Comparativo ambos SÍ filtran (`ebitdaSet`/`perCropTotals`
+  // leen `state.filters.escenario`), así que ahí se quedan visibles como siempre.
+  document.getElementById('escenarioField').hidden = (tab==='escenarios');
 }
 
 function buildFilterUI(){
