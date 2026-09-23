@@ -45,202 +45,141 @@
   }
 
   *{ box-sizing:border-box; }
-  body{ background:var(--page-bg); color:var(--text-primary); font-family:'Public Sans',system-ui,-apple-system,sans-serif; }
+  body{ background:var(--page-bg); color:var(--text-primary); font-family:'Public Sans',system-ui,-apple-system,sans-serif; margin:0; }
   h1,h2,h3,.display{ font-family:'Fraunces',Georgia,serif; text-wrap:balance; letter-spacing:-0.01em; }
   .mono{ font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums; }
   button{ font-family:inherit; }
   input,select,textarea{ font-family:inherit; }
   ::selection{ background:var(--accent-soft-2); }
-
   a{ color:var(--accent-strong); }
 
-  .app{ max-width:1400px; margin:0 auto; padding:20px 20px 64px; }
+  .app{ max-width:1400px; margin:0 auto; padding:20px 16px 64px; }
 
-  /* ---------- top bar ---------- */
-  .topbar{
-    display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between;
-    padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid var(--border);
-  }
+  .topbar{ display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid var(--border); }
   .brand{ display:flex; flex-direction:column; gap:2px; }
   .brand .eyebrow{ font-size:11px; font-weight:700; letter-spacing:0.10em; text-transform:uppercase; color:var(--accent-strong); }
   .brand h1{ font-size:28px; font-weight:600; margin:0; color:var(--text-primary); }
   .brand .sub{ font-size:13px; color:var(--text-secondary); max-width:56ch; }
   .badges{ display:flex; gap:8px; flex-wrap:wrap; }
-  .badge{
-    display:flex; align-items:center; gap:8px; background:var(--surface-raised); border:1px solid var(--border);
-    border-radius:999px; padding:7px 12px 7px 14px; font-size:12px; color:var(--text-secondary); box-shadow:var(--shadow-1);
-  }
+  .badge{ display:flex; align-items:center; gap:8px; background:var(--surface-raised); border:1px solid var(--border); border-radius:999px; padding:7px 12px 7px 14px; font-size:12px; color:var(--text-secondary); box-shadow:var(--shadow-1); }
   .badge b{ color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-weight:600; }
-  .badge input{
-    width:64px; border:none; background:transparent; color:var(--text-primary); font-family:'IBM Plex Mono',monospace;
-    font-weight:600; font-size:12px; text-align:right; outline:none;
-  }
+  .badge input{ width:64px; border:none; background:transparent; color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:12px; text-align:right; outline:none; }
 
-  /* ---------- tabs ---------- */
   .tabnav{ display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); overflow-x:auto; }
-  .tabnav button{
-    appearance:none; background:none; border:none; border-bottom:2px solid transparent; padding:10px 14px;
-    font-size:13.5px; font-weight:600; color:var(--text-secondary); cursor:pointer; white-space:nowrap;
-    display:flex; align-items:center; gap:7px; transition:color .15s ease, border-color .15s ease;
-  }
+  .tabnav button{ appearance:none; background:none; border:none; border-bottom:2px solid transparent; padding:10px 14px; font-size:13.5px; font-weight:600; color:var(--text-secondary); cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:7px; transition:color .15s ease, border-color .15s ease; }
   .tabnav button:hover{ color:var(--text-primary); }
   .tabnav button.active{ color:var(--accent-strong); border-bottom-color:var(--accent); }
-  .tabnav .tag{
-    font-size:10px; font-weight:700; padding:1px 6px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong);
-  }
+  .tabnav .tag{ font-size:10px; font-weight:700; padding:1px 6px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); }
 
-  /* ---------- layout ---------- */
-  .layout{ display:grid; grid-template-columns:260px 1fr; gap:20px; align-items:start; }
-  @media (max-width:920px){ .layout{ grid-template-columns:1fr; } }
+  .layout{ display:grid; grid-template-columns:260px minmax(0,1fr); gap:20px; align-items:start; }
+  @media (max-width:920px){ .layout{ grid-template-columns:minmax(0,1fr); } }
 
-  .panel{
-    background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius);
-    box-shadow:var(--shadow-1);
-  }
+  .panel{ background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-1); }
   .filters{ padding:16px; display:flex; flex-direction:column; gap:16px; position:sticky; top:16px; }
+  @media (max-width:920px){ .filters{ position:static; } }
   .filters h3{ font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; margin:0; color:var(--text-muted); font-family:'Public Sans'; }
   .field{ display:flex; flex-direction:column; gap:6px; }
   .field[hidden]{ display:none; }
   .field label{ font-size:12px; font-weight:600; color:var(--text-secondary); }
-  select, .textinput{
-    width:100%; padding:8px 10px; border-radius:7px; border:1px solid var(--border-strong); background:var(--surface);
-    color:var(--text-primary); font-size:13px;
-  }
-  /* Select compacto dentro de un <h4> (ej. "Histórico y forecast mensual — [selector]") -- no debe
-     heredar el width:100% del <select> genérico de arriba, que rompería el layout de la cabecera. */
-  select.tablecrop-select{
-    width:auto; padding:4px 8px; font-size:12.5px; font-weight:700; border-radius:6px;
-    border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary);
-  }
+  select, .textinput{ width:100%; padding:8px 10px; border-radius:7px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary); font-size:13px; }
+  select.tablecrop-select{ width:auto; padding:4px 8px; font-size:12.5px; font-weight:700; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary); }
   .chipgrid{ display:flex; flex-wrap:wrap; gap:6px; }
-  /* La sección de "¿cuáles cultivos entran al consolidado?" solo tiene efecto cuando "Cultivo
-     enfocado" está en Consolidado -- se muestra sangrada, con una guía vertical a la izquierda,
-     para que se lea como dependiente del selector de arriba en vez de como un segundo selector de
-     cultivo aparte (fuente de confusión reportada por Rafael el 22 sep). */
   .field.indented{ margin-left:10px; padding-left:12px; border-left:2px solid var(--border); }
   .chip-quickrow{ display:flex; align-items:center; gap:6px; margin:-2px 0 2px; }
-  .chip-quickrow button{
-    appearance:none; border:none; background:none; padding:0; font-size:11px; font-weight:700;
-    color:var(--accent-strong); text-decoration:underline; cursor:pointer; font-family:inherit;
-  }
+  .chip-quickrow button{ appearance:none; border:none; background:none; padding:0; font-size:11px; font-weight:700; color:var(--accent-strong); text-decoration:underline; cursor:pointer; font-family:inherit; }
   .chip-quickrow button:hover{ opacity:.75; }
   .chip-quickrow .dotsep{ color:var(--text-muted); font-size:11px; }
-  .chip{
-    display:flex; align-items:center; gap:5px; padding:5px 10px 5px 8px; border-radius:999px; border:1px solid var(--border-strong);
-    background:var(--surface); font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; user-select:none;
-  }
+  .chip{ display:flex; align-items:center; gap:5px; padding:5px 10px 5px 8px; border-radius:999px; border:1px solid var(--border-strong); background:var(--surface); font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; user-select:none; }
   .chip input{ accent-color:var(--accent); }
   .chip.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-strong); }
   .segmented{ display:flex; border:1px solid var(--border-strong); border-radius:8px; overflow:hidden; }
-  .segmented button{
-    flex:1; appearance:none; border:none; background:var(--surface); color:var(--text-secondary); font-size:12.5px; font-weight:700;
-    padding:8px 4px; cursor:pointer; border-left:1px solid var(--border-strong);
-  }
+  .segmented button{ flex:1; appearance:none; border:none; background:var(--surface); color:var(--text-secondary); font-size:12.5px; font-weight:700; padding:8px 4px; cursor:pointer; border-left:1px solid var(--border-strong); }
   .segmented button:first-child{ border-left:none; }
   .segmented button.on.base{ background:var(--accent); color:#fff; }
   .segmented button.on.optimista{ background:var(--good); color:#06280a; }
   .segmented button.on.pesimista{ background:var(--critical); color:#fff; }
-  /* Selector de variable dentro de "Histórico y forecast mensual" (decimonovena iteración): a
-     diferencia de Escenario, sus botones no llevan una clase de color propia (base/optimista/
-     pesimista), así que necesita su propia regla ".on" -- de otro modo ningún botón se vería
-     resaltado nunca, aunque el JS sí le agregue la clase "on". */
+  /* Segmentados sin color propio por opción (Variable de la tabla, Vista Mensual/Acumulado) */
+  .seg-accent button.on{ background:var(--accent); color:#fff; }
   .tablevar-seg{ margin:10px 0 12px; max-width:640px; }
-  .tablevar-seg button.on{ background:var(--accent); color:#fff; }
-  .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.5; }
+  .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.5; margin:0; }
+  .hint.warn{ color:var(--warning); font-weight:600; }
   .chartband-hint{ display:flex; align-items:flex-start; gap:7px; margin:2px 0 4px; }
   .chartband-swatch{ flex:none; width:11px; height:11px; margin-top:1px; border-radius:3px; background:var(--good-soft); border:1px solid var(--good); }
 
-  /* Tabla compacta de % por escenario, debajo de los botones de Escenario en el panel de
-     Filtros -- misma data (state.scenarios) que la tabla grande de la pestaña Escenarios, solo
-     que aquí siempre está a la vista sin cambiar de pestaña. */
   .scenario-mini{ width:100%; border-collapse:collapse; margin-top:8px; table-layout:fixed; }
   .scenario-mini th{ font-size:9px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.03em; text-align:center; padding:0 0 4px; }
   .scenario-mini th:first-child{ text-align:left; }
   .scenario-mini td{ padding:2px 2px; text-align:center; vertical-align:middle; }
   .scenario-mini td:first-child{ text-align:left; font-size:11px; font-weight:600; color:var(--text-secondary); padding-right:2px; }
-  .scenario-mini input{
-    width:100%; padding:4px 1px; font-size:10.5px; text-align:center; border:1px solid var(--border-strong);
-    border-radius:5px; background:var(--surface); color:var(--text-primary); font-family:'IBM Plex Mono',monospace;
-  }
+  .scenario-mini input{ width:100%; padding:4px 1px; font-size:10.5px; text-align:center; border:1px solid var(--border-strong); border-radius:5px; background:var(--surface); color:var(--text-primary); font-family:'IBM Plex Mono',monospace; }
   .scenario-mini input:disabled{ opacity:.55; }
 
-  /* ---------- content ---------- */
   .view{ display:flex; flex-direction:column; gap:20px; }
   .view[hidden]{ display:none; }
 
   .kpirow{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
   @media (max-width:800px){ .kpirow{ grid-template-columns:repeat(2,1fr); } }
-  .kpi{
-    background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px;
-    box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:6px;
-  }
+  .kpi{ background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:6px; min-width:0; }
   .kpi .label{ font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); }
-  .kpi .value{ font-size:22px; font-weight:600; font-family:'IBM Plex Mono',monospace; }
+  .kpi .value{ font-size:22px; font-weight:600; font-family:'IBM Plex Mono',monospace; overflow-wrap:anywhere; }
   .kpi .delta{ font-size:11.5px; display:flex; align-items:center; gap:5px; font-weight:600; }
-  .pill{ display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+  .pill{ display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .kpi .pill{ white-space:normal; }
   .pill.good{ background:var(--good-soft); color:var(--good); }
   .pill.warning{ background:var(--warning-soft); color:var(--warning); }
-  .databanner{ display:flex; align-items:center; gap:10px; background:var(--warning-soft); color:var(--warning); border-radius:10px; padding:10px 14px; font-size:12.5px; font-weight:600; margin-bottom:14px; }
-  .databanner .btn-inline{ font-weight:700; text-decoration:underline; cursor:pointer; background:none; border:none; color:inherit; font-size:inherit; padding:0; font-family:inherit; }
   .pill.critical{ background:var(--critical-soft); color:var(--critical); }
+  .databanner{ display:block; line-height:1.5; background:var(--warning-soft); color:var(--warning); border-radius:10px; padding:10px 14px; font-size:12.5px; font-weight:600; }
+  .databanner[hidden]{ display:none; }
+  .databanner .btn-inline{ margin-left:6px; font-weight:700; text-decoration:underline; cursor:pointer; background:none; border:none; color:inherit; font-size:inherit; padding:0; font-family:inherit; }
 
-  .cardgrid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  @media (max-width:900px){ .cardgrid{ grid-template-columns:1fr; } }
-  .card{
-    background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius); padding:16px;
-    box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:10px;
-  }
-  .card h4{ margin:0; font-size:13px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; justify-content:space-between; gap:8px;}
-  .card .cardsub{ font-size:11.5px; color:var(--text-muted); margin-top:-8px; }
+  .cardgrid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+  @media (max-width:900px){ .cardgrid{ grid-template-columns:minmax(0,1fr); } }
+  .card{ background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius); padding:16px; box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .card h4{ margin:0; font-size:13px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+  .card .cardsub{ font-size:11.5px; color:var(--text-muted); margin:-4px 0 0; }
   .chartbox{ position:relative; height:230px; }
   .chartbox.tall{ height:280px; }
-  .chartbox.wide{ height:190px; }
+  .chartbox.wide{ height:210px; }
 
   table{ width:100%; border-collapse:collapse; font-size:12.5px; }
   th{ text-align:right; font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:700; padding:8px 10px; border-bottom:1px solid var(--border); }
   th:first-child, td:first-child{ text-align:left; }
-  td{ padding:8px 10px; text-align:right; border-bottom:1px solid var(--border); color:var(--text-secondary); font-family:'IBM Plex Mono',monospace; }
+  td{ padding:8px 10px; text-align:right; border-bottom:1px solid var(--border); color:var(--text-secondary); font-family:'IBM Plex Mono',monospace; white-space:nowrap; }
   td:first-child{ font-family:'Public Sans'; color:var(--text-primary); font-weight:600; }
   tr:last-child td{ border-bottom:none; }
   tr.now td{ background:var(--accent-soft); }
   tr.total-row td{ border-top:2px solid var(--border-strong); border-bottom:none; background:var(--surface-raised); font-weight:700; color:var(--text-primary); }
+  /* Columna del método de proyección que está seleccionado en el panel */
+  th.active-method{ color:var(--accent-strong); }
+  td.active-method{ color:var(--text-primary); font-weight:600; box-shadow:inset 2px 0 0 var(--accent); }
   .tablewrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); }
   .tablewrap table{ min-width:640px; }
+  #tablaHistorico{ min-width:900px; }
 
-  .scenariotable input{
-    width:64px; padding:5px 6px; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface);
-    color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right;
-  }
+  .scenariotable input{ width:64px; padding:5px 6px; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right; }
   .scenariotable input:disabled{ opacity:.5; }
   .scenariotable td, .scenariotable th{ text-align:center; }
   .scenariotable td:first-child{ text-align:left; }
 
-  /* ---------- data tab ---------- */
-  .dataintro{ font-size:13px; color:var(--text-secondary); line-height:1.6; max-width:74ch; }
+  .dataintro{ font-size:13px; color:var(--text-secondary); line-height:1.6; max-width:74ch; margin:0; }
   .dataintro code{ background:var(--surface); border:1px solid var(--border); padding:1px 5px; border-radius:4px; font-size:12px; }
-  .loadergrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
-  @media (max-width:900px){ .loadergrid{ grid-template-columns:1fr; } }
-  .loadercol{ display:flex; flex-direction:column; gap:12px; }
+  .loadergrid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  @media (max-width:900px){ .loadergrid{ grid-template-columns:minmax(0,1fr); } }
+  .loadercol{ display:flex; flex-direction:column; gap:12px; min-width:0; }
   .loadercol > .colhead{ font-size:12px; font-weight:700; color:var(--text-primary); text-transform:uppercase; letter-spacing:.05em; text-align:center; padding-bottom:4px; border-bottom:2px solid var(--border-strong); }
   .slot{ border:1px solid var(--border); border-radius:9px; padding:10px; display:flex; flex-direction:column; gap:7px; background:var(--surface); }
-  .slot .slothead{ display:flex; justify-content:space-between; align-items:center; font-size:11.5px; font-weight:700; color:var(--text-secondary); }
-  .slot textarea{
-    width:100%; height:64px; resize:vertical; font-family:'IBM Plex Mono',monospace; font-size:10.5px; padding:6px 8px;
-    border-radius:6px; border:1px solid var(--border-strong); background:var(--surface-raised); color:var(--text-primary);
-  }
+  .slot.new{ border-color:var(--accent); }
+  .slot .slothead{ display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:11.5px; font-weight:700; color:var(--text-secondary); }
+  .slot textarea{ width:100%; height:64px; resize:vertical; font-family:'IBM Plex Mono',monospace; font-size:10.5px; padding:6px 8px; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface-raised); color:var(--text-primary); }
   .slot .slotfoot{ display:flex; justify-content:space-between; align-items:center; gap:6px; }
   .slot input[type=file]{ font-size:10.5px; max-width:100%; color:var(--text-muted); }
-  .count{ font-size:10.5px; font-weight:700; color:var(--text-muted); }
+  .count{ font-size:10.5px; font-weight:700; color:var(--text-muted); white-space:nowrap; }
   .count.has{ color:var(--accent-strong); }
 
-  .btn{
-    appearance:none; border:1px solid var(--border-strong); background:var(--surface-raised); color:var(--text-primary);
-    padding:9px 16px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:var(--shadow-1);
-  }
-  .btn:hover{ border-color:var(--border-strong); background:var(--page-bg); }
+  .btn{ appearance:none; border:1px solid var(--border-strong); background:var(--surface-raised); color:var(--text-primary); padding:9px 16px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; box-shadow:var(--shadow-1); }
+  .btn:hover{ background:var(--page-bg); }
   .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .btn.primary:hover{ background:var(--accent-strong); }
-  .btn.small{ padding:5px 10px; font-size:11.5px; }
   .actionrow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 
   .statusbox{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
@@ -257,7 +196,8 @@
 
   footer.note{ font-size:11.5px; color:var(--text-muted); text-align:center; padding-top:8px; }
 </style>
-
+</head>
+<body>
 <div class="app">
 
   <div class="topbar">
@@ -292,7 +232,7 @@
           <button type="button" id="btnIncludedAll">Todos</button><span class="dotsep">·</span><button type="button" id="btnIncludedNone">Ninguno</button>
         </div>
         <div class="chipgrid" id="includedChips"></div>
-        <p class="hint">📦 Empaque no es un cultivo (no tiene tipo de cambio ni aparece en "Comparativo de cultivos"), pero su egreso real sí existe en la base de datos — al incluirlo aquí se suma al Ingreso/Egreso/EBITDA consolidado.</p>
+        <p class="hint">📦 Empaque no es un cultivo (no tiene tipo de cambio ni aparece en "Comparativo de cultivos"), pero su egreso sí existe en la base de datos — al incluirlo aquí se suma al Ingreso/Egreso/EBITDA consolidado.</p>
       </div>
       <div class="field" id="mesField">
         <h3>Mes de referencia</h3>
@@ -321,8 +261,17 @@
           <option value="movil">🔄 Promedio móvil (12 semanas)</option>
           <option value="estacional">📐 Variación estacional (método Excel)</option>
         </select>
+        <p class="hint" id="metodoHint"></p>
       </div>
-      <p class="hint">El forecast corre semana a semana sobre los datos <b>Real</b> y se agrega a nivel mes. El tipo de cambio solo afecta a los cultivos de exportación — papa se vende en mercado nacional.</p>
+      <div class="field" id="vistaField">
+        <h3>Vista</h3>
+        <div class="segmented seg-accent" id="vistaSeg">
+          <button type="button" data-vista="mensual" class="on">Mensual</button>
+          <button type="button" data-vista="acumulado">Acumulado</button>
+        </div>
+        <p class="hint">Acumulado suma mes a mes desde el inicio de la temporada (gráficas y tabla).</p>
+      </div>
+      <p class="hint">El forecast corre semana a semana desde la última semana <b>Real</b> y se agrupa por la columna <b>Mes</b> de tus hojas. El tipo de cambio solo afecta a los cultivos de exportación — papa se vende en mercado nacional.</p>
     </aside>
 
     <main>
@@ -339,16 +288,16 @@
           <div class="kpi"><span class="label">Margen EBITDA</span><span class="value" id="kpiMargen">—</span><span class="delta" id="kpiMargenPill"></span></div>
         </div>
 
-        <p class="hint chartband-hint"><span class="chartband-swatch"></span>El área verde es el espacio entre el escenario Pesimista y el Optimista — su función es mostrarte qué tan grande es el rango entre el peor caso y el mejor caso. La línea sólida de color sí es tu escenario activo (verde bosque = Base, verde fuerte = Optimista, rojo = Pesimista).</p>
+        <p class="hint chartband-hint"><span class="chartband-swatch"></span><span>Cada gráfica tiene 3 líneas: <b>Presupuesto</b> (punteada gris), <b>Real</b> (sólida oscura) y <b>Proyección</b> del método seleccionado en "Método de proyección" (sólida de color: verde bosque = Base, verde fuerte = Optimista, rojo = Pesimista). El área verde es el rango entre el escenario Pesimista y el Optimista.</span></p>
 
         <div class="cardgrid">
           <div class="card">
-            <h4>EBITDA por mes (MXN)</h4>
+            <h4>EBITDA por mes <span class="hint" data-vista-label></span></h4>
             <div class="chartbox tall"><canvas id="chartEbitda"></canvas></div>
             <div class="legend-inline" id="legendEbitda"></div>
           </div>
           <div class="card">
-            <h4>Margen EBITDA por mes (%)</h4>
+            <h4>Margen EBITDA por mes (%) <span class="hint" data-vista-label></span></h4>
             <div class="chartbox tall"><canvas id="chartMargen"></canvas></div>
             <div class="legend-inline" id="legendMargen"></div>
           </div>
@@ -356,36 +305,35 @@
 
         <div class="cardgrid">
           <div class="card">
-            <h4>Ingreso por mes (MXN)</h4>
+            <h4>Ingreso por mes <span class="hint" data-vista-label></span></h4>
             <div class="chartbox tall"><canvas id="chartIngreso"></canvas></div>
             <div class="legend-inline" id="legendIngreso"></div>
           </div>
           <div class="card">
-            <h4>Egreso por mes (MXN)</h4>
+            <h4>Egreso por mes <span class="hint" data-vista-label></span></h4>
             <div class="chartbox tall"><canvas id="chartEgreso"></canvas></div>
             <div class="legend-inline" id="legendEgreso"></div>
           </div>
         </div>
 
         <div class="card">
-          <h4>Producción por mes (kg)</h4>
+          <h4>Producción por mes (kg) <span class="hint" data-vista-label></span></h4>
           <div class="chartbox wide"><canvas id="chartProduccion"></canvas></div>
           <div class="legend-inline" id="legendProduccion"></div>
         </div>
 
         <div class="card">
           <h4>Histórico y forecast mensual — <select id="tableCropSelect" class="tablecrop-select"></select></h4>
-          <div class="segmented tablevar-seg" id="tableVariableSeg">
+          <div class="segmented seg-accent tablevar-seg" id="tableVariableSeg">
             <button type="button" data-var="ingreso">💰 Ingreso</button>
             <button type="button" data-var="egreso">💸 Egreso</button>
             <button type="button" data-var="produccion">🌾 Producción</button>
             <button type="button" data-var="ebitda">📊 EBITDA</button>
           </div>
-          <p class="cardsub">El mes en curso muestra Real acumulado solo de las semanas ya transcurridas; por eso puede lucir bajo frente al Presupuesto del mes completo. La columna "Variación" compara Real vs Presupuesto de ese mes, en pesos (o kg) y en %.</p>
+          <p class="cardsub" id="tablaSub"></p>
           <div class="tablewrap">
             <table id="tablaHistorico"><thead></thead><tbody></tbody></table>
           </div>
-          <p class="cardsub hint" id="tablaEstimadoNote" hidden>* Mes sin datos reales capturados todavía — se muestra estimado con el método de proyección seleccionado. Se reemplaza solo por el dato real en cuanto tu Sheet lo tenga.</p>
         </div>
       </section>
 
@@ -396,7 +344,7 @@
         </div>
         <div class="card">
           <h4>Supuestos por escenario</h4>
-          <p class="cardsub">Variación aplicada sobre el forecast base (método seleccionado). El tipo de cambio no aplica a papa.</p>
+          <p class="cardsub">Variación aplicada sobre las semanas proyectadas (método seleccionado). El tipo de cambio no aplica a papa.</p>
           <div class="tablewrap">
             <table class="scenariotable">
               <thead><tr><th>Escenario</th><th>% Ingreso</th><th>% Egreso</th><th>% Producción</th><th>% Tipo de cambio</th></tr></thead>
@@ -445,26 +393,24 @@
         <div class="card">
           <h4>Cargar información desde tu Google Sheet</h4>
           <p class="dataintro">
-            Esta herramienta no se conecta en vivo a Google Sheets. Exporta o copia cada una de tus 9 hojas
-            (Real, Presupuesto y Proyección — para Egreso, Ingreso y Producción) y pégalas o súbelas abajo, cada una en su casilla.
-            Acepta tal cual el formato de tu hoja de cálculo, con o sin la columna de tipo al inicio
-            (<code>Egreso/Ingreso/Producción, Cultivo, ejercicio, semana, Importe</code> o solo <code>cultivo, ejercicio, semana, importe</code>).
-            <code>ejercicio</code> puede ser el año calendario (ej. <code>2026</code>, con <code>semana</code> como semana ISO de ese año) o la temporada
-            <code>25-26</code> (semana 1-52 desde julio) — se detecta solo. Si el encabezado de la columna de importe dice
-            "acumulado", la herramienta la convierte automáticamente a importe semanal. Un cultivo que no sea uno de los 7
-            (por ejemplo "Empaque") se agrupa como <b>Otros/Overhead</b> y se muestra aparte, sin afectar el EBITDA por cultivo.
-            Puedes pegar directamente desde Excel/Sheets (usa tabulaciones) o subir un archivo <code>.csv</code>.
+            Pega o sube cada hoja en su casilla: Real, Presupuesto y Proyección para Egreso, Ingreso y Producción, más la hoja
+            <b>Variación Egreso</b> (casilla verde, columna de Egreso), que es la que usa el método "Variación estacional".
+            Formato de columnas: <code>Tipo, Cultivo, ejercicio, semana, Importe, Mes</code> (la columna Mes es opcional pero recomendada).
+            En la hoja de Variación la columna de importe es el <b>%</b>: acepta <code>5%</code>, <code>-88%</code>, <code>1647%</code> o el decimal <code>0.05</code>.
+            <code>ejercicio</code> puede ser el año calendario (ej. <code>2026</code>, con semana ISO) o la temporada <code>25-26</code>.
+            Si la hoja <b>Real</b> de una variable trae datos, el real sale de ahí; si viene vacía, se usan las semanas ya transcurridas de Proyección como real.
+            Un cultivo que no sea uno de los 7 (por ejemplo "Empaque") se agrupa aparte como Empaque.
           </p>
           <div class="actionrow">
             <button class="btn primary" id="btnDemo">✨ Cargar datos de ejemplo</button>
             <button class="btn" id="btnProcesar">⚙️ Procesar y actualizar tablero</button>
             <button class="btn" id="btnLimpiar">🗑️ Limpiar todo</button>
-          <button class="btn" id="btnEgresoReal">↺ Recargar datos base</button>
+            <button class="btn" id="btnEgresoReal">↺ Recargar datos base</button>
           </div>
         </div>
 
         <div class="card">
-          <h4>9 hojas de datos</h4>
+          <h4>10 hojas de datos</h4>
           <div class="loadergrid" id="loaderGrid"></div>
         </div>
 
@@ -500,14 +446,11 @@ const DISPLAY = { FRESA:'Fresa', FRAMBUESA:'Frambuesa', ZARZAMORA:'Zarzamora', A
 const ICONS = { FRESA:'🍓', FRAMBUESA:'🍒', ZARZAMORA:'🍇', ARANDANO:'🫐', ESPARRAGO:'🌿', AGUACATE:'🥑', PAPA:'🥔', OTROS:'📦' };
 const CROP_COLOR_VAR = { FRESA:'--crop-1', FRAMBUESA:'--crop-2', ZARZAMORA:'--crop-3', ARANDANO:'--crop-4', ESPARRAGO:'--crop-5', AGUACATE:'--crop-6', PAPA:'--crop-7' };
 const CROPS_WITH_TC = new Set(CROPS.filter(c=>c!=='PAPA'));
-// "Empaque" (y cualquier otro renglón que no sea uno de los 7 cultivos) se agrupa bajo OTHER_LABEL
-// ('OTROS'). Es seleccionable en el filtro de "Cultivos incluidos en consolidado" para que su
-// egreso entre o salga del EBITDA/KPIs consolidados, pero nunca aparece en las vistas que son
-// específicamente "los 7 cultivos" (Comparativo / Participación) ni tiene tipo de cambio.
 const VARIABLES = ['egreso','ingreso','produccion'];
 const TIPOS = ['real','presupuesto','proyeccion'];
 const MES_ABR = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const DAY_MS = 86400000;
+const METODO_LABEL = { polinomial:'Regresión polinomial', promedio:'Promedio histórico', movil:'Promedio móvil', estacional:'Variación estacional' };
 
 const CROP_PROFILES = {
   FRESA:      { weeklyKg: 9000, priceUsd: 2.9,  priceMxn:null, weeklyEgreso: 343000, growth: 0.05 },
@@ -519,30 +462,10 @@ const CROP_PROFILES = {
   PAPA:       { weeklyKg: 26000,priceUsd: null, priceMxn: 9.4, weeklyEgreso: 215000, growth: 0.01 }
 };
 
-// Tasas de variación semanal (temporada 26-27) extraídas de la hoja "Egresos T2627 Sem" del Excel
-// de Rafael (bloque "Var. T2526", filas 30-38), usadas como respaldo del método "Variación
-// estacional" cuando todavía no hay suficiente historia real cargada para calcularlas en vivo. Ojo:
-// el Excel original tiene un bug de desfase de filas donde Frambuesa/Zarzamora/Aguacate terminan
-// aplicando la curva de variación del cultivo de arriba; aquí las tasas ya están reasignadas al
-// cultivo correcto. Clave "AAAA-S" = año calendario ISO + semana ISO.
-const VARIACION_SEASONAL_RATES_DEFAULT = {
-  FRESA: {"2026-28":0.04,"2026-29":0.05,"2026-30":0.06,"2026-31":0.1,"2026-32":0.05,"2026-33":0.06,"2026-34":0.05,"2026-35":0.76,"2026-36":0.05,"2026-37":0.06,"2026-38":0.04,"2026-39":0.05,"2026-40":0.04,"2026-41":0.04,"2026-42":0.04,"2026-43":0.04,"2026-44":0.17,"2026-45":0.02,"2026-46":0.03,"2026-47":0.03,"2026-48":0.04,"2026-49":0.03,"2026-50":0.02,"2026-51":0.06,"2026-52":0.04,"2027-1":0.02,"2027-2":0.04,"2027-3":0.04,"2027-4":0.04,"2027-5":0.06,"2027-6":0.04,"2027-7":0.05,"2027-8":0.03,"2027-9":0.03,"2027-10":0.01,"2027-11":0.03,"2027-12":0.02,"2027-13":0.02,"2027-14":0.01,"2027-15":0.01,"2027-16":0.02,"2027-17":0.01,"2027-18":0.02,"2027-19":0.02,"2027-20":0.02,"2027-21":0.01,"2027-22":0.04,"2027-23":0.01,"2027-24":0.01,"2027-25":0.02,"2027-26":0.02,"2027-27":0.02},
-  FRAMBUESA: {"2026-28":0.31,"2026-29":0.18,"2026-30":0.2,"2026-31":0.24,"2026-32":0.15,"2026-33":0.12,"2026-34":0.09,"2026-35":0.16,"2026-36":0.1,"2026-37":0.1,"2026-38":0.1,"2026-39":0.1,"2026-40":0.09,"2026-41":0.06,"2026-42":0.05,"2026-43":0.06,"2026-44":0.07,"2026-45":0.04,"2026-46":0.04,"2026-47":0.06,"2026-48":0.06,"2026-49":0.05,"2026-50":0.04,"2026-51":0.06,"2026-52":0.04,"2027-1":0.02,"2027-2":0.03,"2027-3":0.05,"2027-4":0.06,"2027-5":0.06,"2027-6":0.05,"2027-7":0.05,"2027-8":0.04,"2027-9":0.03,"2027-10":0.07,"2027-11":0.03,"2027-12":0.05,"2027-13":0.05,"2027-14":0.01,"2027-15":0.05,"2027-16":0.03,"2027-17":0.02,"2027-18":0.05,"2027-19":0.04,"2027-20":0.05,"2027-21":0.02,"2027-22":0.05,"2027-23":0.02,"2027-24":0.02,"2027-25":0.02,"2027-26":0.02,"2027-27":0.04},
-  ZARZAMORA: {"2026-28":0.01,"2026-29":0.02,"2026-30":0.02,"2026-31":0.02,"2026-32":0.02,"2026-33":0.02,"2026-34":0.02,"2026-35":0.02,"2026-36":0.01,"2026-37":0.02,"2026-38":0.02,"2026-39":0.01,"2026-40":0.02,"2026-41":0.02,"2026-42":0.02,"2026-43":0.05,"2026-44":0.04,"2026-45":0.02,"2026-46":0.02,"2026-47":0.02,"2026-48":0.05,"2026-49":0.03,"2026-50":0.02,"2026-51":0.05,"2026-52":0.03,"2027-1":0.03,"2027-2":0.02,"2027-3":0.02,"2027-4":0.06,"2027-5":0.04,"2027-6":0.01,"2027-7":0.04,"2027-8":0.04,"2027-9":0.03,"2027-10":0.01,"2027-11":0.04,"2027-12":0.05,"2027-13":0.03,"2027-14":0.01,"2027-15":0.03,"2027-16":0.02,"2027-17":0.04,"2027-18":0.03,"2027-19":0.02,"2027-20":0.01,"2027-21":0.02,"2027-22":0.04,"2027-23":0.03,"2027-24":0.02,"2027-25":0.03,"2027-26":0.04,"2027-27":0.01},
-  ARANDANO: {"2026-28":0.1,"2026-29":0.11,"2026-30":0.2,"2026-31":0.08,"2026-32":0.05,"2026-33":0.11,"2026-34":0.04,"2026-35":0.15,"2026-36":0.06,"2026-37":0.06,"2026-38":0.03,"2026-39":0.09,"2026-40":0.04,"2026-41":0.03,"2026-42":0.03,"2026-43":0.08,"2026-44":0.04,"2026-45":0.02,"2026-46":0.02,"2026-47":0.07,"2026-48":0.02,"2026-49":0.03,"2026-50":0.03,"2026-51":0.04,"2026-52":0.06,"2027-1":0.02,"2027-2":0.02,"2027-3":0.02,"2027-4":0.02,"2027-5":0.07,"2027-6":0.03,"2027-7":0.03,"2027-8":0.06,"2027-9":0.04,"2027-10":0.02,"2027-11":0.02,"2027-12":0.03,"2027-13":0.04,"2027-14":0.02,"2027-15":0.02,"2027-16":0.02,"2027-17":0.01,"2027-18":0.05,"2027-19":0.02,"2027-20":0.04,"2027-21":0.01,"2027-22":0.07,"2027-23":0.03,"2027-24":0.02,"2027-25":0.01,"2027-26":0.01,"2027-27":0.01},
-  ESPARRAGO: {"2026-28":0.05,"2026-29":0.06,"2026-30":0.05,"2026-31":0.04,"2026-32":0.03,"2026-33":0.06,"2026-34":0.06,"2026-35":0.05,"2026-36":0.04,"2026-37":0.03,"2026-38":0.06,"2026-39":0.04,"2026-40":0.04,"2026-41":0.03,"2026-42":0.04,"2026-43":0.04,"2026-44":0.02,"2026-45":0.03,"2026-46":0.03,"2026-47":0.03,"2026-48":0.02,"2026-49":0.02,"2026-50":0.02,"2026-51":0.04,"2026-52":0.02,"2027-1":0.02,"2027-2":0.02,"2027-3":0.03,"2027-4":0.02,"2027-5":0.03,"2027-6":0.02,"2027-7":0.02,"2027-8":0.02,"2027-9":0.02,"2027-10":0.01,"2027-11":0.01,"2027-12":0.01,"2027-13":0.02,"2027-14":0.0,"2027-15":0.01,"2027-16":0.02,"2027-17":0.02,"2027-18":0.01,"2027-19":0.01,"2027-20":0.02,"2027-21":0.02,"2027-22":0.02,"2027-23":0.02,"2027-24":0.02,"2027-25":0.01,"2027-26":0.01,"2027-27":0.01},
-  AGUACATE: {"2026-28":0.15,"2026-29":0.09,"2026-30":0.12,"2026-31":0.18,"2026-32":0.06,"2026-33":0.11,"2026-34":0.08,"2026-35":0.12,"2026-36":0.13,"2026-37":0.07,"2026-38":0.11,"2026-39":0.11,"2026-40":0.13,"2026-41":0.12,"2026-42":0.08,"2026-43":0.09,"2026-44":0.1,"2026-45":0.06,"2026-46":0.05,"2026-47":0.05,"2026-48":0.05,"2026-49":0.06,"2026-50":0.04,"2026-51":0.05,"2026-52":0.04,"2027-1":0.02,"2027-2":0.02,"2027-3":0.03,"2027-4":0.04,"2027-5":0.05,"2027-6":0.03,"2027-7":0.04,"2027-8":0.02,"2027-9":0.04,"2027-10":0.04,"2027-11":0.04,"2027-12":0.06,"2027-13":0.04,"2027-14":0.03,"2027-15":0.06,"2027-16":0.06,"2027-17":0.05,"2027-18":0.03,"2027-19":0.02,"2027-20":0.02,"2027-21":0.02,"2027-22":0.03,"2027-23":0.03,"2027-24":0.02,"2027-25":0.02,"2027-26":0.02,"2027-27":0.02},
-  PAPA: {"2026-28":0.1,"2026-29":0.29,"2026-30":0.33,"2026-31":0.16,"2026-32":0.07,"2026-33":0.09,"2026-34":0.12,"2026-35":0.07,"2026-36":0.04,"2026-37":0.06,"2026-38":0.11,"2026-39":0.04,"2026-40":0.05,"2026-41":0.06,"2026-42":0.05,"2026-43":0.11,"2026-44":0.08,"2026-45":0.07,"2026-46":0.1,"2026-47":0.04,"2026-48":0.07,"2026-49":0.05,"2026-50":0.04,"2026-51":0.05,"2026-52":0.03,"2027-1":0.04,"2027-2":0.05,"2027-3":0.05,"2027-4":0.03,"2027-5":0.05,"2027-6":0.02,"2027-7":0.08,"2027-8":0.03,"2027-9":0.05,"2027-10":0.01,"2027-11":0.03,"2027-12":0.03,"2027-13":0.03,"2027-14":0.01,"2027-15":0.02,"2027-16":0.01,"2027-17":0.02,"2027-18":0.01,"2027-19":0.01,"2027-20":0.01,"2027-21":0.02,"2027-22":0.02,"2027-23":0.01,"2027-24":0.01,"2027-25":0.0,"2027-26":0.02,"2027-27":0.02},
-};
-
 /* ============================================================
    2. DATE / SEASON HELPERS
    ============================================================ */
-// La temporada arranca en la semana ISO 26 del año (aprox. 22 de junio), no el 1 de julio —
-// así coincide con lo que Rafael ya registra como "temporada 26-27" en su hoja de REAL Egreso
-// (que trae datos de arranque de temporada desde la semana 26/27, antes del 1 de julio).
-// seasonStartDate/getSeasonLabel están escritos como inversas una de la otra a propósito: si
-// alguna vez cambia SEASON_START_WEEK, ambas quedan consistentes automáticamente.
+// La temporada arranca en la semana ISO 26 (aprox. 22 de junio), igual que las hojas de Rafael.
 const SEASON_START_WEEK = 26;
 function seasonStartDate(seasonLabel){
   const startYear = 2000 + parseInt(seasonLabel.split('-')[0],10);
@@ -562,26 +485,19 @@ function weekToDate(seasonLabel, week){
   return new Date(start.getTime() + (week-1)*7*DAY_MS);
 }
 function isoWeekToDate(year, week){
-  // Lunes de la semana ISO `week` del año calendario `year` (ISO-8601: el 4 de enero siempre cae en la semana 1)
   const jan4 = new Date(Date.UTC(year,0,4));
-  const jan4DayMon0 = (jan4.getUTCDay()+6)%7; // lunes=0
+  const jan4DayMon0 = (jan4.getUTCDay()+6)%7;
   const week1Monday = new Date(jan4.getTime() - jan4DayMon0*DAY_MS);
   return new Date(week1Monday.getTime() + (week-1)*7*DAY_MS);
 }
-// Inversa de isoWeekToDate: dada una fecha cualquiera, regresa {y,w} (año calendario ISO + semana
-// ISO 1-52/53) — usada por el método "Variación estacional" para ubicar, semana a semana, qué tasa
-// de variación de la temporada anterior le corresponde a cada semana proyectada, sin importar si la
-// fecha vino de un ejercicio "AA-AA" o de un año calendario. Se revisa primero el año calendario de
-// la propia fecha (y solo como respaldo el anterior/siguiente) para evitar la ambigüedad típica de
-// fin de año, donde un lunes puede describirse como "semana 53 del año Y" o "semana 1 del año Y+1";
-// se prefiere cualquier resultado en el rango 1-52 antes que caer en una semana 53.
+// Inversa de isoWeekToDate: {y,w} (año ISO + semana ISO). Prefiere un resultado 1-52 antes que la semana 53.
 function dateToWeekYear(d){
   let fallback53 = null;
   for(const y of [d.getUTCFullYear(), d.getUTCFullYear()-1, d.getUTCFullYear()+1]){
     const jan4 = new Date(Date.UTC(y,0,4));
     const jan4DayMon0 = (jan4.getUTCDay()+6)%7;
     const week1Monday = new Date(jan4.getTime() - jan4DayMon0*DAY_MS);
-    const diffWeeks = Math.round((d.getTime()-week1Monday.getTime())/(7*DAY_MS));
+    const diffWeeks = Math.floor((d.getTime()-week1Monday.getTime())/(7*DAY_MS));
     if(diffWeeks>=0 && diffWeeks<52) return { y, w: diffWeeks+1 };
     if(diffWeeks===52 && !fallback53) fallback53 = { y, w: 53 };
   }
@@ -590,10 +506,9 @@ function dateToWeekYear(d){
   const jan4 = new Date(Date.UTC(y,0,4));
   const jan4DayMon0 = (jan4.getUTCDay()+6)%7;
   const week1Monday = new Date(jan4.getTime() - jan4DayMon0*DAY_MS);
-  return { y, w: Math.round((d.getTime()-week1Monday.getTime())/(7*DAY_MS))+1 };
+  return { y, w: Math.floor((d.getTime()-week1Monday.getTime())/(7*DAY_MS))+1 };
 }
 function resolveRowDate(ejercicioRaw, semana){
-  // Acepta dos formatos de "ejercicio": temporada "AA-AA" (semana 1-52 desde julio) o año calendario "AAAA" + semana ISO del año
   const ej = String(ejercicioRaw).trim();
   if(/^\d{2}-\d{2}$/.test(ej)) return weekToDate(ej, semana);
   const year = Math.round(parseFloat(ej));
@@ -625,25 +540,64 @@ function fmtDateHuman(d){
   return d.toLocaleDateString('es-MX', { day:'numeric', month:'long', year:'numeric', timeZone:'UTC' });
 }
 
+// Regla de Rafael: semanas domingo-sábado; la semana que cruza de un mes a otro cuenta para el
+// mes SIGUIENTE. En vez de reimplementarla, se lee de la columna "Mes" de sus hojas.
+const MES_NOMBRE_A_NUM = {
+  enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6, julio:7, agosto:8,
+  septiembre:9, setiembre:9, octubre:10, noviembre:11, diciembre:12
+};
+function mesToMonthKey(mes, date){
+  if(!mes) return null;
+  const norm = String(mes).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  const mesNum = MES_NOMBRE_A_NUM[norm];
+  if(!mesNum) return null;
+  const dateMonth = date.getUTCMonth()+1;
+  let year = date.getUTCFullYear();
+  if(dateMonth - mesNum >= 6) year += 1;
+  else if(mesNum - dateMonth >= 6) year -= 1;
+  return year + '-' + String(mesNum).padStart(2,'0');
+}
+function weekKey(date){ const {y,w} = dateToWeekYear(date); return y+'-'+w; }
+// Mes (AAAA-MM) al que pertenece una semana: 1) el mapa semana→Mes armado con las columnas Mes de
+// Real/Presupuesto/Proyección, 2) la columna Mes de la propia fila, 3) el mes calendario del lunes.
+function monthKeyForWeek(date, mesHint){
+  const k = state.weekMes && state.weekMes[weekKey(date)];
+  if(k) return k;
+  return mesToMonthKey(mesHint, date) || monthKeyFromDate(date);
+}
+
 const NOW = new Date();
 const NOW_UTC = new Date(Date.UTC(NOW.getFullYear(), NOW.getMonth(), NOW.getDate()));
 const CURRENT_SEASON = getSeasonLabel(NOW_UTC);
 const CURRENT_MONTH_KEY = monthKeyFromDate(NOW_UTC);
 const FORECAST_MONTHS = nextMonths(NOW_UTC,3);
+const HORIZON_MK = FORECAST_MONTHS[FORECAST_MONTHS.length-1];
 const SEASON_MONTHS_LIST = seasonMonths(CURRENT_SEASON);
 const CURRENT_WEEK_OF_SEASON = Math.max(1, Math.min(52, Math.floor((NOW_UTC - seasonStartDate(CURRENT_SEASON))/(7*DAY_MS))+1));
+
+function recentHistoricalMonths(n){
+  const idxNow = SEASON_MONTHS_LIST.indexOf(CURRENT_MONTH_KEY);
+  const start = Math.max(0, idxNow-n+1);
+  return SEASON_MONTHS_LIST.slice(start, idxNow+1);
+}
+// Meses que muestran gráficas y tabla: la temporada hasta el mes actual + los 3 de forecast.
+const DISPLAY_MONTHS = recentHistoricalMonths(6).concat(FORECAST_MONTHS);
+const PROJECTION_MONTHS = Array.from(new Set(recentHistoricalMonths(12).concat(FORECAST_MONTHS)));
 
 /* ============================================================
    3. FORMATTERS
    ============================================================ */
 const fmtMXN = v => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(v||0);
-const fmtMXN2 = v => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:2}).format(v||0);
 const fmtKg = v => new Intl.NumberFormat('es-MX',{maximumFractionDigits:0}).format(v||0)+' kg';
 const fmtPct = v => (v>=0?'+':'')+(v||0).toFixed(1)+'%';
-// Para celdas de variación (Real vs Presupuesto): antepone "+" a valores positivos -- los negativos
-// ya traen su propio "-" desde Intl.NumberFormat (fmtMXN/fmtKg), así que no hay que duplicarlo.
-const fmtSigned = (fmt, v) => (v>0?'+':'')+fmt(v);
 const fmtNum = v => new Intl.NumberFormat('es-MX',{maximumFractionDigits:0}).format(v||0);
+// Millones con un decimal: 386,147,702 → "$386.1 M"
+const fmtM = v => {
+  const n = (v||0)/1e6;
+  const s = new Intl.NumberFormat('es-MX',{minimumFractionDigits:1, maximumFractionDigits:1}).format(Math.abs(n));
+  return (n<0 && s!=='0.0' ? '-' : '')+'$'+s+' M';
+};
+const fmtSigned = (fmt, v) => (v>0?'+':'')+fmt(v);
 
 function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 function cropColor(crop){ return cssVar(CROP_COLOR_VAR[crop]); }
@@ -651,12 +605,14 @@ function cropColor(crop){ return cssVar(CROP_COLOR_VAR[crop]); }
 /* ============================================================
    4. STATE
    ============================================================ */
+const OTHER_LABEL = 'OTROS';
 const state = {
-  raw: { egreso:[], ingreso:[], produccion:[] },   // flat arrays of {tipo,cultivo,ejercicio,semana,importe,date}
-  monthly: null,                                    // built index
-  // 'OTROS' (Empaque) se incluye por default: es egreso real que ya viene en la base de datos y
-  // debe contar en el EBITDA/KPIs consolidados salvo que el usuario lo desmarque.
-  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat(['OTROS'])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial', tablaVariable:'ebitda' },
+  raw: { egreso:[], ingreso:[], produccion:[] },   // {tipo,cultivo,ejercicio,semana,importe,date,mes,mk}
+  variacion: {},                                    // cultivo → [{date, rate, mk}] (hoja Variación Egreso)
+  realFromSheet: {},                                // variable → true si el real sale de la hoja Real
+  weekMes: {},                                      // 'AAAA-S' → 'AAAA-MM'
+  monthly: null,
+  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat([OTHER_LABEL])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial', tablaVariable:'egreso', vista:'mensual' },
   scenarios: {
     base:      { ingreso:0, egreso:0, produccion:0, tc:0 },
     optimista: { ingreso:8, egreso:-5, produccion:5, tc:5 },
@@ -685,13 +641,12 @@ function hashStr(str){ let h=0; for(let i=0;i<str.length;i++){ h = (Math.imul(31
 
 function generateDemoRows(){
   const rows = { egreso:[], ingreso:[], produccion:[] };
-  const priorSeasons = [priorSeason(priorSeason(CURRENT_SEASON)), priorSeason(CURRENT_SEASON)]; // 2 temporadas completas anteriores
+  const priorSeasons = [priorSeason(priorSeason(CURRENT_SEASON)), priorSeason(CURRENT_SEASON)];
   CROPS.forEach(crop=>{
     const profile = CROP_PROFILES[crop];
     const rand = seededRandom(hashStr(crop));
     const price = profile.priceUsd!=null ? profile.priceUsd : profile.priceMxn;
     const usesTc = profile.priceUsd!=null;
-
     const seasonSteps = [
       { season: priorSeasons[0], weeks:52, step:0 },
       { season: priorSeasons[1], weeks:52, step:1 },
@@ -710,8 +665,7 @@ function generateDemoRows(){
         rows.produccion.push({ tipo:'real', cultivo:crop, ejercicio:entry.season, semana:week, importe:Math.round(kg), date });
       }
     });
-
-    // Presupuesto y Proyección manual: temporada actual completa (52 semanas)
+    let prevEgresoP = null;
     for(let week=1; week<=52; week++){
       const phase = Math.sin(((week-1)/52)*Math.PI*2 - Math.PI/2)*0.5+0.5;
       const growth = Math.pow(1+profile.growth, 2.4);
@@ -722,13 +676,16 @@ function generateDemoRows(){
       rows.egreso.push({ tipo:'presupuesto', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(egresoB), date });
       rows.ingreso.push({ tipo:'presupuesto', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(ingresoB), date });
       rows.produccion.push({ tipo:'presupuesto', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(kgB), date });
-
       const kgP = kgB*(0.96+rand()*0.07);
       const egresoP = egresoB*(0.99+rand()*0.05);
       const ingresoP = usesTc ? kgP*price*state.tcBase : kgP*price;
       rows.egreso.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(egresoP), date });
       rows.ingreso.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(ingresoP), date });
       rows.produccion.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(kgP), date });
+      // Hoja de variación de ejemplo: % semana contra semana de la proyección de ejemplo
+      const rate = prevEgresoP ? egresoP/prevEgresoP-1 : 0;
+      rows.egreso.push({ tipo:'variacion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:(rate*100).toFixed(2)+'%', date });
+      prevEgresoP = egresoP;
     }
   });
   return rows;
@@ -744,10 +701,9 @@ function rowsToCsv(rows, tipo){
 /* ============================================================
    6. CSV / PASTE PARSING
    ============================================================ */
-const OTHER_LABEL = 'OTROS';
 function normalizeCropName(raw){
   if(raw==null) return null;
-  const s = String(raw).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+  const s = String(raw).normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
   return CROPS.includes(s) ? s : null;
 }
 function parseDelimited(text){
@@ -760,22 +716,19 @@ function looksNumeric(v){
   return Number.isFinite(n) && /\d/.test(String(v));
 }
 function detectLayout(row){
-  // Formato nativo exportado de Google Sheets + columna "Mes" agregada al final (22 sep, a pedido
-  // de Rafael para el método "Variación estacional"): tipo, cultivo, ejercicio, semana, importe, mes.
-  // Se revisa ANTES que el formato nativo sin mes (más abajo) para no perder esa 6ª columna.
+  // tipo, cultivo, ejercicio, semana, importe, mes
   if(row.length>=6 && looksNumeric(row[2]) && looksNumeric(row[3]) && !looksNumeric(row[1]) && !looksNumeric(row[5])){
     return { cultivoIdx:1, ejercicioIdx:2, semanaIdx:3, importeIdx:4, mesIdx:5 };
   }
-  // Formato simple pegado a mano + columna "Mes": cultivo, ejercicio, semana, importe, mes.
-  // Se revisa ANTES que el formato simple sin mes para no perder esa 5ª columna.
+  // cultivo, ejercicio, semana, importe, mes
   if(row.length>=5 && looksNumeric(row[1]) && looksNumeric(row[2]) && !looksNumeric(row[0]) && !looksNumeric(row[4])){
     return { cultivoIdx:0, ejercicioIdx:1, semanaIdx:2, importeIdx:3, mesIdx:4 };
   }
-  // Formato simple pegado a mano: cultivo, ejercicio, semana, importe
+  // cultivo, ejercicio, semana, importe
   if(row.length>=4 && looksNumeric(row[1]) && looksNumeric(row[2]) && !looksNumeric(row[0])){
     return { cultivoIdx:0, ejercicioIdx:1, semanaIdx:2, importeIdx:3 };
   }
-  // Formato nativo exportado de Google Sheets (con columna de tipo al inicio): tipo, cultivo, ejercicio, semana, importe
+  // tipo, cultivo, ejercicio, semana, importe
   if(row.length>=5 && looksNumeric(row[2]) && looksNumeric(row[3]) && !looksNumeric(row[1])){
     return { cultivoIdx:1, ejercicioIdx:2, semanaIdx:3, importeIdx:4 };
   }
@@ -788,28 +741,23 @@ function parseMoney(v){
   if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1,-1); }
   if(/^-/.test(s)) neg = true;
   s = s.replace(/[^0-9.]/g,'');
+  if(s==='') return NaN;
   let n = parseFloat(s);
   if(neg) n = -Math.abs(n);
   return n;
 }
+// % de la hoja Variación Egreso: "1647%" → 16.47 · "-88%" → -0.88 · "0.05" (decimal, p. ej. desde
+// el Apps Script) → 0.05. Celda vacía → NaN (se trata como 0% al encadenar, igual que en Excel).
+function parsePercent(v){
+  if(v==null) return NaN;
+  const s = String(v).trim();
+  if(s==='') return NaN;
+  const n = parseMoney(s);
+  if(!Number.isFinite(n)) return NaN;
+  return s.includes('%') ? n/100 : n;
+}
 function decumulate(records){
-  // Convierte una serie de "importe acumulado" en importe semanal incremental, reiniciando al empezar
-  // cada temporada, y descarta semanas futuras aún no capturadas (el acumulado "cae" cuando todavía no hay dato real).
-  //
-  // OJO: una semana "todavía no capturada" en la hoja llega como $0 (o prácticamente $0) — eso es la
-  // señal real de "no hay dato todavía", y de ahí en adelante se deja de contar esa temporada/cultivo.
-  // Eso es DISTINTO de una corrección: el acumulado puede bajar un poco de una semana a otra por un
-  // ajuste/corrección en la hoja y seguir siendo un importe real y positivo. Antes cualquier caída,
-  // por chica que fuera, se trataba igual que "ya no hay más datos" y mataba TODAS las semanas
-  // siguientes de ese cultivo para el resto de la temporada, aunque la hoja sí siguiera reportando
-  // después con normalidad — eso hacía que el total "Real" mostrado se quedara corto sin avisar.
-  //
-  // TAMBIÉN distinto: un $0 ANTES de que haya arrancado el dato real de la temporada (p.ej. la
-  // primera semana de la temporada, antes de que el cultivo/gasto empiece) no es "se acabaron los
-  // datos" — es "todavía no arranca". Si se tratara igual, un solo $0 inicial truncaría TODA la
-  // temporada desde la primera semana (nunca llega a "started"), aunque las semanas siguientes sí
-  // traigan dato real válido. Por eso la señal de truncar-para-siempre solo aplica DESPUÉS de haber
-  // visto al menos un importe real (started=true) para ese cultivo/temporada.
+  // Convierte "importe acumulado" en importe semanal; ver notas de diseño en la bitácora del proyecto.
   const byCrop = {};
   records.forEach(r=> (byCrop[r.cultivo] = byCrop[r.cultivo]||[]).push(r));
   const out = [];
@@ -820,19 +768,10 @@ function decumulate(records){
       const season = getSeasonLabel(r.date);
       if(season !== prevSeason){ prevVal = 0; prevSeason = season; truncated = false; started = false; }
       if(truncated) return;
-      if(r.importe < 1){
-        if(started) truncated = true; // ya había arrancado -> de aquí en adelante no hay más capturado
-        return; // si no había arrancado, es un $0 previo al inicio real — se ignora sin truncar
-      }
+      if(r.importe < 1){ if(started) truncated = true; return; }
       started = true;
-      if(r.importe < prevVal - 0.5){
-        // Corrección a la baja: se acepta el nuevo acumulado como base (sin registrar un gasto
-        // negativo) y se sigue contando con normalidad de ahí en adelante — no se trunca la temporada.
-        prevVal = r.importe;
-        return;
-      }
-      const incremental = Math.max(0, r.importe - prevVal);
-      out.push(Object.assign({}, r, { importe: incremental }));
+      if(r.importe < prevVal - 0.5){ prevVal = r.importe; return; }
+      out.push(Object.assign({}, r, { importe: Math.max(0, r.importe - prevVal) }));
       prevVal = r.importe;
     });
   });
@@ -847,6 +786,7 @@ function parseSlot(text, tipo){
     if(/acumulad/i.test(rows[0].join(' '))) cumulative = true;
     dataStart = 1;
   }
+  const isVar = tipo==='variacion';
   for(let i=dataStart;i<rows.length;i++){
     const row = rows[i];
     const rownum = i+1;
@@ -855,20 +795,28 @@ function parseSlot(text, tipo){
     const cultivoRaw = row[layout.cultivoIdx];
     const ejercicioRaw = row[layout.ejercicioIdx];
     const semana = parseInt(row[layout.semanaIdx],10);
-    const importe = parseMoney(row[layout.importeIdx]);
-    // Columna "Mes" opcional (22 sep, a pedido de Rafael): el nombre del mes que él le asigna a esa
-    // semana según su propia regla (semanas domingo-sábado, con la semana de traslape asignada al
-    // mes siguiente) — solo la usa el método "Variación estacional" (ver estacionalMonthKeyFor).
+    const rawImporte = row[layout.importeIdx];
     const mes = layout.mesIdx!=null ? String(row[layout.mesIdx]||'').trim() || null : null;
     const date = resolveRowDate(ejercicioRaw, semana);
     if(!date){ errors.push(`Fila ${rownum}: ejercicio/semana inválido ("${ejercicioRaw}" / "${row[layout.semanaIdx]}")`); continue; }
-    if(!Number.isFinite(importe)){ errors.push(`Fila ${rownum}: importe inválido ("${row[layout.importeIdx]}")`); continue; }
+    let importe;
+    if(isVar){
+      importe = parsePercent(rawImporte);
+      if(!Number.isFinite(importe)){
+        if(rawImporte==null || String(rawImporte).trim()==='') continue; // % vacío = sin variación capturada
+        errors.push(`Fila ${rownum}: % de variación inválido ("${rawImporte}")`); continue;
+      }
+    } else {
+      if(rawImporte==null || String(rawImporte).trim()==='') continue; // semana todavía sin capturar
+      importe = parseMoney(rawImporte);
+      if(!Number.isFinite(importe)){ errors.push(`Fila ${rownum}: importe inválido ("${rawImporte==null?'':rawImporte}")`); continue; }
+    }
     let cultivo = normalizeCropName(cultivoRaw);
     if(!cultivo){
       const cleaned = String(cultivoRaw||'').trim();
       if(!cleaned){ errors.push(`Fila ${rownum}: cultivo vacío`); continue; }
       cultivo = OTHER_LABEL;
-      notes.push(`Fila ${rownum}: "${cleaned}" no es uno de los 7 cultivos — se agrupó como Otros/Overhead (queda fuera del EBITDA por cultivo).`);
+      notes.push(`Fila ${rownum}: "${cleaned}" no es uno de los 7 cultivos — se agrupó como Empaque/Otros.`);
     }
     records.push({ tipo, cultivo, ejercicio:String(ejercicioRaw).trim(), semana, importe, date, mes });
   }
@@ -885,22 +833,19 @@ function buildMonthlyIndex(){
     idx[v] = {};
     TIPOS.forEach(t=>{ idx[v][t] = {}; CROPS.concat([OTHER_LABEL]).forEach(c=> idx[v][t][c] = {}); });
     state.raw[v].forEach(r=>{
-      const mk = monthKeyFromDate(r.date);
       const bucket = idx[v][r.tipo] && idx[v][r.tipo][r.cultivo];
       if(!bucket) return;
-      bucket[mk] = (bucket[mk]||0) + r.importe;
+      bucket[r.mk] = (bucket[r.mk]||0) + r.importe;
     });
   });
   return idx;
 }
 
+// Semanas reales (ya transcurridas y con importe distinto de 0) de un cultivo, en orden.
 function realWeeklyFor(variable, crop){
-  return state.raw[variable].filter(r=>r.tipo==='real' && r.cultivo===crop).sort((a,b)=>a.date-b.date);
+  return state.raw[variable].filter(r=>r.tipo==='real' && r.cultivo===crop && r.date<=NOW_UTC).sort((a,b)=>a.date-b.date);
 }
 
-// Resuelve un sistema lineal 3x3 A·x=B por regla de Cramer. Devuelve null si A es (casi)
-// singular — típico cuando hay menos de 3 semanas con fechas distintas — para que el
-// llamador pueda caer de vuelta al promedio en vez de dividir entre ~0.
 function solve3x3(A, B){
   const det3 = m => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])
                    - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])
@@ -911,158 +856,14 @@ function solve3x3(A, B){
   return [det3(withCol(A,0,B))/D, det3(withCol(A,1,B))/D, det3(withCol(A,2,B))/D];
 }
 
-// Calcula, para un cultivo/variable dado, la tasa de variación semana-a-semana de la temporada
-// anterior (misma mecánica que el bloque "Var. T2526" del Excel, pero derivada en vivo de los
-// datos Real cargados en vez de un valor fijo): para cada semana de la temporada previa, la
-// variación % contra la semana anterior se guarda bajo la clave año-semana ISO que le
-// correspondería 52 semanas después (es decir, la semana equivalente de la temporada actual).
-// Devuelve null si no hay al menos dos temporadas con suficiente historia real, para que el
-// llamador pueda caer de vuelta a VARIACION_SEASONAL_RATES_DEFAULT.
-function computeSeasonalRatesFromHistory(variable, crop){
-  const all = state.raw[variable].filter(r=>r.tipo==='real' && r.cultivo===crop).sort((a,b)=>a.date-b.date);
-  if(all.length<10) return null;
-  const bySeason = {};
-  all.forEach(r=>{ const s=getSeasonLabel(r.date); (bySeason[s]=bySeason[s]||[]).push(r); });
-  const seasons = Object.keys(bySeason).sort();
-  if(seasons.length<2) return null;
-  // Bug corregido (21 sep): una sola fila que cae justo en el primer día de la temporada siguiente
-  // (p.ej. la última fila de la hoja, si su fecha coincide exacto con el inicio de temporada) hacía
-  // que "seasons.length" contara 2 aunque la temporada "actual" fuera en realidad solo esa fila
-  // suelta, no una temporada real — eso disparaba el cálculo en vivo con tasas etiquetadas para
-  // semanas de la temporada SIGUIENTE (que nunca se van a buscar), dejando el carry-forward sin
-  // ninguna tasa válida para los meses que sí importan (el forecast se congelaba en el mismo valor
-  // semana tras semana). Ahora también se exige que la temporada "actual" tenga un mínimo de filas
-  // reales antes de confiar en que hay 2 temporadas de verdad.
-  const currentRows = bySeason[seasons[seasons.length-1]];
-  if(currentRows.length<5) return null;
-  const priorRows = bySeason[seasons[seasons.length-2]].sort((a,b)=>a.date-b.date);
-  if(priorRows.length<10) return null;
-  const rates = {};
-  for(let i=1;i<priorRows.length;i++){
-    const prev = priorRows[i-1].importe, cur = priorRows[i].importe;
-    if(prev>0){
-      const shifted = new Date(priorRows[i].date.getTime() + 52*7*DAY_MS);
-      const {y,w} = dateToWeekYear(shifted);
-      rates[y+'-'+w] = (cur/prev)-1;
-    }
-  }
-  return Object.keys(rates).length ? rates : null;
-}
-
-// Tasas de variación semana a semana calculadas directamente de la curva de Presupuesto (PPTO) de
-// la temporada en curso, pedidas por Rafael (21 sep) como alternativa a computeSeasonalRatesFromHistory:
-// esa función necesita 2 temporadas completas de datos Real para comparar año contra año, algo que
-// hoy no existe ni en la hoja Real ni en la hoja Proyección (ambas solo cubren la temporada 26-27).
-// Presupuesto, en cambio, ya trae un importe para CADA semana de toda la temporada -- pasada y
-// futura -- así que no necesita una segunda temporada: la tasa de la semana N es simplemente
-// Presupuesto(semana N) / Presupuesto(semana N-1) - 1, tomada tal cual la curva que el propio
-// equipo ya presupuestó. Devuelve null si no hay al menos ~10 semanas de Presupuesto para ese
-// cultivo/variable, para que el llamador caiga al siguiente respaldo disponible.
-function computeSeasonalRatesFromBudget(variable, crop){
-  const rows = state.raw[variable].filter(r=>r.tipo==='presupuesto' && r.cultivo===crop).sort((a,b)=>a.date-b.date);
-  if(rows.length<10) return null;
-  const rates = {};
-  for(let i=1;i<rows.length;i++){
-    const prev = rows[i-1].importe, cur = rows[i].importe;
-    if(prev>0){
-      const {y,w} = dateToWeekYear(rows[i].date);
-      rates[y+'-'+w] = (cur/prev)-1;
-    }
-  }
-  return Object.keys(rates).length ? rates : null;
-}
-
-// Método "Variación estacional (método Excel)": reproduce la fórmula real que Rafael usa en su
-// Excel para proyectar (hoja "Egresos T2627 Sem"): cada semana proyectada = semana anterior ×
-// (1 + variación % que tuvo esa misma semana calendario en la temporada pasada). Es un
-// carry-forward semana a semana (no una regresión), así que se arma como un closure con cursor
-// que avanza de una semana en una semana y cachea lo ya calculado, para que llamadas repetidas del
-// modelo (una por cada semana de forecast) sean baratas y consistentes entre sí.
-function buildSeasonalCarryforwardModel(sortedRecords, crop, variable){
-  // Rediseño (18 sep, 2ª iteración del día): Rafael confirmó que anclar este método en la hoja
-  // "Proyección" de su base de datos no reproduce su cálculo aparte (~$257M en octubre contra
-  // ~$226M que daba esa vía) — esa hoja, aunque trae un número ya calculado, no está siguiendo la
-  // MISMA fórmula de variación estacional que su Excel de control (hoja "Egresos T2627 Sem"), así
-  // que usarla como fuente de verdad para ESTE método metía un descuadre en vez de resolverlo.
-  // Por eso se vuelve a construir el método ÚNICAMENTE a partir de las hojas "de base" del forecast
-  // (el Real semana a semana, y el historial de 2+ temporadas de Real cuando existe) en vez de leer
-  // un número ya proyectado por otra hoja — replicando bit a bit la fórmula real de su Excel:
-  //   proyección_semana = SI(real_semana=0, proyección_semana_anterior × (1 + variación % que tuvo
-  //   esa misma semana calendario en la temporada pasada), real_semana)
-  // Es decir: se ancla en la última semana con Real > 0 (ignorando el $0 de relleno de la semana en
-  // curso todavía sin capturar) y se arrastra hacia adelante semana a semana aplicando la tasa de
-  // esa semana calendario — la tasa se calcula en vivo si hay 2+ temporadas de Real disponibles
-  // (computeSeasonalRatesFromHistory) y, si no, se usa VARIACION_SEASONAL_RATES_DEFAULT, que son las
-  // 52 tasas ya extraídas directamente del Excel real de Rafael (T26-27, con el cruce
-  // Frambuesa/Zarzamora/Aguacate corregido) — la MISMA tasa que usa su cálculo aparte, así que este
-  // método debería acercarse a esa cifra de referencia en vez de a la de la hoja Proyección.
-  let anchorIdx = -1;
-  for(let i=sortedRecords.length-1;i>=0;i--){
-    if(sortedRecords[i].importe>0){ anchorIdx = i; break; }
-  }
-  if(anchorIdx===-1) return ()=>0;
-  const anchorTime = sortedRecords[anchorIdx].date.getTime();
-  const anchorValue = sortedRecords[anchorIdx].importe;
-
-  // Orden de prioridad de las tasas (corregido 22 sep, instrucción explícita de Rafael: "los datos
-  // que se ocupen para ese método no se sacarán de otro lado más que de la base de datos de
-  // forecast... ppto egreso y proyección egreso"). Ya NO se usa `VARIACION_SEASONAL_RATES_DEFAULT`
-  // (la tabla fija extraída de un Excel de control aparte, fuera de las 9 casillas de la pestaña
-  // Datos) — aunque esa tabla reproducía fielmente el "método aparte" de Rafael, viene de un
-  // archivo distinto al que se pega en el forecast, así que deja de ser una fuente válida. Las
-  // únicas dos fuentes de tasa permitidas ahora, ambas alimentadas por las hojas que sí se pegan en
-  // la pestaña Datos: 1) en vivo desde 2 temporadas reales (`computeSeasonalRatesFromHistory`, lee
-  // `tipo==='real'`, que sale de Proyección Egreso reclasificada) — la más fiel, hoy casi nunca
-  // disponible porque solo hay una temporada cargada; 2) desde la curva de Presupuesto de la
-  // temporada en curso (`computeSeasonalRatesFromBudget`, lee `tipo==='presupuesto'` = PPTO Egreso)
-  // — hoy es, en la práctica, la que se usa casi siempre. Si ninguna de las dos está disponible, el
-  // carry-forward no tiene con qué crecer y simplemente arrastra el último valor conocido sin
-  // cambio (no se inventa una tasa de ningún lado externo).
-  const liveRates = computeSeasonalRatesFromHistory(variable, crop);
-  const budgetRates = computeSeasonalRatesFromBudget(variable, crop);
-  const cropRates = liveRates || budgetRates || null;
-  const cache = {};
-
-  return d => {
-    const target = d.getTime();
-    if(target<=anchorTime) return anchorValue;
-    if(cache[target]!=null) return cache[target];
-    let cursorTime = anchorTime;
-    let cursorValue = anchorValue;
-    while(cursorTime < target){
-      const nextTime = cursorTime + 7*DAY_MS;
-      if(cache[nextTime]!=null){
-        cursorValue = cache[nextTime];
-      } else {
-        const {y,w} = dateToWeekYear(new Date(nextTime));
-        const rate = cropRates ? cropRates[y+'-'+w] : undefined;
-        cursorValue = (rate!=null) ? Math.max(0, cursorValue*(1+rate)) : cursorValue;
-        cache[nextTime] = cursorValue;
-      }
-      cursorTime = nextTime;
-    }
-    cache[target] = cursorValue;
-    return cursorValue;
-  };
-}
-
-function computeMethodModel(sortedRecords, method, crop, variable){
+// Modelos estadísticos (polinomial / móvil / promedio) ajustados sobre las semanas reales.
+function computeMethodModel(sortedRecords, method){
   if(!sortedRecords.length) return ()=>0;
   const t0 = sortedRecords[0].date.getTime();
   const toX = d => (d.getTime()-t0)/(7*DAY_MS);
   if(method==='polinomial'){
-    // Regresión polinomial de grado 2 (cuadrática): importe ≈ a + b·x + c·x², ajustada por
-    // mínimos cuadrados sobre las semanas reales (x = semanas desde el inicio de la serie).
-    // A diferencia de una recta, esta curva SÍ puede capturar aceleración/desaceleración
-    // dentro de los datos reales (útil para ver si el ritmo de gasto/ingreso se está
-    // acelerando o frenando). El problema de usar la parábola tal cual para PROYECTAR es que
-    // el término cuadrático crece sin freno mientras más te alejas — puede disparar o
-    // colapsar el pronóstico en solo un par de semanas. Por eso, para extrapolar, no se sigue
-    // dibujando la parábola: se toma el valor y la pendiente que la curva tiene justo en la
-    // última semana con dato real, y esa pendiente se va "amortiguando" semana a semana
-    // (tendencia amortiguada / damped trend, técnica estándar de pronóstico) en vez de
-    // acumularse para siempre — así el pronóstico converge a un nivel estable en vez de
-    // explotar, pero sigue reflejando si la tendencia reciente era al alza o a la baja.
+    // Regresión cuadrática por mínimos cuadrados; para extrapolar se usa el valor y la pendiente de la
+    // curva en la última semana real con tendencia amortiguada (PHI), para que no se dispare.
     const n = sortedRecords.length;
     const avg = sortedRecords.reduce((a,r)=>a+r.importe,0)/n;
     let sx=0,sx2=0,sx3=0,sx4=0,sy=0,sxy=0,sx2y=0;
@@ -1071,29 +872,18 @@ function computeMethodModel(sortedRecords, method, crop, variable){
       sx+=x; sx2+=x2; sx3+=x2*x; sx4+=x2*x2;
       sy+=y; sxy+=x*y; sx2y+=x2*y;
     });
-    const coef = solve3x3(
-      [[n,sx,sx2],[sx,sx2,sx3],[sx2,sx3,sx4]],
-      [sy,sxy,sx2y]
-    );
+    const coef = solve3x3([[n,sx,sx2],[sx,sx2,sx3],[sx2,sx3,sx4]], [sy,sxy,sx2y]);
     if(!coef) return ()=>avg;
     const [a,b,c] = coef;
     const lastX = toX(sortedRecords[n-1].date);
-    const yLast = Math.max(0, a + b*lastX + c*lastX*lastX); // valor de la curva en la última semana real
-    const slopeLast = b + 2*c*lastX; // pendiente (tendencia) de la curva en ese punto
-    const PHI = 0.85; // factor de amortiguamiento semanal de la tendencia (0-1; más chico = frena más rápido)
+    const yLast = Math.max(0, a + b*lastX + c*lastX*lastX);
+    const slopeLast = b + 2*c*lastX;
+    const PHI = 0.85;
     const maxHist = Math.max(avg, ...sortedRecords.map(r=>r.importe));
-    const cap = maxHist*2; // techo duro de seguridad adicional
-    // Con pocas semanas de historia (inicio de temporada) el ajuste cuadrático puede ser
-    // inestable; se atenúa el peso de la curva cuando hay poca información (n chico),
-    // mezclando con el promedio histórico — a partir de ~12 semanas de datos la proyección
-    // es prácticamente la tendencia amortiguada pura.
+    const cap = maxHist*2;
     const trendWeight = Math.min(1, Math.max(0, (n-3)/9));
     return d => {
-      const x = toX(d);
-      const h = Math.max(0, x - lastX); // semanas hacia adelante desde la última semana real
-      // Suma geométrica amortiguada de la pendiente: cada semana adicional pesa PHI veces
-      // menos que la anterior, así que el efecto de la tendencia se va aplanando en vez de
-      // acumularse sin límite (converge a slopeLast·PHI/(1-PHI) en vez de crecer para siempre).
+      const h = Math.max(0, toX(d) - lastX);
       const dampedSum = PHI*(1-Math.pow(PHI,h))/(1-PHI);
       const raw = Math.min(cap, Math.max(0, yLast + slopeLast*dampedSum));
       return Math.max(0, trendWeight*raw + (1-trendWeight)*avg);
@@ -1104,173 +894,98 @@ function computeMethodModel(sortedRecords, method, crop, variable){
     const avg = lastN.reduce((a,r)=>a+r.importe,0)/lastN.length;
     return ()=>avg;
   }
-  if(method==='estacional'){
-    return buildSeasonalCarryforwardModel(sortedRecords, crop, variable);
-  }
   const avg = sortedRecords.reduce((a,r)=>a+r.importe,0)/sortedRecords.length;
   return ()=>avg;
 }
 
-// Meses que el motor de proyección puede llegar a necesitar: toda la temporada en curso (hasta el
-// mes actual) + los 3 meses de forecast. Antes solo se calculaba para FORECAST_MONTHS (los meses
-// que empiezan DESPUÉS del mes actual), así que un mes ya en curso pero sin datos "Real" capturados
-// todavía (p.ej. septiembre recién arrancando) caía en un hueco: no era "Real" (no hay filas) ni
-// era "forecast" (no es uno de los FORECAST_MONTHS) — y se mostraba como $0 en vez de calcularse.
-// Con PROJECTION_MONTHS el modelo cubre también esos meses en curso.
-const PROJECTION_MONTHS = Array.from(new Set(recentHistoricalMonths(12).concat(FORECAST_MONTHS)));
+// ---------- Semanas proyectadas (escenario Base) por [variable, cultivo, método] ----------
+// Devuelve [{date, mk, v}] solo para las semanas POSTERIORES a la última semana real del cultivo,
+// hasta el último mes del horizonte de forecast. Todo se calcula a nivel [semana, cultivo]; la suma
+// entre cultivos y la agrupación por Mes se hacen después (monthlyParts).
+const projCache = {};
+function clearForecastCache(){ Object.keys(projCache).forEach(k=>delete projCache[k]); }
 
-function monthHasReal(variable, crops, mk){
-  // Ojo: algunas hojas "Real" (p.ej. Egreso/Producción ya sin acumular) vienen con TODAS las
-  // semanas de la temporada precargadas, incluidas las que todavía no ocurren, en $0 como relleno.
-  // Si se contara cualquier fila como "ya hay dato real", un mes futuro con puras filas de $0
-  // se mostraría como Real=$0 en vez de proyectarse — el mismo bug de septiembre, mismo síntoma,
-  // pero por otra causa. Por eso solo cuentan las filas cuya fecha (derivada de ejercicio+semana)
-  // ya pasó — igual que se filtra al ajustar el modelo de proyección — sin importar si su importe
-  // es $0 o no (una semana ya transcurrida con gasto real de $0 sí debe contar como Real).
-  return state.raw[variable].some(r=> r.tipo==='real' && crops.includes(r.cultivo) && r.date<=NOW_UTC && monthKeyFromDate(r.date)===mk);
+// Diagnóstico por cultivo del método estacional (para el aviso bajo "Método de proyección").
+function estacionalSourceFor(variable, crop){
+  if(variable==='egreso' && state.variacion[crop] && state.variacion[crop].length) return 'variacion';
+  return 'proyeccion';
 }
 
-const baseForecastCache = {};
-function baseForecastFor(variable, crop, method){
+function projectedWeeks(variable, crop, method){
   const key = variable+'|'+crop+'|'+method;
-  if(baseForecastCache[key]) return baseForecastCache[key];
-  // Algunas hojas traen semanas futuras precargadas en $0 (todavía no ocurren) que, tras
-  // decumular, pueden colarse como filas "reales" con fecha muy adelantada. Se descartan las
-  // filas con fecha posterior a hoy antes de ajustar el modelo y de anclar dónde arranca la
-  // proyección — si no, el ajuste se distorsiona y la proyección puede arrancar después de
-  // esas filas fantasma y quedarse en $0.
-  const series = realWeeklyFor(variable, crop).filter(r=> r.date <= NOW_UTC);
-  const out = Object.fromEntries(PROJECTION_MONTHS.map(m=>[m,0]));
-  if(series.length){
-    const model = computeMethodModel(series, method, crop, variable);
-    // Decisión de Rafael (22 sep, revertido en la misma fecha): los 4 métodos de proyección
-    // (polinomial/móvil/promedio/estacional) SIGUEN funcionando y calculando las semanas futuras.
-    // Prioridad por semana futura: 1) si el equipo YA dejó su propio número en la hoja Proyección
-    // (importe>0), se usa ese valor tal cual; 2) si Proyección todavía no la tiene, se calcula con
-    // el método seleccionado. (Se probó brevemente una variante que usaba Presupuesto en vez del
-    // método para las semanas sin Proyección — Rafael pidió mantener los métodos activos, así que
-    // se revirtió a este comportamiento.)
-    const teamProy = {};
-    state.raw[variable].forEach(r=>{
-      if(r.tipo==='proyeccion' && r.cultivo===crop && r.importe>0) teamProy[r.date.getTime()] = r.importe;
-    });
-    const lastDate = series[series.length-1].date;
-    const horizonEnd = monthEndDate(FORECAST_MONTHS[FORECAST_MONTHS.length-1]);
-    let cursor = new Date(lastDate.getTime()+7*DAY_MS);
-    while(cursor<=horizonEnd){
-      const mk = monthKeyFromDate(cursor);
-      if(mk in out){
-        const known = teamProy[cursor.getTime()];
-        out[mk] += known!=null ? known : Math.max(0, model(cursor));
+  if(projCache[key]) return projCache[key];
+  const series = realWeeklyFor(variable, crop);
+  const anchor = series.length ? series[series.length-1] : null;
+  const out = [];
+
+  if(method==='estacional'){
+    if(estacionalSourceFor(variable, crop)==='variacion'){
+      // Método "Variación estacional" (Egreso): encadenado semana a semana desde la última semana
+      // real:  Egreso_t = Egreso_{t-1} × (1 + %Variación_t)   — el % sale de la hoja Variación Egreso.
+      if(anchor){
+        let v = anchor.importe;
+        state.variacion[crop].forEach(r=>{
+          if(r.date<=anchor.date || r.mk>HORIZON_MK) return;
+          v = v*(1+r.rate);
+          out.push({ date:r.date, mk:r.mk, v });
+        });
       }
-      cursor = new Date(cursor.getTime()+7*DAY_MS);
+    } else {
+      // Sin hoja de variación para esta variable/cultivo (Ingreso, Producción, o Egreso aún sin
+      // cargar): se toman tal cual los importes de la hoja Proyección para las semanas por venir.
+      const from = anchor ? anchor.date : NOW_UTC;
+      state.raw[variable].forEach(r=>{
+        if((r.origTipo||r.tipo)!=='proyeccion' || r.cultivo!==crop) return;
+        if(r.date<=from || r.mk>HORIZON_MK) return;
+        out.push({ date:r.date, mk:r.mk, v:r.importe });
+      });
+      out.sort((a,b)=>a.date-b.date);
+    }
+  } else if(anchor){
+    const model = computeMethodModel(series, method);
+    const stop = monthEndDate(HORIZON_MK).getTime() + 7*DAY_MS;
+    for(let t = anchor.date.getTime()+7*DAY_MS; t<=stop; t+=7*DAY_MS){
+      const d = new Date(t);
+      const mk = monthKeyForWeek(d, null);
+      if(mk>HORIZON_MK) break;
+      out.push({ date:d, mk, v: Math.max(0, model(d)) });
     }
   }
-  baseForecastCache[key] = out;
+  projCache[key] = out;
   return out;
 }
-function clearForecastCache(){ Object.keys(baseForecastCache).forEach(k=>delete baseForecastCache[k]); }
 
-// Método "Variación estacional (método Excel)" — instrucción explícita de Rafael (22 sep): "los
-// datos que se ocupen para ese método no se sacarán de otro lado más que de la base de datos de
-// forecast... ppto egreso y proyección egreso". Además, Rafael aclaró que agrupa las semanas en
-// meses con SU PROPIA regla (semanas de domingo a sábado; la semana que cae a caballo entre dos
-// meses se le asigna al mes SIGUIENTE) — regla que no coincide con el mes calendario que usa el
-// resto de la herramienta (`monthKeyFromDate`, que trabaja con el lunes de cada semana ISO). Para no
-// reimplementar esa regla a ciegas, Rafael agregó una columna "Mes" a la hoja Proyección Egreso con
-// el nombre del mes que le corresponde a cada fila — este método la lee directo de ahí.
-// Con esto, "Variación estacional" deja de ser un método de PROYECCIÓN en el sentido de los otros 3
-// (polinomial/móvil/promedio, que sí calculan con `computeMethodModel`/`baseForecastFor`): ya NO
-// ancla en la última semana real ni arrastra con ninguna tasa — simplemente suma lo que ya existe en
-// Proyección Egreso (semanas pasadas, re-etiquetadas tipo:'real', y semanas futuras que el equipo ya
-// capturó, tipo:'proyeccion'), agrupado por esa columna "Mes". Presupuesto NUNCA es fuente para este
-// método. Un mes sin ninguna fila en Proyección Egreso (como diciembre, mientras no se capture) da
-// $0 — nunca se completa con ningún cálculo.
-const MES_NOMBRE_A_NUM = {
-  enero:1, febrero:2, marzo:3, abril:4, mayo:5, junio:6, julio:7, agosto:8,
-  septiembre:9, setiembre:9, octubre:10, noviembre:11, diciembre:12
-};
-function estacionalMonthKeyFor(record){
-  if(!record.mes) return monthKeyFromDate(record.date);
-  const norm = String(record.mes).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
-  const mesNum = MES_NOMBRE_A_NUM[norm];
-  if(!mesNum) return monthKeyFromDate(record.date);
-  const dateMonth = record.date.getUTCMonth()+1;
-  let year = record.date.getUTCFullYear();
-  // La columna "Mes" de Rafael puede correr un mes adelante o atrás de la fecha calculada (p.ej. una
-  // semana de finales de diciembre que él etiqueta "Enero") — se ajusta el año para esos casos de
-  // frontera, nunca el mes.
-  if(dateMonth - mesNum >= 6) year += 1;
-  else if(mesNum - dateMonth >= 6) year -= 1;
-  return year + '-' + String(mesNum).padStart(2,'0');
-}
-function estacionalDirectMonthly(variable, crop, monthsList){
-  const out = Object.fromEntries(monthsList.map(m=>[m,0]));
-  state.raw[variable].forEach(r=>{
-    if(r.tipo==='presupuesto' || r.cultivo!==crop) return;
-    const mk = estacionalMonthKeyFor(r);
-    if(mk in out) out[mk] += r.importe;
-  });
-  return out;
-}
-function estacionalScenarioFor(variable, crop, scenario, monthsList){
-  const base = estacionalDirectMonthly(variable, crop, monthsList);
+function scenarioFactor(variable, crop, scenario){
   const s = state.scenarios[scenario];
-  const out = {};
-  monthsList.forEach(mk=>{
-    let v = base[mk];
-    // El % de escenario (Base/Optimista/Pesimista) solo se aplica a los meses del horizonte de
-    // forecast -- los meses ya transcurridos siguen siendo el dato tal cual, sin ningún ajuste.
-    if(s && FORECAST_MONTHS.includes(mk)){
-      if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
-      else if(variable==='egreso'){ v *= (1+s.egreso/100); }
-      else if(variable==='produccion'){ v *= (1+s.produccion/100); }
-    }
-    out[mk] = v;
-  });
-  return out;
+  if(!s) return 1;
+  if(variable==='ingreso') return (1+s.ingreso/100) * (CROPS_WITH_TC.has(crop) ? (1+s.tc/100) : 1);
+  if(variable==='egreso') return 1+s.egreso/100;
+  if(variable==='produccion') return 1+s.produccion/100;
+  return 1;
 }
-function estacionalConsolidated(variable, scenario, crops, monthsList){
-  monthsList = monthsList || FORECAST_MONTHS;
-  const out = Object.fromEntries(monthsList.map(m=>[m,0]));
+
+// Núcleo: por mes, lo real (semanas ya capturadas), lo proyectado (semanas posteriores a la última
+// real, con el % del escenario) y el total estimado del mes (real + proyectado).
+function monthlyParts(variable, crops, method, scenario, months){
+  const real = {}, proj = {}, full = {}, hasReal = {};
+  months.forEach(mk=>{ real[mk]=0; proj[mk]=0; hasReal[mk]=false; });
   crops.forEach(c=>{
-    const f = estacionalScenarioFor(variable, c, scenario, monthsList);
-    monthsList.forEach(mk=> out[mk]+=(f[mk]||0));
+    months.forEach(mk=>{
+      const bucket = state.monthly[variable].real[c];
+      if(bucket && mk in bucket){ real[mk] += bucket[mk]; hasReal[mk] = true; }
+    });
+    const f = scenarioFactor(variable, c, scenario);
+    projectedWeeks(variable, c, method).forEach(p=>{ if(p.mk in proj) proj[p.mk] += p.v*f; });
   });
-  return out;
+  months.forEach(mk=> full[mk] = real[mk] + proj[mk]);
+  return { real, proj, full, hasReal };
 }
 
 function scenarioForecastFor(variable, crop, method, scenario){
-  // "Variación estacional" no calcula nada: se desvía aquí también (además de en
-  // scenarioForecastConsolidated) para que el desglose por cultivo (pestaña Comparativo:
-  // "Comparación de los siete cultivos" y "Participación de cada cultivo") use la misma
-  // fuente directa de Proyección Egreso agrupada por la columna Mes, en vez del modelo viejo
-  // de baseForecastFor/computeMethodModel.
-  if(method==='estacional') return estacionalScenarioFor(variable, crop, scenario, PROJECTION_MONTHS);
-  const base = baseForecastFor(variable, crop, method);
-  const s = state.scenarios[scenario];
-  const out = {};
-  Object.keys(base).forEach(mk=>{
-    let v = base[mk];
-    if(variable==='ingreso'){ v *= (1+s.ingreso/100); if(CROPS_WITH_TC.has(crop)) v *= (1+s.tc/100); }
-    else if(variable==='egreso'){ v *= (1+s.egreso/100); }
-    else if(variable==='produccion'){ v *= (1+s.produccion/100); }
-    out[mk] = v;
-  });
-  return out;
+  return monthlyParts(variable, [crop], method, scenario, PROJECTION_MONTHS).full;
 }
 function scenarioForecastConsolidated(variable, method, scenario, crops, monthsList){
-  monthsList = monthsList || FORECAST_MONTHS;
-  // "Variación estacional" ya no pasa por baseForecastFor/computeMethodModel (ver
-  // estacionalConsolidated más arriba) -- se desvía aquí para que TODO lo que consuma esta función
-  // (bandas Optimista/Pesimista, EBITDA, la tabla histórica) use la misma fuente directa.
-  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList);
-  const out = Object.fromEntries(monthsList.map(m=>[m,0]));
-  crops.forEach(c=>{
-    const f = scenarioForecastFor(variable, c, method, scenario);
-    monthsList.forEach(mk=> out[mk]+=(f[mk]||0));
-  });
-  return out;
+  return monthlyParts(variable, crops, method, scenario, monthsList || FORECAST_MONTHS).full;
 }
 function ebitdaSet(method, scenario, crops){
   const ingreso = scenarioForecastConsolidated('ingreso', method, scenario, crops);
@@ -1283,67 +998,43 @@ function sum3(obj){ return FORECAST_MONTHS.reduce((a,mk)=>a+(obj[mk]||0),0); }
 function historicalMonthly(variable, tipo, crops, monthsList){
   const out = {};
   monthsList.forEach(mk=>{
-    out[mk] = crops.reduce((s,c)=> s + (state.monthly[variable][tipo][c][mk]||0), 0);
+    out[mk] = crops.reduce((s,c)=> s + ((state.monthly[variable][tipo][c]||{})[mk]||0), 0);
   });
   return out;
 }
-// "Lo que el equipo proyectó" para un mes NO debe cambiar una vez que ese mes ya transcurrió --
-// pedido explícito de Rafael (decimonovena iteración, segunda vuelta): "no quiero que se mueva
-// cuando ya finalice el mes... quiero que aparezca lo que se proyectó". El problema de usar
-// `historicalMonthly(variable,'proyeccion',...)` para esto es que `processAllSlots()` reetiqueta
-// como tipo:'real' cualquier fila de la casilla Proyección cuya fecha ya pasó (para que alimente el
-// resto de la herramienta como dato real) -- filtrar por el `tipo` MUTABLE hace que la suma se vaya
-// encogiendo semana a semana hasta $0 en cuanto el mes entero queda en el pasado. Esta función usa
-// `origTipo` en su lugar: un campo que `processAllSlots()` fija una sola vez al pegar los datos y
-// nunca vuelve a tocar, sin importar cuántas veces se reclasifique `tipo` después. Si una fila no
-// tiene `origTipo` (datos de demostración, que se regeneran de cero en cada carga y no sufren
-// reclasificación), cae de vuelta a `tipo` -- ahí sigue siendo válido usarlo directo.
-function teamProjectedMonthly(variable, crops, monthsList){
-  const out = Object.fromEntries(monthsList.map(m=>[m,0]));
-  state.raw[variable].forEach(r=>{
-    if((r.origTipo||r.tipo)!=='proyeccion' || !crops.includes(r.cultivo)) return;
-    const mk = monthKeyFromDate(r.date);
-    if(mk in out) out[mk] += r.importe;
-  });
+
+function cumulate(obj, months){
+  const out = {}; let acc = 0;
+  months.forEach(mk=>{ acc += (obj[mk]||0); out[mk] = acc; });
   return out;
 }
-function hasTeamProjection(variable){
-  return state.raw[variable].some(r=>(r.origTipo||r.tipo)==='proyeccion');
-}
-// Para el tramo "histórico" de las gráficas/tabla: usa el importe Real capturado cuando el mes ya
-// tiene filas Real; si el mes no tiene ninguna fila Real todavía (el mes en curso casi siempre, a
-// veces el anterior si el Sheet va con retraso), en vez de mostrar $0 se calcula con el mismo
-// método de proyección seleccionado (regresión/promedio/móvil) bajo el escenario activo — así ya
-// "se calcula" en vez de quedar en blanco, y en cuanto llegue el dato Real real de esa hoja lo
-// reemplaza automáticamente.
-function realOrProjectedMonthly(variable, crops, method, scenario, monthsList){
-  // Corrección (22 sep, a pedido de Rafael): antes, un mes con AL MENOS una semana real capturada
-  // se mostraba SOLO con esa suma (`real[mk]`), descartando por completo lo que `baseForecastFor`
-  // ya calculaba para las semanas restantes de ese mismo mes (fueran del método seleccionado o —
-  // desde el cambio de arriba — de la propia hoja Proyección). Eso era exactamente el bug de "mes a
-  // medias" que hacía que septiembre saliera corto: sus semanas ya capturadas se sumaban bien, pero
-  // las que faltaban se perdían en vez de completarse. Ahora se SUMAN las dos partes para cualquier
-  // mes: lo ya real (semanas pasadas) + lo proyectado (semanas futuras, tomado de la hoja Proyección
-  // cuando el equipo ya la tiene, o calculado con el método seleccionado cuando no) — para un mes
-  // totalmente en el pasado (ya no le queda ninguna semana futura) la segunda parte da 0 sola, así
-  // que el resultado no cambia; para un mes totalmente futuro, la primera parte da 0 sola.
-  // "Variación estacional" ya no separa "real" + "parte proyectada": estacionalConsolidated suma
-  // en un solo paso TODO lo que ya existe en Proyección Egreso (pasado y futuro, agrupado por su
-  // columna "Mes") -- sumar `real[mk]` aquí encima lo duplicaría, porque estacionalConsolidated ya
-  // incluye esas mismas semanas pasadas.
-  if(method==='estacional') return estacionalConsolidated(variable, scenario, crops, monthsList);
-  const real = historicalMonthly(variable, 'real', crops, monthsList);
-  const forecastPart = scenarioForecastConsolidated(variable, method, scenario, crops, monthsList);
-  const out = {};
-  monthsList.forEach(mk=>{
-    out[mk] = (real[mk]||0) + (forecastPart[mk]||0);
+
+// Series listas para graficar/tabular para un "kind" (ingreso, egreso, produccion, ebitda, margen),
+// ya con la vista Mensual/Acumulado aplicada. EBITDA y Margen se derivan DESPUÉS de acumular
+// Ingreso y Egreso, así el margen acumulado es EBITDA acumulado / Ingreso acumulado.
+function kindSeries(kind, method, scenario, crops, months, vista){
+  const cum = vista==='acumulado';
+  const base = variable => {
+    const p = monthlyParts(variable, crops, method, scenario, months);
+    const pres = historicalMonthly(variable, 'presupuesto', crops, months);
+    return {
+      real: cum ? cumulate(p.real, months) : p.real,
+      full: cum ? cumulate(p.full, months) : p.full,
+      pres: cum ? cumulate(pres, months) : pres,
+      hasReal: p.hasReal
+    };
+  };
+  if(kind==='ingreso' || kind==='egreso' || kind==='produccion') return base(kind);
+  const I = base('ingreso'), E = base('egreso');
+  const out = { real:{}, full:{}, pres:{}, hasReal:{} };
+  months.forEach(mk=>{
+    out.hasReal[mk] = I.hasReal[mk] || E.hasReal[mk];
+    ['real','full','pres'].forEach(k=>{
+      const eb = (I[k][mk]||0) - (E[k][mk]||0);
+      out[k][mk] = kind==='ebitda' ? eb : ((I[k][mk]||0)>0 ? eb/I[k][mk]*100 : 0);
+    });
   });
   return out;
-}
-function recentHistoricalMonths(n){
-  const idxNow = SEASON_MONTHS_LIST.indexOf(CURRENT_MONTH_KEY);
-  const start = Math.max(0, idxNow-n+1);
-  return SEASON_MONTHS_LIST.slice(start, idxNow+1);
 }
 
 function currentCropsSelection(){
@@ -1364,8 +1055,6 @@ function refreshThemeColors(){
     good: cssVar('--good'), critical: cssVar('--critical'),
     mIngreso: cssVar('--m-ingreso'), mEgreso: cssVar('--m-egreso'), mEbitda: cssVar('--m-ebitda')
   };
-  // Si Chart.js no cargó (CDN bloqueado, sin conexión, etc.) no se debe romper el resto del
-  // tablero — KPIs, tablas y filtros siguen funcionando aunque las gráficas no se puedan dibujar.
   if(typeof Chart!=='undefined' && Chart.defaults){
     Chart.defaults.font.family = "'Public Sans', system-ui, sans-serif";
     Chart.defaults.font.size = 11;
@@ -1395,24 +1084,16 @@ function hexA(hex, alpha){
   if(!hex) return 'rgba(0,0,0,'+alpha+')';
   hex = hex.trim();
   if(hex[0]!=='#') return hex;
-  const n = hex.length===4
-    ? [hex[1]+hex[1], hex[2]+hex[2], hex[3]+hex[3]]
-    : [hex.slice(1,3), hex.slice(3,5), hex.slice(5,7)];
+  const n = hex.length===4 ? [hex[1]+hex[1], hex[2]+hex[2], hex[3]+hex[3]] : [hex.slice(1,3), hex.slice(3,5), hex.slice(5,7)];
   const [r,g,b] = n.map(h=>parseInt(h,16));
   return `rgba(${r},${g},${b},${alpha})`;
 }
-
 const charts = {};
 function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
 
 /* ============================================================
    9. RENDER — FORECAST TAB
    ============================================================ */
-// Arma las <option> de "Consolidado + 7 cultivos + Empaque" -- compartida por el selector del
-// panel de Filtros (#focalCrop) y por el selector nuevo dentro de la tarjeta "Histórico y forecast
-// mensual" (#tableCropSelect, decimoctava iteración), para que agregar/quitar un cultivo (como
-// pasó con Empaque en la decimotercera iteración) nunca requiera acordarse de tocar dos listas de
-// opciones por separado.
 function cropSelectOptionsHTML(consolidadoLabel){
   return `<option value="CONSOLIDADO">🧺 ${consolidadoLabel}</option>` +
     '<optgroup label="Cultivos">' +
@@ -1427,14 +1108,10 @@ function renderKpis(){
   const { ingreso, egreso, ebitda } = ebitdaSet(method, sc, crops);
   const ingresoTotal = sum3(ingreso), egresoTotal = sum3(egreso), ebitdaTotal = sum3(ebitda);
   const margen = ingresoTotal>0 ? (ebitdaTotal/ingresoTotal*100) : 0;
-
-  const presu = historicalMonthly('ingreso','presupuesto', crops, FORECAST_MONTHS);
-  const presuE = historicalMonthly('egreso','presupuesto', crops, FORECAST_MONTHS);
-  const presuIngresoTotal = sum3(presu), presuEgresoTotal = sum3(presuE);
+  const presuIngresoTotal = sum3(historicalMonthly('ingreso','presupuesto', crops, FORECAST_MONTHS));
+  const presuEgresoTotal = sum3(historicalMonthly('egreso','presupuesto', crops, FORECAST_MONTHS));
   const presuEbitdaTotal = presuIngresoTotal - presuEgresoTotal;
-
   const hasIngreso = state.raw.ingreso.length>0;
-  document.getElementById('ingresoWarnBanner').hidden = hasIngreso;
 
   document.getElementById('kpiIngreso').textContent = hasIngreso ? fmtMXN(ingresoTotal) : '—';
   document.getElementById('kpiEgreso').textContent = fmtMXN(egresoTotal);
@@ -1457,45 +1134,47 @@ function renderKpis(){
   document.getElementById('kpiMargenPill').innerHTML = `<span class="pill ${cls}">${label}</span>`;
 }
 
-// Color de la línea "Real + Forecast" según el escenario activo (22 sep, a pedido de Rafael):
-// Base = verde bosque (el acento normal de la herramienta), Optimista = verde más fuerte/saturado
-// (el mismo tono que ya se usaba para las señales "bien"/Optimista en el resto del tablero),
-// Pesimista = rojo (el mismo tono "crítico" que ya se usaba en la banda Pesimista). Así, con solo
-// ver el color de la línea en cualquier gráfica, se sabe en qué escenario está parado el tablero.
 function scenarioLineColor(sc){
   if(sc==='optimista') return CH.good;
   if(sc==='pesimista') return CH.critical;
-  return CH.accent; // base
+  return CH.accent;
 }
 
-function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
+// 3 líneas principales: Presupuesto, Real y Proyección del método seleccionado (+ banda de escenarios).
+// La línea de Proyección arranca en el último mes con real (para que se vea la continuación) y
+// muestra el total estimado del mes: real capturado + semanas proyectadas por el método.
+function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
   destroyChart(canvasId);
   if(!chartsAvailable()){ chartFallback(canvasId); return; }
   const crops = currentCropsSelection();
-  const method = state.filters.metodo, sc = state.filters.escenario;
-  const histMonths = recentHistoricalMonths(6);
-  const allMonths = histMonths.concat(FORECAST_MONTHS);
+  const method = state.filters.metodo, sc = state.filters.escenario, vista = state.filters.vista;
+  const months = DISPLAY_MONTHS;
+  const act = kindSeries(kind, method, sc, crops, months, vista);
+  const opt = kindSeries(kind, method, 'optimista', crops, months, vista);
+  const pes = kindSeries(kind, method, 'pesimista', crops, months, vista);
 
-  const real = valueFn('real', null, histMonths, crops, method);
-  const presupuesto = historicalCombinedForValue(valueFn, crops, allMonths, method);
-  const base = ['base','optimista','pesimista'].reduce((acc,s)=>{ acc[s]=valueFn('scenario', s, FORECAST_MONTHS, crops, method); return acc; },{});
-
-  const central = histMonths.map(mk=>real[mk]).concat(FORECAST_MONTHS.map(mk=>base[sc][mk]));
-  const optimista = allMonths.map(mk=> FORECAST_MONTHS.includes(mk) ? base.optimista[mk] : null);
-  const pesimista = allMonths.map(mk=> FORECAST_MONTHS.includes(mk) ? base.pesimista[mk] : null);
-  const presupuestoArr = allMonths.map(mk=> presupuesto[mk] ?? null);
+  let lastRealIdx = -1;
+  months.forEach((mk,i)=>{ if(act.hasReal[mk]) lastRealIdx = i; });
+  const projStart = Math.max(0, lastRealIdx);
+  const realArr = months.map(mk=> act.hasReal[mk] ? act.real[mk] : null);
+  const projArr = months.map((mk,i)=> i>=projStart ? act.full[mk] : null);
+  const optArr  = months.map((mk,i)=> i>=projStart ? opt.full[mk] : null);
+  const pesArr  = months.map((mk,i)=> i>=projStart ? pes.full[mk] : null);
+  const presArr = months.map(mk=> act.pres[mk]);
   const lineColor = scenarioLineColor(sc);
+  const projLabel = `Proyección · ${METODO_LABEL[method]} (${sc})`;
 
   const ctx = document.getElementById(canvasId).getContext('2d');
   charts[canvasId] = new Chart(ctx, {
     type:'line',
     data:{
-      labels: allMonths.map(monthLabel),
+      labels: months.map(monthLabel),
       datasets:[
-        { label:'Presupuesto', data:presupuestoArr, borderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.25 },
-        { label:'Pesimista', data:pesimista, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.14), pointRadius:0, fill:false, tension:0.25 },
-        { label:'Optimista', data:optimista, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
-        { label: sc[0].toUpperCase()+sc.slice(1)+' (real + forecast)', data: central, borderColor: lineColor, backgroundColor: lineColor, borderWidth:2.5, pointRadius:3, pointBackgroundColor:lineColor, tension:0.25, fill:false }
+        { label:'Presupuesto', data:presArr, borderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.25 },
+        { label:'Pesimista', data:pesArr, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.12), pointRadius:0, fill:false, tension:0.25 },
+        { label:'Optimista', data:optArr, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
+        { label:'Real', data:realArr, borderColor:CH.primary, backgroundColor:CH.primary, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
+        { label:projLabel, data:projArr, borderColor:lineColor, backgroundColor:lineColor, borderWidth:2.5, pointRadius:3, pointBackgroundColor:lineColor, tension:0.25, fill:false }
       ]
     },
     options:{
@@ -1509,211 +1188,25 @@ function renderLineWithBand(canvasId, legendId, valueFn, unitFmt, isPercent){
   });
 
   document.getElementById(legendId).innerHTML = `
-    <span class="sw" style="color:${lineColor}"><span class="line" style="background:${lineColor}"></span>Real + Forecast (${sc})</span>
     <span class="sw" style="color:${CH.muted}"><span class="dashed"></span>Presupuesto</span>
-    <span class="sw" style="color:${CH.good}"><span class="dot" style="background:${hexA(CH.good,0.5)}"></span>Optimista</span>
-    <span class="sw" style="color:${CH.critical}"><span class="dot" style="background:${hexA(CH.critical,0.5)}"></span>Pesimista</span>`;
+    <span class="sw" style="color:${CH.primary}"><span class="line" style="background:${CH.primary}"></span>Real</span>
+    <span class="sw" style="color:${lineColor}"><span class="line" style="background:${lineColor}"></span>${projLabel}</span>
+    <span class="sw" style="color:${CH.good}"><span class="dot" style="background:${hexA(CH.good,0.5)}"></span>Rango Pesimista–Optimista</span>`;
 }
 
-function historicalCombinedForValue(kind, crops, months, method){
-  // Presupuesto reference line spans the whole displayed range (historical + forecast months)
-  if(kind===valueIngreso) return historicalMonthly('ingreso','presupuesto',crops,months);
-  if(kind===valueEgreso) return historicalMonthly('egreso','presupuesto',crops,months);
-  if(kind===valueEbitda){
-    const i = historicalMonthly('ingreso','presupuesto',crops,months);
-    const e = historicalMonthly('egreso','presupuesto',crops,months);
-    const out={}; months.forEach(mk=> out[mk]=(i[mk]||0)-(e[mk]||0)); return out;
-  }
-  if(kind===valueMargen){
-    const i = historicalMonthly('ingreso','presupuesto',crops,months);
-    const e = historicalMonthly('egreso','presupuesto',crops,months);
-    const out={}; months.forEach(mk=> out[mk]= i[mk]>0 ? (i[mk]-e[mk])/i[mk]*100 : 0); return out;
-  }
-  if(kind===valueProduccion) return historicalMonthly('produccion','presupuesto',crops,months);
-  return {};
-}
-
-function valueEbitda(mode, scenario, months, crops, method){
-  if(mode==='real'){
-    const i = valueIngreso('real', scenario, months, crops, method);
-    const e = valueEgreso('real', scenario, months, crops, method);
-    const out={}; months.forEach(mk=> out[mk]=(i[mk]||0)-(e[mk]||0)); return out;
-  }
-  const set = ebitdaSet(method, scenario, crops);
-  return set.ebitda;
-}
-function valueMargen(mode, scenario, months, crops, method){
-  if(mode==='real'){
-    const i = valueIngreso('real', scenario, months, crops, method);
-    const e = valueEgreso('real', scenario, months, crops, method);
-    const out={}; months.forEach(mk=> out[mk] = i[mk]>0 ? (i[mk]-e[mk])/i[mk]*100 : 0); return out;
-  }
-  const set = ebitdaSet(method, scenario, crops);
-  const out={}; months.forEach(mk=> out[mk] = set.ingreso[mk]>0 ? set.ebitda[mk]/set.ingreso[mk]*100 : 0); return out;
-}
-function valueIngreso(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('ingreso', crops, method, scenario||state.filters.escenario, months);
-  return scenarioForecastConsolidated('ingreso', method, scenario, crops, months);
-}
-function valueEgreso(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('egreso', crops, method, scenario||state.filters.escenario, months);
-  return scenarioForecastConsolidated('egreso', method, scenario, crops, months);
-}
-function valueProduccion(mode, scenario, months, crops, method){
-  if(mode==='real') return realOrProjectedMonthly('produccion', crops, method, scenario||state.filters.escenario, months);
-  return scenarioForecastConsolidated('produccion', method, scenario, crops, months);
-}
-
-// Ingreso, Egreso y Producción se dibujan cada una en su propia gráfica, con el mismo estilo
-// (línea real+forecast, Presupuesto punteado, banda Optimista/Pesimista) que EBITDA y Margen —
-// reutilizando exactamente renderLineWithBand, que ya sabe hacer eso para cualquier valueFn.
-
-// Metadatos de cada variable seleccionable en "Histórico y forecast mensual" (decimonovena
-// iteración): qué formatter usar (pesos para Ingreso/Egreso/EBITDA, kg para Producción) y si un
-// Real por ENCIMA del Presupuesto es una buena noticia (Ingreso/Producción/EBITDA) o una mala
-// (Egreso: gastar más de lo presupuestado nunca es favorable) -- eso decide el color de la
-// pastilla de variación.
 const TABLE_VAR_META = {
-  ingreso:    { label:'Ingreso',    domain:'ingreso',    fmt:fmtMXN, favorableWhenAbove:true  },
-  egreso:     { label:'Egreso',     domain:'egreso',     fmt:fmtMXN, favorableWhenAbove:false },
-  produccion: { label:'Producción', domain:'produccion', fmt:fmtKg,  favorableWhenAbove:true  },
-  ebitda:     { label:'EBITDA',     domain:null,         fmt:fmtMXN, favorableWhenAbove:true  }
+  ingreso:    { label:'Ingreso',    fmt:fmtM,  favorableWhenAbove:true  },
+  egreso:     { label:'Egreso',     fmt:fmtM,  favorableWhenAbove:false },
+  produccion: { label:'Producción', fmt:fmtKg, favorableWhenAbove:true  },
+  ebitda:     { label:'EBITDA',     fmt:fmtM,  favorableWhenAbove:true  }
 };
+const TABLE_METHODS = [
+  { key:'polinomial', label:'Regresión polinomial' },
+  { key:'movil',      label:'Promedio móvil' },
+  { key:'estacional', label:'Variación estacional' }
+];
+function hasTipo(variable, tipo){ return state.raw[variable].some(r=>r.tipo===tipo); }
 
-// Arma las 4 series (Real, Presupuesto, Proyección equipo, Forecast del método) para la variable
-// elegida, más las banderas hasReal/hasPres/hasProy (si esa hoja ya se cargó) y un check de "mes
-// todavía estimado". EBITDA es la única variable derivada (Ingreso - Egreso); las otras tres leen
-// directo su propio dominio en state.raw. Centralizar esto aquí evita repetir la lógica de gating
-// (hasIngresoReal, etc.) cuatro veces dentro de renderHistoricoTable().
-function tableVariableSeries(v, crops, method, sc, months){
-  if(v==='ebitda'){
-    const i = realOrProjectedMonthly('ingreso', crops, method, sc, months);
-    const e = realOrProjectedMonthly('egreso', crops, method, sc, months);
-    const pi = historicalMonthly('ingreso','presupuesto',crops,months), pe = historicalMonthly('egreso','presupuesto',crops,months);
-    const yi = teamProjectedMonthly('ingreso',crops,months), ye = teamProjectedMonthly('egreso',crops,months);
-    const fi = scenarioForecastConsolidated('ingreso', method, sc, crops, FORECAST_MONTHS);
-    const fe = scenarioForecastConsolidated('egreso', method, sc, crops, FORECAST_MONTHS);
-    const real={}, presupuesto={}, proyeccion={}, forecast={};
-    months.forEach(mk=>{
-      real[mk] = (i[mk]||0)-(e[mk]||0);
-      presupuesto[mk] = (pi[mk]||0)-(pe[mk]||0);
-      proyeccion[mk] = (yi[mk]||0)-(ye[mk]||0);
-    });
-    FORECAST_MONTHS.forEach(mk=> forecast[mk] = (fi[mk]||0)-(fe[mk]||0));
-    return {
-      real, presupuesto, proyeccion, forecast,
-      // El EBITDA depende de Ingreso Y Egreso a la vez; mientras Ingreso no exista, ningún EBITDA
-      // es representativo -- igual que ya se manejaba antes de esta iteración.
-      hasReal: state.raw.ingreso.some(r=>r.tipo==='real'),
-      hasPres: state.raw.ingreso.some(r=>r.tipo==='presupuesto'),
-      hasProy: hasTeamProjection('ingreso'),
-      estimated: mk => !FORECAST_MONTHS.includes(mk) && (!monthHasReal('ingreso',crops,mk) || !monthHasReal('egreso',crops,mk))
-    };
-  }
-  const domain = TABLE_VAR_META[v].domain;
-  return {
-    real: realOrProjectedMonthly(domain, crops, method, sc, months),
-    presupuesto: historicalMonthly(domain,'presupuesto',crops,months),
-    proyeccion: teamProjectedMonthly(domain, crops, months),
-    forecast: scenarioForecastConsolidated(domain, method, sc, crops, FORECAST_MONTHS),
-    hasReal: state.raw[domain].some(r=>r.tipo==='real'),
-    hasPres: state.raw[domain].some(r=>r.tipo==='presupuesto'),
-    hasProy: hasTeamProjection(domain),
-    estimated: mk => !FORECAST_MONTHS.includes(mk) && !monthHasReal(domain,crops,mk)
-  };
-}
-
-function renderHistoricoTable(){
-  const crops = currentCropsSelection();
-  const method = state.filters.metodo, sc = state.filters.escenario;
-  // Selector propio de la tarjeta (decimoctava iteración): deja ver la tabla por cultivo o por
-  // Empaque sin tener que subir al panel de Filtros -- comparte las mismas opciones y el mismo
-  // `state.filters.focalCrop` que "Cultivo enfocado", así que cambiar aquí también mueve los KPIs
-  // y las 5 gráficas de esta pestaña (y viceversa: cambiar "Cultivo enfocado" arriba actualiza este
-  // selector solo, sin acción del usuario, porque se reconstruye en cada render de esta tabla).
-  const tableCropSelect = document.getElementById('tableCropSelect');
-  tableCropSelect.innerHTML = cropSelectOptionsHTML(`Consolidado (${includedCropsOrdered().length} cultivos)`);
-  tableCropSelect.value = state.filters.focalCrop;
-
-  // Selector de variable (decimonovena iteración): Ingreso / Egreso / Producción / EBITDA, cada
-  // uno con su propia columna Real/Presupuesto/Variación/Proyección/Forecast -- en vez de mezclar
-  // las tres primeras variables en columnas fijas de EBITDA como antes. El estado "on" se decide
-  // aquí, en cada render, y no solo en el click -- mismo principio que ya se aplicó al selector de
-  // cultivo gemelo: una sola fuente de verdad (state.filters.tablaVariable) evita que un control
-  // se quede desincronizado.
-  const v = state.filters.tablaVariable;
-  const meta = TABLE_VAR_META[v];
-  document.querySelectorAll('#tableVariableSeg button').forEach(btn=>{
-    btn.classList.toggle('on', btn.dataset.var===v);
-  });
-
-  const months = recentHistoricalMonths(6).concat(FORECAST_MONTHS);
-  const S = tableVariableSeries(v, crops, method, sc, months);
-
-  const thead = document.getElementById('tablaHistorico').querySelector('thead');
-  const tbody = document.getElementById('tablaHistorico').querySelector('tbody');
-  thead.innerHTML = `<tr><th>Mes</th><th>${meta.label} real</th><th>Presupuesto</th><th>Variación vs presupuesto</th><th>Proyección equipo</th><th>Forecast (${sc})</th></tr>`;
-  tbody.innerHTML = '';
-  let anyEstimated = false;
-  // Acumuladores para el renglón de totales de abajo -- solo suman los meses YA transcurridos
-  // (sin pronóstico), que son los únicos "reales" de la tabla; el forecast de los 3 meses futuros
-  // no se acumula ahí porque todavía no sucede.
-  let totReal=0, totPres=0, totProy=0;
-  months.forEach(mk=>{
-    const isForecast = FORECAST_MONTHS.includes(mk);
-    const estimated = !isForecast && S.estimated(mk);
-    if(estimated) anyEstimated = true;
-
-    const realV = (isForecast || !S.hasReal) ? null : (S.real[mk]||0);
-    const presV = S.hasPres ? (S.presupuesto[mk]||0) : null;
-    const proyV = S.hasProy ? (S.proyeccion[mk]||0) : null;
-    const fcV = (isForecast && S.hasReal) ? (S.forecast[mk]||0) : null;
-
-    // Variación Real vs Presupuesto de ESE mes -- solo tiene sentido si el mes ya pasó (no aplica
-    // a los meses de forecast, que todavía no tienen un "real" que comparar) y si ambos datos
-    // existen (si Presupuesto no se ha cargado para esta variable, presV es null).
-    let diff=null, pct=null;
-    if(!isForecast && realV!=null && presV!=null){
-      diff = realV - presV;
-      pct = presV!==0 ? diff/presV*100 : null;
-    }
-
-    if(!isForecast){
-      if(realV!=null) totReal += realV;
-      if(presV!=null) totPres += presV;
-      if(proyV!=null) totProy += proyV;
-    }
-
-    appendHistoricoRow(tbody, mk, isForecast, estimated, realV, presV, proyV, fcV, diff, pct, meta);
-  });
-
-  // Renglón de totales: la suma de lo que ya es real (meses transcurridos de la temporada) en
-  // cada columna, para ver de un vistazo cuánto lleva acumulado a la fecha cada indicador --
-  // pedido de Rafael tras revisar la tabla con Ingreso todavía sin cargar. La variación total se
-  // calcula sobre los ACUMULADOS (no es el promedio de las variaciones mensuales), igual que
-  // cualquier reporte de presupuesto acumulado.
-  let totDiff=null, totPct=null;
-  if(S.hasReal && S.hasPres){
-    totDiff = totReal - totPres;
-    totPct = totPres!==0 ? totDiff/totPres*100 : null;
-  }
-  const totalRow = document.createElement('tr');
-  totalRow.className = 'total-row';
-  totalRow.innerHTML = `<td>Total real a la fecha</td>
-    <td>${S.hasReal?meta.fmt(totReal):'—'}</td>
-    <td>${S.hasPres?meta.fmt(totPres):'—'}</td>
-    <td>${varianceCellHTML(totDiff, totPct, meta)}</td>
-    <td>${S.hasProy?meta.fmt(totProy):'—'}</td>
-    <td>—</td>`;
-  tbody.appendChild(totalRow);
-  document.getElementById('tablaEstimadoNote').hidden = !anyEstimated;
-}
-
-// Pastilla verde/roja con el $ (o kg) y el % de variación juntos en un solo elemento (pedido de
-// Rafael: "que aparezca en los 2 formatos... pero que el usuario no se confunda") -- mostrarlos
-// pegados en una sola pastilla, en vez de dos columnas separadas, evita tener que cruzar la vista
-// entre dos celdas lejanas para leer un solo concepto. El color depende de TABLE_VAR_META
-// (favorableWhenAbove): para Egreso, "por debajo del presupuesto" es lo bueno (verde).
 function varianceCellHTML(diff, pct, meta){
   if(diff==null) return '—';
   const favorable = diff===0 ? null : (meta.favorableWhenAbove ? diff>0 : diff<0);
@@ -1722,35 +1215,87 @@ function varianceCellHTML(diff, pct, meta){
   return `<span class="${pillClass}">${fmtSigned(meta.fmt,diff)} (${pctTxt})</span>`;
 }
 
-function appendHistoricoRow(tbody, mk, isForecast, estimated, realV, presV, proyV, fcV, diff, pct, meta){
-  const tr = document.createElement('tr');
-  if(mk===CURRENT_MONTH_KEY) tr.className='now';
-  tr.innerHTML = `<td>${monthLabel(mk)}${isForecast?' 🔮':''}</td>
-    <td>${realV==null?'—':meta.fmt(realV)+(estimated?' *':'')}</td>
-    <td>${presV==null?'—':meta.fmt(presV)}</td>
-    <td>${varianceCellHTML(diff, pct, meta)}</td>
-    <td>${proyV==null?'—':meta.fmt(proyV)}</td>
-    <td>${fcV==null?'—':meta.fmt(fcV)}</td>`;
-  tbody.appendChild(tr);
+function renderHistoricoTable(){
+  const crops = currentCropsSelection();
+  const sc = state.filters.escenario, vista = state.filters.vista, activeMethod = state.filters.metodo;
+  const tableCropSelect = document.getElementById('tableCropSelect');
+  tableCropSelect.innerHTML = cropSelectOptionsHTML(`Consolidado (${includedCropsOrdered().length} cultivos)`);
+  tableCropSelect.value = state.filters.focalCrop;
+
+  const v = state.filters.tablaVariable;
+  const meta = TABLE_VAR_META[v];
+  document.querySelectorAll('#tableVariableSeg button').forEach(btn=> btn.classList.toggle('on', btn.dataset.var===v));
+
+  const months = DISPLAY_MONTHS;
+  const S = {};
+  TABLE_METHODS.forEach(m=> S[m.key] = kindSeries(v, m.key, sc, crops, months, vista));
+  const base = S.estacional; // Real y Presupuesto no dependen del método
+  const hasPres = v==='ebitda' ? (hasTipo('ingreso','presupuesto')||hasTipo('egreso','presupuesto')) : hasTipo(v,'presupuesto');
+
+  const thead = document.getElementById('tablaHistorico').querySelector('thead');
+  const tbody = document.getElementById('tablaHistorico').querySelector('tbody');
+  const mcls = k => k===activeMethod ? ' class="active-method"' : '';
+  thead.innerHTML = `<tr><th>Mes</th><th>${meta.label} real</th><th>Presupuesto</th><th>Variación vs presupuesto</th>` +
+    TABLE_METHODS.map(m=>`<th${mcls(m.key)}>${m.label}</th>`).join('') + '</tr>';
+  tbody.innerHTML = '';
+
+  let totReal=0, totPresReal=0, totPres=0; const totM = {polinomial:0, movil:0, estacional:0}; let anyReal=false;
+  months.forEach(mk=>{
+    const isForecast = FORECAST_MONTHS.includes(mk);
+    const realV = base.hasReal[mk] ? base.real[mk] : null;
+    const presV = hasPres ? base.pres[mk] : null;
+    let diff=null, pct=null;
+    if(realV!=null && presV!=null){ diff = realV - presV; pct = presV!==0 ? diff/presV*100 : null; }
+    if(vista==='mensual'){
+      if(realV!=null){ totReal += realV; anyReal = true; if(presV!=null) totPresReal += presV; }
+      if(presV!=null) totPres += presV;
+      TABLE_METHODS.forEach(m=> totM[m.key] += S[m.key].full[mk]||0);
+    }
+    const tr = document.createElement('tr');
+    if(mk===CURRENT_MONTH_KEY) tr.className='now';
+    tr.innerHTML = `<td>${monthLabel(mk)}${isForecast?' 🔮':''}</td>
+      <td>${realV==null?'—':meta.fmt(realV)}</td>
+      <td>${presV==null?'—':meta.fmt(presV)}</td>
+      <td>${varianceCellHTML(diff, pct, meta)}</td>` +
+      TABLE_METHODS.map(m=>`<td${mcls(m.key)}>${meta.fmt(S[m.key].full[mk]||0)}</td>`).join('');
+    tbody.appendChild(tr);
+  });
+
+  if(vista==='mensual'){
+    let totDiff=null, totPct=null;
+    if(anyReal && hasPres){ totDiff = totReal - totPresReal; totPct = totPresReal!==0 ? totDiff/totPresReal*100 : null; }
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'total-row';
+    totalRow.innerHTML = `<td>Total ${monthLabel(months[0])} – ${monthLabel(months[months.length-1])}</td>
+      <td>${anyReal?meta.fmt(totReal):'—'}</td>
+      <td>${hasPres?meta.fmt(totPres):'—'}</td>
+      <td>${varianceCellHTML(totDiff, totPct, meta)}</td>` +
+      TABLE_METHODS.map(m=>`<td${mcls(m.key)}>${meta.fmt(totM[m.key])}</td>`).join('');
+    tbody.appendChild(totalRow);
+  }
+
+  const vistaTxt = vista==='acumulado' ? 'Cifras <b>acumuladas</b> mes a mes desde el inicio de la temporada.' : 'Cifras del mes.';
+  document.getElementById('tablaSub').innerHTML =
+    `${vistaTxt} Las 3 columnas de método muestran el total estimado del mes (real capturado + semanas proyectadas con ese método), escenario <b>${sc}</b>. ` +
+    `La columna resaltada es el método seleccionado en el panel. ` +
+    (vista==='mensual' ? 'En el renglón Total, la variación compara el real solo contra el presupuesto de los meses que ya tienen real.' : '');
 }
 
 function renderForecastTab(){
   renderKpis();
-  renderLineWithBand('chartEbitda','legendEbitda', valueEbitda, fmtMXN, false);
-  renderLineWithBand('chartMargen','legendMargen', valueMargen, v=>v.toFixed(1)+'%', true);
-  renderLineWithBand('chartIngreso','legendIngreso', valueIngreso, fmtMXN, false);
-  renderLineWithBand('chartEgreso','legendEgreso', valueEgreso, fmtMXN, false);
-  renderLineWithBand('chartProduccion','legendProduccion', valueProduccion, fmtKg, false);
+  const money = v=>fmtM(v);
+  renderLineWithBand('chartEbitda','legendEbitda', 'ebitda', money, false);
+  renderLineWithBand('chartMargen','legendMargen', 'margen', v=>(+v).toFixed(1)+'%', true);
+  renderLineWithBand('chartIngreso','legendIngreso', 'ingreso', money, false);
+  renderLineWithBand('chartEgreso','legendEgreso', 'egreso', money, false);
+  renderLineWithBand('chartProduccion','legendProduccion', 'produccion', fmtKg, false);
+  document.querySelectorAll('[data-vista-label]').forEach(el=> el.textContent = state.filters.vista==='acumulado' ? '· acumulado' : '· mensual');
   renderHistoricoTable();
 }
 
 /* ============================================================
    10. RENDER — ESCENARIOS TAB
    ============================================================ */
-// Las dos tablas de % de escenario (la grande de la pestaña 🧭 Escenarios y la compacta del panel
-// de Filtros, debajo de los botones de Escenario) muestran y editan exactamente los mismos datos
-// (`state.scenarios`) -- esta función arma las filas para cualquiera de las dos, y `renderAll()`
-// (más abajo) refresca ambas cada vez que algo cambia, para que nunca queden desincronizadas.
 function renderScenarioRowsInto(tbodyId, labels){
   const tbody = document.getElementById(tbodyId);
   if(!tbody) return;
@@ -1767,19 +1312,14 @@ function renderScenarioRowsInto(tbodyId, labels){
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('input').forEach(inp=>{
-    inp.addEventListener('input', ()=>{
-      const sc = inp.dataset.sc, k = inp.dataset.k;
-      state.scenarios[sc][k] = parseFloat(inp.value)||0;
+    inp.addEventListener('change', ()=>{
+      state.scenarios[inp.dataset.sc][inp.dataset.k] = parseFloat(inp.value)||0;
       renderAll();
     });
   });
 }
-function renderScenarioTable(){
-  renderScenarioRowsInto('scenarioBody', { base:'Base', optimista:'Optimista', pesimista:'Pesimista' });
-}
-function renderScenarioMiniTable(){
-  renderScenarioRowsInto('scenarioMiniBody', { base:'Base', optimista:'Optim.', pesimista:'Pesim.' });
-}
+function renderScenarioTable(){ renderScenarioRowsInto('scenarioBody', { base:'Base', optimista:'Optimista', pesimista:'Pesimista' }); }
+function renderScenarioMiniTable(){ renderScenarioRowsInto('scenarioMiniBody', { base:'Base', optimista:'Optim.', pesimista:'Pesim.' }); }
 
 function renderEscenariosChart(){
   destroyChart('chartEscenarios');
@@ -1800,8 +1340,8 @@ function renderEscenariosChart(){
     },
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ position:'top', labels:{ boxWidth:10, color:CH.text } },
-        tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+fmtMXN(c.raw) } } },
-      scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtMXN(v) } } })
+        tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+fmtM(c.raw) } } },
+      scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtM(v) } } })
     }
   });
 }
@@ -1818,28 +1358,20 @@ function renderScenarioTableNumbers(){
     const ing = sum3(sets[key].ingreso), egr = sum3(sets[key].egreso), eb = sum3(sets[key].ebitda);
     const mg = ing>0 ? eb/ing*100 : 0;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${label}</td><td>${fmtMXN(ing)}</td><td>${fmtMXN(egr)}</td><td>${fmtMXN(eb)}</td><td>${mg.toFixed(1)}%</td>`;
+    tr.innerHTML = `<td>${label}</td><td>${fmtM(ing)}</td><td>${fmtM(egr)}</td><td>${fmtM(eb)}</td><td>${mg.toFixed(1)}%</td>`;
     tbody.appendChild(tr);
   });
 }
-
-function renderEscenariosTab(){
-  renderScenarioTable();
-  renderEscenariosChart();
-  renderScenarioTableNumbers();
-}
+function renderEscenariosTab(){ renderScenarioTable(); renderEscenariosChart(); renderScenarioTableNumbers(); }
 
 /* ============================================================
    11. RENDER — COMPARATIVO TAB
    ============================================================ */
-function periodMonths(){
-  return state.filters.mes==='TOTAL3' ? FORECAST_MONTHS : [state.filters.mes];
-}
+function periodMonths(){ return state.filters.mes==='TOTAL3' ? FORECAST_MONTHS : [state.filters.mes]; }
 function perCropTotals(){
   const method = state.filters.metodo, sc = state.filters.escenario;
   const months = periodMonths();
-  const crops = includedCropsOrdered();
-  return crops.map(crop=>{
+  return includedCropsOrdered().map(crop=>{
     const ing = scenarioForecastFor('ingreso', crop, method, sc);
     const egr = scenarioForecastFor('egreso', crop, method, sc);
     const ingT = months.reduce((a,mk)=>a+(ing[mk]||0),0);
@@ -1847,17 +1379,15 @@ function perCropTotals(){
     return { crop, ingreso: ingT, egreso: egrT, ebitda: ingT-egrT };
   });
 }
-
 function renderComparativoTab(){
   document.getElementById('comparativoSub').textContent =
-    `Escenario ${state.filters.escenario} · ${state.filters.mes==='TOTAL3' ? 'Total de los 3 meses proyectados' : monthLabel(state.filters.mes)}`;
+    `Escenario ${state.filters.escenario} · ${METODO_LABEL[state.filters.metodo]} · ${state.filters.mes==='TOTAL3' ? 'Total de los 3 meses proyectados' : monthLabel(state.filters.mes)}`;
   const totals = perCropTotals();
 
   destroyChart('chartCultivos');
   if(!chartsAvailable()){ chartFallback('chartCultivos'); }
   else {
-    const ctx = document.getElementById('chartCultivos').getContext('2d');
-    charts.chartCultivos = new Chart(ctx, {
+    charts.chartCultivos = new Chart(document.getElementById('chartCultivos').getContext('2d'), {
       type:'bar',
       data:{
         labels: totals.map(t=> ICONS[t.crop]+' '+DISPLAY[t.crop]),
@@ -1869,8 +1399,8 @@ function renderComparativoTab(){
       },
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ position:'top', labels:{ boxWidth:10, color:CH.text } },
-          tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+fmtMXN(c.raw) } } },
-        scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtMXN(v) } } })
+          tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+fmtM(c.raw) } } },
+        scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtM(v) } } })
       }
     });
   }
@@ -1881,8 +1411,7 @@ function renderComparativoTab(){
     const sumIngreso = totals.reduce((a,t)=>a+Math.max(0,t.ingreso),0)||1;
     const sumEgreso = totals.reduce((a,t)=>a+Math.max(0,t.egreso),0)||1;
     const sumEbitda = totals.reduce((a,t)=>a+Math.max(0,t.ebitda),0)||1;
-    const ctx2 = document.getElementById('chartParticipacion').getContext('2d');
-    charts.chartParticipacion = new Chart(ctx2, {
+    charts.chartParticipacion = new Chart(document.getElementById('chartParticipacion').getContext('2d'), {
       type:'bar',
       data:{
         labels:['Ingresos','Egresos','EBITDA'],
@@ -1907,7 +1436,7 @@ function renderComparativoTab(){
   totals.forEach(t=>{
     const mg = t.ingreso>0 ? t.ebitda/t.ingreso*100 : 0;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${ICONS[t.crop]} ${DISPLAY[t.crop]}</td><td>${fmtMXN(t.ingreso)}</td><td>${fmtMXN(t.egreso)}</td><td>${fmtMXN(t.ebitda)}</td><td>${mg.toFixed(1)}%</td><td>${CROPS_WITH_TC.has(t.crop)?'Sí':'No (nacional)'}</td>`;
+    tr.innerHTML = `<td>${ICONS[t.crop]} ${DISPLAY[t.crop]}</td><td>${fmtM(t.ingreso)}</td><td>${fmtM(t.egreso)}</td><td>${fmtM(t.ebitda)}</td><td>${mg.toFixed(1)}%</td><td>${CROPS_WITH_TC.has(t.crop)?'Sí':'No (nacional)'}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -1918,16 +1447,12 @@ function renderComparativoTab(){
 const SLOT_DEFS = [
   { tipo:'real', variable:'egreso' }, { tipo:'real', variable:'ingreso' }, { tipo:'real', variable:'produccion' },
   { tipo:'presupuesto', variable:'egreso' }, { tipo:'presupuesto', variable:'ingreso' }, { tipo:'presupuesto', variable:'produccion' },
-  { tipo:'proyeccion', variable:'egreso' }, { tipo:'proyeccion', variable:'ingreso' }, { tipo:'proyeccion', variable:'produccion' }
+  { tipo:'proyeccion', variable:'egreso' }, { tipo:'proyeccion', variable:'ingreso' }, { tipo:'proyeccion', variable:'produccion' },
+  { tipo:'variacion', variable:'egreso' }
 ];
-const TIPO_LABEL = { real:'Real (ya no se usa)', presupuesto:'Presupuesto', proyeccion:'Proyección equipo' };
+const TIPO_LABEL = { real:'Real', presupuesto:'Presupuesto', proyeccion:'Proyección equipo', variacion:'Variación % (método estacional)' };
 const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción' };
 
-// Datos base de Rafael (Google Sheet / FORECAST.xlsx) — se usan como dato por defecto para que
-// el tablero funcione desde que se abre. Estructura genérica para las 9 combinaciones
-// (Real/Presupuesto/Proyección × Egreso/Ingreso/Producción): las que aún no llegan quedan
-// como cadena vacía. Esto es lo que actualiza la tarea programada cuando se refresca desde
-// el Google Sheet — cada actualización solo tiene que reescribir este bloque.
 const BAKED_DATA = {
  egreso: {
   real: `Egreso	Cultivo	ejercicio	semana	Importe	Mes
@@ -2805,442 +2330,444 @@ Presupuesto	ZARZAMORA	2027	26	1348037	junio
 Presupuesto	ZARZAMORA	2027	27	2581442	julio
 Presupuesto	ZARZAMORA	2027	28	669	julio`,
   proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe	Mes	1723404381.873727
-Proyección	AGUACATE	2026	26	0	junio	
-Proyección	AGUACATE	2026	27	175465588	julio	
-Proyección	AGUACATE	2026	28	2371571	julio	
-Proyección	AGUACATE	2026	29	3223077	julio	
-Proyección	AGUACATE	2026	30	10619357	julio	
-Proyección	AGUACATE	2026	31	12153941	agosto	
-Proyección	AGUACATE	2026	32	3489154	agosto	
-Proyección	AGUACATE	2026	33	6151722	agosto	
-Proyección	AGUACATE	2026	34	5319969	agosto	
-Proyección	AGUACATE	2026	35	8777948.85	agosto	
-Proyección	AGUACATE	2026	36	10621318.1085	septiembre	
-Proyección	AGUACATE	2026	37	6372790.8651	septiembre	
-Proyección	AGUACATE	2026	38	10833744.47067	septiembre	
-Proyección	AGUACATE	2026	39	12892155.920097299	septiembre	
-Proyección	AGUACATE	2026	40	16373038.01852357	octubre	
-Proyección	AGUACATE	2026	41	17355420.299634986	octubre	
-Proyección	AGUACATE	2026	42	13016565.22472624	octubre	
-Proyección	AGUACATE	2026	43	15619878.269671487	octubre	
-Proyección	AGUACATE	2026	44	17806661.227425497	octubre	
-Proyección	AGUACATE	2026	45	11396263.185552318	noviembre	
-Proyección	AGUACATE	2026	46	11624188.449263364	noviembre	
-Proyección	AGUACATE	2026	47	10810495.257814927	noviembre	
-Proyección	AGUACATE	2026	48	11351020.020705674	noviembre	
-Proyección	AGUACATE	2026	49	14756326.026917376	diciembre	
-Proyección	AGUACATE	2026	50	11657497.561264727	diciembre	
-Proyección	AGUACATE	2026	51	13406122.195454435	diciembre	
-Proyección	AGUACATE	2026	52	10322714.090499915	diciembre	
-Proyección	AGUACATE	2027	1		enero	
-Proyección	AGUACATE	2027	2		enero	
-Proyección	AGUACATE	2027	3		enero	
-Proyección	AGUACATE	2027	4		enero	
-Proyección	AGUACATE	2027	5		enero	
-Proyección	AGUACATE	2027	6		febrero	
-Proyección	AGUACATE	2027	7		febrero	
-Proyección	AGUACATE	2027	8		febrero	
-Proyección	AGUACATE	2027	9		febrero	
-Proyección	AGUACATE	2027	10		marzo	
-Proyección	AGUACATE	2027	11		marzo	
-Proyección	AGUACATE	2027	12		marzo	
-Proyección	AGUACATE	2027	13		marzo	
-Proyección	AGUACATE	2027	14		abril	
-Proyección	AGUACATE	2027	15		abril	
-Proyección	AGUACATE	2027	16		abril	
-Proyección	AGUACATE	2027	17		abril	
-Proyección	AGUACATE	2027	18		mayo	
-Proyección	AGUACATE	2027	19		mayo	
-Proyección	AGUACATE	2027	20		mayo	
-Proyección	AGUACATE	2027	21		mayo	
-Proyección	AGUACATE	2027	22		mayo	
-Proyección	AGUACATE	2027	23		junio	
-Proyección	AGUACATE	2027	24		junio	
-Proyección	AGUACATE	2027	25		junio	
-Proyección	AGUACATE	2027	26		junio	
-Proyección	ARANDANO	2026	26	0	junio	
-Proyección	ARANDANO	2026	27	4799901	julio	
-Proyección	ARANDANO	2026	28	1360606	julio	
-Proyección	ARANDANO	2026	29	2248386	julio	
-Proyección	ARANDANO	2026	30	6683480	julio	
-Proyección	ARANDANO	2026	31	9520204	agosto	
-Proyección	ARANDANO	2026	32	1096453	agosto	
-Proyección	ARANDANO	2026	33	5950668	agosto	
-Proyección	ARANDANO	2026	34	899702	agosto	
-Proyección	ARANDANO	2026	35	3859721.58	agosto	
-Proyección	ARANDANO	2026	36	1621083.0636000002	septiembre	
-Proyección	ARANDANO	2026	37	1848034.6925040004	septiembre	
-Proyección	ARANDANO	2026	38	1145781.5093524803	septiembre	
-Proyección	ARANDANO	2026	39	3185272.5959998956	septiembre	
-Proyección	ARANDANO	2026	40	1528930.8460799498	octubre	
-Proyección	ARANDANO	2026	41	1085540.9007167644	octubre	
-Proyección	ARANDANO	2026	42	1270082.8538386142	octubre	
-Proyección	ARANDANO	2026	43	3200608.791673308	octubre	
-Proyección	ARANDANO	2026	44	1632310.483753387	octubre	
-Proyección	ARANDANO	2026	45	995709.395089566	noviembre	
-Proyección	ARANDANO	2026	46	1095280.3345985226	noviembre	
-Proyección	ARANDANO	2026	47	3417274.643947391	noviembre	
-Proyección	ARANDANO	2026	48	1025182.3931842174	noviembre	
-Proyección	ARANDANO	2026	49	1794069.1880723804	diciembre	
-Proyección	ARANDANO	2026	50	1471136.734219352	diciembre	
-Proyección	ARANDANO	2026	51	2383241.5094353505	diciembre	
-Proyección	ARANDANO	2026	52	3384202.9433981976	diciembre	
-Proyección	ARANDANO	2027	1		enero	
-Proyección	ARANDANO	2027	2		enero	
-Proyección	ARANDANO	2027	3		enero	
-Proyección	ARANDANO	2027	4		enero	
-Proyección	ARANDANO	2027	5		enero	
-Proyección	ARANDANO	2027	6		febrero	
-Proyección	ARANDANO	2027	7		febrero	
-Proyección	ARANDANO	2027	8		febrero	
-Proyección	ARANDANO	2027	9		febrero	
-Proyección	ARANDANO	2027	10		marzo	
-Proyección	ARANDANO	2027	11		marzo	
-Proyección	ARANDANO	2027	12		marzo	
-Proyección	ARANDANO	2027	13		marzo	
-Proyección	ARANDANO	2027	14		abril	
-Proyección	ARANDANO	2027	15		abril	
-Proyección	ARANDANO	2027	16		abril	
-Proyección	ARANDANO	2027	17		abril	
-Proyección	ARANDANO	2027	18		mayo	
-Proyección	ARANDANO	2027	19		mayo	
-Proyección	ARANDANO	2027	20		mayo	
-Proyección	ARANDANO	2027	21		mayo	
-Proyección	ARANDANO	2027	22		mayo	
-Proyección	ARANDANO	2027	23		junio	
-Proyección	ARANDANO	2027	24		junio	
-Proyección	ARANDANO	2027	25		junio	
-Proyección	ARANDANO	2027	26		junio	
-Proyección	ARANDANO	2027	27		julio	
-Proyección	ARANDANO	2027	28	0	julio	
-Proyección	ESPARRAGO	2026	26	0	junio	
-Proyección	ESPARRAGO	2026	27	109927359	julio	
-Proyección	ESPARRAGO	2026	28	3677980	julio	
-Proyección	ESPARRAGO	2026	29	5005816	julio	
-Proyección	ESPARRAGO	2026	30	7596455	julio	
-Proyección	ESPARRAGO	2026	31	7267965	agosto	
-Proyección	ESPARRAGO	2026	32	7209569	agosto	
-Proyección	ESPARRAGO	2026	33	8862046	agosto	
-Proyección	ESPARRAGO	2026	34	5215117	agosto	
-Proyección	ESPARRAGO	2026	35	5006512.319999999	agosto	
-Proyección	ESPARRAGO	2026	36	4055274.9792	septiembre	
-Proyección	ESPARRAGO	2026	37	3122561.733984	septiembre	
-Proyección	ESPARRAGO	2026	38	6588605.258706241	septiembre	
-Proyección	ESPARRAGO	2026	39	4150821.3129849317	septiembre	
-Proyección	ESPARRAGO	2026	40	4648919.870543124	octubre	
-Proyección	ESPARRAGO	2026	41	3719135.8964344994	octubre	
-Proyección	ESPARRAGO	2026	42	5467129.767758714	octubre	
-Proyección	ESPARRAGO	2026	43	5303115.874725953	octubre	
-Proyección	ESPARRAGO	2026	44	3393994.1598246098	octubre	
-Proyección	ESPARRAGO	2026	45	4378252.466173747	noviembre	
-Proyección	ESPARRAGO	2026	46	4947425.286776333	noviembre	
-Proyección	ESPARRAGO	2026	47	4650579.769569753	noviembre	
-Proyección	ESPARRAGO	2026	48	3534440.6248730123	noviembre	
-Proyección	ESPARRAGO	2026	49	3569785.0311217424	diciembre	
-Proyección	ESPARRAGO	2026	50	3105712.977075916	diciembre	
-Proyección	ESPARRAGO	2026	51	5838740.396902721	diciembre	
-Proyección	ESPARRAGO	2026	52	3503244.2381416326	diciembre	
-Proyección	ESPARRAGO	2027	1		enero	
-Proyección	ESPARRAGO	2027	2		enero	
-Proyección	ESPARRAGO	2027	3		enero	
-Proyección	ESPARRAGO	2027	4		enero	
-Proyección	ESPARRAGO	2027	5		enero	
-Proyección	ESPARRAGO	2027	6		febrero	
-Proyección	ESPARRAGO	2027	7		febrero	
-Proyección	ESPARRAGO	2027	8		febrero	
-Proyección	ESPARRAGO	2027	9		febrero	
-Proyección	ESPARRAGO	2027	10		marzo	
-Proyección	ESPARRAGO	2027	11		marzo	
-Proyección	ESPARRAGO	2027	12		marzo	
-Proyección	ESPARRAGO	2027	13		marzo	
-Proyección	ESPARRAGO	2027	14		abril	
-Proyección	ESPARRAGO	2027	15		abril	
-Proyección	ESPARRAGO	2027	16		abril	
-Proyección	ESPARRAGO	2027	17		abril	
-Proyección	ESPARRAGO	2027	18		mayo	
-Proyección	ESPARRAGO	2027	19		mayo	
-Proyección	ESPARRAGO	2027	20		mayo	
-Proyección	ESPARRAGO	2027	21		mayo	
-Proyección	ESPARRAGO	2027	22		mayo	
-Proyección	ESPARRAGO	2027	23		junio	
-Proyección	ESPARRAGO	2027	24		junio	
-Proyección	ESPARRAGO	2027	25		junio	
-Proyección	ESPARRAGO	2027	26		junio	
-Proyección	ESPARRAGO	2027	27		julio	
-Proyección	ESPARRAGO	2027	28	0	julio	
-Proyección	FRAMBUESA	2026	26	0	junio	
-Proyección	FRAMBUESA	2026	27	37228716	julio	
-Proyección	FRAMBUESA	2026	28	2831262	julio	
-Proyección	FRAMBUESA	2026	29	1727218	julio	
-Proyección	FRAMBUESA	2026	30	7945793	julio	
-Proyección	FRAMBUESA	2026	31	8633329	agosto	
-Proyección	FRAMBUESA	2026	32	2221586	agosto	
-Proyección	FRAMBUESA	2026	33	8597468	agosto	
-Proyección	FRAMBUESA	2026	34	6588147	agosto	
-Proyección	FRAMBUESA	2026	35	12319834.89	agosto	
-Proyección	FRAMBUESA	2026	36	8870281.1208	septiembre	
-Proyección	FRAMBUESA	2026	37	10200823.288919998	septiembre	
-Proyección	FRAMBUESA	2026	38	10404839.754698398	septiembre	
-Proyección	FRAMBUESA	2026	39	11549372.127715223	septiembre	
-Proyección	FRAMBUESA	2026	40	11087397.242606614	octubre	
-Proyección	FRAMBUESA	2026	41	8426421.904381027	octubre	
-Proyección	FRAMBUESA	2026	42	7836572.371074355	octubre	
-Proyección	FRAMBUESA	2026	43	8698595.331892535	octubre	
-Proyección	FRAMBUESA	2026	44	10786258.211546743	octubre	
-Proyección	FRAMBUESA	2026	45	6903205.255389916	noviembre	
-Proyección	FRAMBUESA	2026	46	7386429.62326721	noviembre	
-Proyección	FRAMBUESA	2026	47	11301237.323598832	noviembre	
-Proyección	FRAMBUESA	2026	48	11753286.816542786	noviembre	
-Proyección	FRAMBUESA	2026	49	11635753.948377358	diciembre	
-Proyección	FRAMBUESA	2026	50	10123105.935088301	diciembre	
-Proyección	FRAMBUESA	2026	51	14982196.783930685	diciembre	
-Proyección	FRAMBUESA	2026	52	11236647.587948013	diciembre	
-Proyección	FRAMBUESA	2027	1		enero	
-Proyección	FRAMBUESA	2027	2		enero	
-Proyección	FRAMBUESA	2027	3		enero	
-Proyección	FRAMBUESA	2027	4		enero	
-Proyección	FRAMBUESA	2027	5		enero	
-Proyección	FRAMBUESA	2027	6		febrero	
-Proyección	FRAMBUESA	2027	7		febrero	
-Proyección	FRAMBUESA	2027	8		febrero	
-Proyección	FRAMBUESA	2027	9		febrero	
-Proyección	FRAMBUESA	2027	10		marzo	
-Proyección	FRAMBUESA	2027	11		marzo	
-Proyección	FRAMBUESA	2027	12		marzo	
-Proyección	FRAMBUESA	2027	13		marzo	
-Proyección	FRAMBUESA	2027	14		abril	
-Proyección	FRAMBUESA	2027	15		abril	
-Proyección	FRAMBUESA	2027	16		abril	
-Proyección	FRAMBUESA	2027	17		abril	
-Proyección	FRAMBUESA	2027	18		mayo	
-Proyección	FRAMBUESA	2027	19		mayo	
-Proyección	FRAMBUESA	2027	20		mayo	
-Proyección	FRAMBUESA	2027	21		mayo	
-Proyección	FRAMBUESA	2027	22		mayo	
-Proyección	FRAMBUESA	2027	23		junio	
-Proyección	FRAMBUESA	2027	24		junio	
-Proyección	FRAMBUESA	2027	25		junio	
-Proyección	FRAMBUESA	2027	26		junio	
-Proyección	FRAMBUESA	2027	27		julio	
-Proyección	FRESA	2026	26	0	junio	
-Proyección	FRESA	2026	27	99443460	julio	
-Proyección	FRESA	2026	28	17594036	julio	
-Proyección	FRESA	2026	29	7851406	julio	
-Proyección	FRESA	2026	30	20459933	julio	
-Proyección	FRESA	2026	31	9129941	agosto	
-Proyección	FRESA	2026	32	5825289	agosto	
-Proyección	FRESA	2026	33	9613622	agosto	
-Proyección	FRESA	2026	34	3613694	agosto	
-Proyección	FRESA	2026	35	63131234.17999999	agosto	
-Proyección	FRESA	2026	36	7575748.101599999	septiembre	
-Proyección	FRESA	2026	37	8863625.278871998	septiembre	
-Proyección	FRESA	2026	38	6204537.695210398	septiembre	
-Proyección	FRESA	2026	39	7693626.742060894	septiembre	
-Proyección	FRESA	2026	40	7616690.474640286	octubre	
-Proyección	FRESA	2026	41	6550353.808190646	octubre	
-Proyección	FRESA	2026	42	7139885.650927804	octubre	
-Proyección	FRESA	2026	43	7925273.072529864	octubre	
-Proyección	FRESA	2026	44	34078674.21187841	octubre	
-Proyección	FRESA	2026	45	4771014.389662978	noviembre	
-Proyección	FRESA	2026	46	7251941.872287727	noviembre	
-Proyección	FRESA	2026	47	6816825.359950463	noviembre	
-Proyección	FRESA	2026	48	10157069.78632619	noviembre	
-Proyección	FRESA	2026	49	7617802.339744642	diciembre	
-Proyección	FRESA	2026	50	6627488.035577839	diciembre	
-Proyección	FRESA	2026	51	15839696.405031033	diciembre	
-Proyección	FRESA	2026	52	11404581.411622344	diciembre	
-Proyección	FRESA	2027	1		enero	
-Proyección	FRESA	2027	2		enero	
-Proyección	FRESA	2027	3		enero	
-Proyección	FRESA	2027	4		enero	
-Proyección	FRESA	2027	5		enero	
-Proyección	FRESA	2027	6		febrero	
-Proyección	FRESA	2027	7		febrero	
-Proyección	FRESA	2027	8		febrero	
-Proyección	FRESA	2027	9		febrero	
-Proyección	FRESA	2027	10		marzo	
-Proyección	FRESA	2027	11		marzo	
-Proyección	FRESA	2027	12		marzo	
-Proyección	FRESA	2027	13		marzo	
-Proyección	FRESA	2027	14		abril	
-Proyección	FRESA	2027	15		abril	
-Proyección	FRESA	2027	16		abril	
-Proyección	FRESA	2027	17		abril	
-Proyección	FRESA	2027	18		mayo	
-Proyección	FRESA	2027	19		mayo	
-Proyección	FRESA	2027	20		mayo	
-Proyección	FRESA	2027	21		mayo	
-Proyección	FRESA	2027	22		mayo	
-Proyección	FRESA	2027	23		junio	
-Proyección	FRESA	2027	24		junio	
-Proyección	FRESA	2027	25		junio	
-Proyección	FRESA	2027	26		junio	
-Proyección	FRESA	2027	27		julio	
-Proyección	FRESA	2027	28	0	julio	
-Proyección	PAPA	2026	26	0	junio	
-Proyección	PAPA	2026	27	12796555	julio	
-Proyección	PAPA	2026	28	2591433	julio	
-Proyección	PAPA	2026	29	1275774	julio	
-Proyección	PAPA	2026	30	3607349	julio	
-Proyección	PAPA	2026	31	1570987	agosto	
-Proyección	PAPA	2026	32	-616503	agosto	
-Proyección	PAPA	2026	33	1931788	agosto	
-Proyección	PAPA	2026	34	1244527	agosto	
-Proyección	PAPA	2026	35	858723.6299999999	agosto	
-Proyección	PAPA	2026	36	455123.5239	septiembre	
-Proyección	PAPA	2026	37	801017.4020639999	septiembre	
-Proyección	PAPA	2026	38	1457851.6717564797	septiembre	
-Proyección	PAPA	2026	39	626876.2188552864	septiembre	
-Proyección	PAPA	2026	40	758520.2248148965	octubre	
-Proyección	PAPA	2026	41	925394.6742741737	octubre	
-Proyección	PAPA	2026	42	962410.4612451406	octubre	
-Proyección	PAPA	2026	43	1963317.3409400869	octubre	
-Proyección	PAPA	2026	44	1649186.566389673	octubre	
-Proyección	PAPA	2026	45	1533743.5067423957	noviembre	
-Proyección	PAPA	2026	46	2361965.0003832895	noviembre	
-Proyección	PAPA	2026	47	921166.350149483	noviembre	
-Proyección	PAPA	2026	48	2008142.6433258725	noviembre	
-Proyección	PAPA	2026	49	1425781.2767613693	diciembre	
-Proyección	PAPA	2026	50	1297460.9618528462	diciembre	
-Proyección	PAPA	2026	51	1569927.7638419438	diciembre	
-Proyección	PAPA	2026	52	1161746.5452430383	diciembre	
-Proyección	PAPA	2027	1		enero	
-Proyección	PAPA	2027	2		enero	
-Proyección	PAPA	2027	3		enero	
-Proyección	PAPA	2027	4		enero	
-Proyección	PAPA	2027	5		enero	
-Proyección	PAPA	2027	6		febrero	
-Proyección	PAPA	2027	7		febrero	
-Proyección	PAPA	2027	8		febrero	
-Proyección	PAPA	2027	9		febrero	
-Proyección	PAPA	2027	10		marzo	
-Proyección	PAPA	2027	11		marzo	
-Proyección	PAPA	2027	12		marzo	
-Proyección	PAPA	2027	13		marzo	
-Proyección	PAPA	2027	14		abril	
-Proyección	PAPA	2027	15		abril	
-Proyección	PAPA	2027	16		abril	
-Proyección	PAPA	2027	17		abril	
-Proyección	PAPA	2027	18		mayo	
-Proyección	PAPA	2027	19		mayo	
-Proyección	PAPA	2027	20		mayo	
-Proyección	PAPA	2027	21		mayo	
-Proyección	PAPA	2027	22		mayo	
-Proyección	PAPA	2027	23		junio	
-Proyección	PAPA	2027	24		junio	
-Proyección	PAPA	2027	25		junio	
-Proyección	PAPA	2027	26		junio	
-Proyección	PAPA	2027	27		julio	
-Proyección	ZARZAMORA	2026	26	0	junio	
-Proyección	ZARZAMORA	2026	27	7021160	julio	
-Proyección	ZARZAMORA	2026	28	909857	julio	
-Proyección	ZARZAMORA	2026	29	1982026	julio	
-Proyección	ZARZAMORA	2026	30	4054402	julio	
-Proyección	ZARZAMORA	2026	31	4210493	agosto	
-Proyección	ZARZAMORA	2026	32	1035807	agosto	
-Proyección	ZARZAMORA	2026	33	3372312	agosto	
-Proyección	ZARZAMORA	2026	34	1287315	agosto	
-Proyección	ZARZAMORA	2026	35	1428919.6500000001	agosto	
-Proyección	ZARZAMORA	2026	36	671592.2355000001	septiembre	
-Proyección	ZARZAMORA	2026	37	1148422.722705	septiembre	
-Proyección	ZARZAMORA	2026	38	1332170.3583378	septiembre	
-Proyección	ZARZAMORA	2026	39	919197.5472530819	septiembre	
-Proyección	ZARZAMORA	2026	40	1222532.737846599	octubre	
-Proyección	ZARZAMORA	2026	41	1723771.1603637044	octubre	
-Proyección	ZARZAMORA	2026	42	1603107.179138245	octubre	
-Proyección	ZARZAMORA	2026	43	3655084.368435199	octubre	
-Proyección	ZARZAMORA	2026	44	2924067.4947481593	octubre	
-Proyección	ZARZAMORA	2026	45	1725199.8219014143	noviembre	
-Proyección	ZARZAMORA	2026	46	1673443.8272443719	noviembre	
-Proyección	ZARZAMORA	2026	47	1639974.9506994844	noviembre	
-Proyección	ZARZAMORA	2026	48	4263934.87181866	noviembre	
-Proyección	ZARZAMORA	2026	49	2899475.7128366884	diciembre	
-Proyección	ZARZAMORA	2026	50	1739685.427702013	diciembre	
-Proyección	ZARZAMORA	2026	51	4749341.217626495	diciembre	
-Proyección	ZARZAMORA	2026	52	3324538.8523385464	diciembre	
-Proyección	ZARZAMORA	2027	1		enero	
-Proyección	ZARZAMORA	2027	2		enero	
-Proyección	ZARZAMORA	2027	3		enero	
-Proyección	ZARZAMORA	2027	4		enero	
-Proyección	ZARZAMORA	2027	5		enero	
-Proyección	ZARZAMORA	2027	6		febrero	
-Proyección	ZARZAMORA	2027	7		febrero	
-Proyección	ZARZAMORA	2027	8		febrero	
-Proyección	ZARZAMORA	2027	9		febrero	
-Proyección	ZARZAMORA	2027	10		marzo	
-Proyección	ZARZAMORA	2027	11		marzo	
-Proyección	ZARZAMORA	2027	12		marzo	
-Proyección	ZARZAMORA	2027	13		marzo	
-Proyección	ZARZAMORA	2027	14		abril	
-Proyección	ZARZAMORA	2027	15		abril	
-Proyección	ZARZAMORA	2027	16		abril	
-Proyección	ZARZAMORA	2027	17		abril	
-Proyección	ZARZAMORA	2027	18		mayo	
-Proyección	ZARZAMORA	2027	19		mayo	
-Proyección	ZARZAMORA	2027	20		mayo	
-Proyección	ZARZAMORA	2027	21		mayo	
-Proyección	ZARZAMORA	2027	22		mayo	
-Proyección	ZARZAMORA	2027	23		junio	
-Proyección	ZARZAMORA	2027	24		junio	
-Proyección	ZARZAMORA	2027	25		junio	
-Proyección	ZARZAMORA	2027	26		junio	
-Proyección	ZARZAMORA	2027	27		julio	
-Proyección	ZARZAMORA	2027	28	0	julio	
-Proyección	EMPAQUE	2026	26	0	junio	
-Proyección	EMPAQUE	2026	27	120449	julio	
-Proyección	EMPAQUE	2026	28	420738	julio	
-Proyección	EMPAQUE	2026	29	339804	julio	
-Proyección	EMPAQUE	2026	30	222040	julio	
-Proyección	EMPAQUE	2026	31	1045543	agosto	
-Proyección	EMPAQUE	2026	32	327605	agosto	
-Proyección	EMPAQUE	2026	33	366123	agosto	
-Proyección	EMPAQUE	2026	34	3820233	agosto	
-Proyección	EMPAQUE	2026	35	3973042.3200000003	agosto	
-Proyección	EMPAQUE	2026	36	4489537.8216	septiembre	
-Proyección	EMPAQUE	2026	37	5432340.764136001	septiembre	
-Proyección	EMPAQUE	2026	38	5921251.432908241	septiembre	
-Proyección	EMPAQUE	2026	39	6217314.004553653	septiembre	
-Proyección	EMPAQUE	2026	40	7958161.925828677	octubre	
-Proyección	EMPAQUE	2026	41	8276488.402861824	octubre	
-Proyección	EMPAQUE	2026	42	9435196.779262481	octubre	
-Proyección	EMPAQUE	2026	43	8019917.262373108	octubre	
-Proyección	EMPAQUE	2026	44	10425892.44108504	octubre	
-Proyección	EMPAQUE	2026	45	15638838.66162756	noviembre	
-Proyección	EMPAQUE	2026	46	16733557.367941491	noviembre	
-Proyección	EMPAQUE	2026	47	17570235.236338567	noviembre	
-Proyección	EMPAQUE	2026	48	14056188.189070854	noviembre	
-Proyección	EMPAQUE	2026	49	15040121.362305814	diciembre	
-Proyección	EMPAQUE	2026	50	15641726.216798047	diciembre	
-Proyección	EMPAQUE	2026	51	16736647.051973911	diciembre	
-Proyección	EMPAQUE	2026	52	17406112.93405287	diciembre	
-Proyección	EMPAQUE	2027	1		enero	
-Proyección	EMPAQUE	2027	2		enero	
-Proyección	EMPAQUE	2027	3		enero	
-Proyección	EMPAQUE	2027	4		enero	
-Proyección	EMPAQUE	2027	5		enero	
-Proyección	EMPAQUE	2027	6		febrero	
-Proyección	EMPAQUE	2027	7		febrero	
-Proyección	EMPAQUE	2027	8		febrero	
-Proyección	EMPAQUE	2027	9		febrero	
-Proyección	EMPAQUE	2027	10		marzo	
-Proyección	EMPAQUE	2027	11		marzo	
-Proyección	EMPAQUE	2027	12		marzo	
-Proyección	EMPAQUE	2027	13		marzo	
-Proyección	EMPAQUE	2027	14		abril	
-Proyección	EMPAQUE	2027	15		abril	
-Proyección	EMPAQUE	2027	16		abril	
-Proyección	EMPAQUE	2027	17		abril	
-Proyección	EMPAQUE	2027	18		mayo	
-Proyección	EMPAQUE	2027	19		mayo	
-Proyección	EMPAQUE	2027	20		mayo	
-Proyección	EMPAQUE	2027	21		mayo	
-Proyección	EMPAQUE	2027	22		mayo	
-Proyección	EMPAQUE	2027	23		junio	
-Proyección	EMPAQUE	2027	24		junio	
-Proyección	EMPAQUE	2027	25		junio	
-Proyección	EMPAQUE	2027	26		junio	
-Proyección	EMPAQUE	2027	27		julio	
-Proyección	EMPAQUE	2027	28	0	julio	`
+Proyección	AGUACATE	2026	26	0	junio
+Proyección	AGUACATE	2026	27	175465588	julio
+Proyección	AGUACATE	2026	28	2371571	julio
+Proyección	AGUACATE	2026	29	3223077	julio
+Proyección	AGUACATE	2026	30	10619357	julio
+Proyección	AGUACATE	2026	31	12153941	agosto
+Proyección	AGUACATE	2026	32	3489154	agosto
+Proyección	AGUACATE	2026	33	6151722	agosto
+Proyección	AGUACATE	2026	34	5319969	agosto
+Proyección	AGUACATE	2026	35	8777948.85	agosto
+Proyección	AGUACATE	2026	36	10621318.1085	septiembre
+Proyección	AGUACATE	2026	37	6372790.8651	septiembre
+Proyección	AGUACATE	2026	38	10833744.47067	septiembre
+Proyección	AGUACATE	2026	39	12892155.920097299	septiembre
+Proyección	AGUACATE	2026	40	16373038.01852357	octubre
+Proyección	AGUACATE	2026	41	17355420.299634986	octubre
+Proyección	AGUACATE	2026	42	13016565.22472624	octubre
+Proyección	AGUACATE	2026	43	15619878.269671487	octubre
+Proyección	AGUACATE	2026	44	17806661.227425497	octubre
+Proyección	AGUACATE	2026	45	11396263.185552318	noviembre
+Proyección	AGUACATE	2026	46	11624188.449263364	noviembre
+Proyección	AGUACATE	2026	47	10810495.257814927	noviembre
+Proyección	AGUACATE	2026	48	11351020.020705674	noviembre
+Proyección	AGUACATE	2026	49	14756326.026917376	diciembre
+Proyección	AGUACATE	2026	50	11657497.561264727	diciembre
+Proyección	AGUACATE	2026	51	13406122.195454435	diciembre
+Proyección	AGUACATE	2026	52	10322714.090499915	diciembre
+Proyección	AGUACATE	2027	1		enero
+Proyección	AGUACATE	2027	2		enero
+Proyección	AGUACATE	2027	3		enero
+Proyección	AGUACATE	2027	4		enero
+Proyección	AGUACATE	2027	5		enero
+Proyección	AGUACATE	2027	6		febrero
+Proyección	AGUACATE	2027	7		febrero
+Proyección	AGUACATE	2027	8		febrero
+Proyección	AGUACATE	2027	9		febrero
+Proyección	AGUACATE	2027	10		marzo
+Proyección	AGUACATE	2027	11		marzo
+Proyección	AGUACATE	2027	12		marzo
+Proyección	AGUACATE	2027	13		marzo
+Proyección	AGUACATE	2027	14		abril
+Proyección	AGUACATE	2027	15		abril
+Proyección	AGUACATE	2027	16		abril
+Proyección	AGUACATE	2027	17		abril
+Proyección	AGUACATE	2027	18		mayo
+Proyección	AGUACATE	2027	19		mayo
+Proyección	AGUACATE	2027	20		mayo
+Proyección	AGUACATE	2027	21		mayo
+Proyección	AGUACATE	2027	22		mayo
+Proyección	AGUACATE	2027	23		junio
+Proyección	AGUACATE	2027	24		junio
+Proyección	AGUACATE	2027	25		junio
+Proyección	AGUACATE	2027	26		junio
+Proyección	ARANDANO	2026	26	0	junio
+Proyección	ARANDANO	2026	27	4799901	julio
+Proyección	ARANDANO	2026	28	1360606	julio
+Proyección	ARANDANO	2026	29	2248386	julio
+Proyección	ARANDANO	2026	30	6683480	julio
+Proyección	ARANDANO	2026	31	9520204	agosto
+Proyección	ARANDANO	2026	32	1096453	agosto
+Proyección	ARANDANO	2026	33	5950668	agosto
+Proyección	ARANDANO	2026	34	899702	agosto
+Proyección	ARANDANO	2026	35	3859721.58	agosto
+Proyección	ARANDANO	2026	36	1621083.0636000002	septiembre
+Proyección	ARANDANO	2026	37	1848034.6925040004	septiembre
+Proyección	ARANDANO	2026	38	1145781.5093524803	septiembre
+Proyección	ARANDANO	2026	39	3185272.5959998956	septiembre
+Proyección	ARANDANO	2026	40	1528930.8460799498	octubre
+Proyección	ARANDANO	2026	41	1085540.9007167644	octubre
+Proyección	ARANDANO	2026	42	1270082.8538386142	octubre
+Proyección	ARANDANO	2026	43	3200608.791673308	octubre
+Proyección	ARANDANO	2026	44	1632310.483753387	octubre
+Proyección	ARANDANO	2026	45	995709.395089566	noviembre
+Proyección	ARANDANO	2026	46	1095280.3345985226	noviembre
+Proyección	ARANDANO	2026	47	3417274.643947391	noviembre
+Proyección	ARANDANO	2026	48	1025182.3931842174	noviembre
+Proyección	ARANDANO	2026	49	1794069.1880723804	diciembre
+Proyección	ARANDANO	2026	50	1471136.734219352	diciembre
+Proyección	ARANDANO	2026	51	2383241.5094353505	diciembre
+Proyección	ARANDANO	2026	52	3384202.9433981976	diciembre
+Proyección	ARANDANO	2027	1		enero
+Proyección	ARANDANO	2027	2		enero
+Proyección	ARANDANO	2027	3		enero
+Proyección	ARANDANO	2027	4		enero
+Proyección	ARANDANO	2027	5		enero
+Proyección	ARANDANO	2027	6		febrero
+Proyección	ARANDANO	2027	7		febrero
+Proyección	ARANDANO	2027	8		febrero
+Proyección	ARANDANO	2027	9		febrero
+Proyección	ARANDANO	2027	10		marzo
+Proyección	ARANDANO	2027	11		marzo
+Proyección	ARANDANO	2027	12		marzo
+Proyección	ARANDANO	2027	13		marzo
+Proyección	ARANDANO	2027	14		abril
+Proyección	ARANDANO	2027	15		abril
+Proyección	ARANDANO	2027	16		abril
+Proyección	ARANDANO	2027	17		abril
+Proyección	ARANDANO	2027	18		mayo
+Proyección	ARANDANO	2027	19		mayo
+Proyección	ARANDANO	2027	20		mayo
+Proyección	ARANDANO	2027	21		mayo
+Proyección	ARANDANO	2027	22		mayo
+Proyección	ARANDANO	2027	23		junio
+Proyección	ARANDANO	2027	24		junio
+Proyección	ARANDANO	2027	25		junio
+Proyección	ARANDANO	2027	26		junio
+Proyección	ARANDANO	2027	27		julio
+Proyección	ARANDANO	2027	28	0	julio
+Proyección	ESPARRAGO	2026	26	0	junio
+Proyección	ESPARRAGO	2026	27	109927359	julio
+Proyección	ESPARRAGO	2026	28	3677980	julio
+Proyección	ESPARRAGO	2026	29	5005816	julio
+Proyección	ESPARRAGO	2026	30	7596455	julio
+Proyección	ESPARRAGO	2026	31	7267965	agosto
+Proyección	ESPARRAGO	2026	32	7209569	agosto
+Proyección	ESPARRAGO	2026	33	8862046	agosto
+Proyección	ESPARRAGO	2026	34	5215117	agosto
+Proyección	ESPARRAGO	2026	35	5006512.319999999	agosto
+Proyección	ESPARRAGO	2026	36	4055274.9792	septiembre
+Proyección	ESPARRAGO	2026	37	3122561.733984	septiembre
+Proyección	ESPARRAGO	2026	38	6588605.258706241	septiembre
+Proyección	ESPARRAGO	2026	39	4150821.3129849317	septiembre
+Proyección	ESPARRAGO	2026	40	4648919.870543124	octubre
+Proyección	ESPARRAGO	2026	41	3719135.8964344994	octubre
+Proyección	ESPARRAGO	2026	42	5467129.767758714	octubre
+Proyección	ESPARRAGO	2026	43	5303115.874725953	octubre
+Proyección	ESPARRAGO	2026	44	3393994.1598246098	octubre
+Proyección	ESPARRAGO	2026	45	4378252.466173747	noviembre
+Proyección	ESPARRAGO	2026	46	4947425.286776333	noviembre
+Proyección	ESPARRAGO	2026	47	4650579.769569753	noviembre
+Proyección	ESPARRAGO	2026	48	3534440.6248730123	noviembre
+Proyección	ESPARRAGO	2026	49	3569785.0311217424	diciembre
+Proyección	ESPARRAGO	2026	50	3105712.977075916	diciembre
+Proyección	ESPARRAGO	2026	51	5838740.396902721	diciembre
+Proyección	ESPARRAGO	2026	52	3503244.2381416326	diciembre
+Proyección	ESPARRAGO	2027	1		enero
+Proyección	ESPARRAGO	2027	2		enero
+Proyección	ESPARRAGO	2027	3		enero
+Proyección	ESPARRAGO	2027	4		enero
+Proyección	ESPARRAGO	2027	5		enero
+Proyección	ESPARRAGO	2027	6		febrero
+Proyección	ESPARRAGO	2027	7		febrero
+Proyección	ESPARRAGO	2027	8		febrero
+Proyección	ESPARRAGO	2027	9		febrero
+Proyección	ESPARRAGO	2027	10		marzo
+Proyección	ESPARRAGO	2027	11		marzo
+Proyección	ESPARRAGO	2027	12		marzo
+Proyección	ESPARRAGO	2027	13		marzo
+Proyección	ESPARRAGO	2027	14		abril
+Proyección	ESPARRAGO	2027	15		abril
+Proyección	ESPARRAGO	2027	16		abril
+Proyección	ESPARRAGO	2027	17		abril
+Proyección	ESPARRAGO	2027	18		mayo
+Proyección	ESPARRAGO	2027	19		mayo
+Proyección	ESPARRAGO	2027	20		mayo
+Proyección	ESPARRAGO	2027	21		mayo
+Proyección	ESPARRAGO	2027	22		mayo
+Proyección	ESPARRAGO	2027	23		junio
+Proyección	ESPARRAGO	2027	24		junio
+Proyección	ESPARRAGO	2027	25		junio
+Proyección	ESPARRAGO	2027	26		junio
+Proyección	ESPARRAGO	2027	27		julio
+Proyección	ESPARRAGO	2027	28	0	julio
+Proyección	FRAMBUESA	2026	26	0	junio
+Proyección	FRAMBUESA	2026	27	37228716	julio
+Proyección	FRAMBUESA	2026	28	2831262	julio
+Proyección	FRAMBUESA	2026	29	1727218	julio
+Proyección	FRAMBUESA	2026	30	7945793	julio
+Proyección	FRAMBUESA	2026	31	8633329	agosto
+Proyección	FRAMBUESA	2026	32	2221586	agosto
+Proyección	FRAMBUESA	2026	33	8597468	agosto
+Proyección	FRAMBUESA	2026	34	6588147	agosto
+Proyección	FRAMBUESA	2026	35	12319834.89	agosto
+Proyección	FRAMBUESA	2026	36	8870281.1208	septiembre
+Proyección	FRAMBUESA	2026	37	10200823.288919998	septiembre
+Proyección	FRAMBUESA	2026	38	10404839.754698398	septiembre
+Proyección	FRAMBUESA	2026	39	11549372.127715223	septiembre
+Proyección	FRAMBUESA	2026	40	11087397.242606614	octubre
+Proyección	FRAMBUESA	2026	41	8426421.904381027	octubre
+Proyección	FRAMBUESA	2026	42	7836572.371074355	octubre
+Proyección	FRAMBUESA	2026	43	8698595.331892535	octubre
+Proyección	FRAMBUESA	2026	44	10786258.211546743	octubre
+Proyección	FRAMBUESA	2026	45	6903205.255389916	noviembre
+Proyección	FRAMBUESA	2026	46	7386429.62326721	noviembre
+Proyección	FRAMBUESA	2026	47	11301237.323598832	noviembre
+Proyección	FRAMBUESA	2026	48	11753286.816542786	noviembre
+Proyección	FRAMBUESA	2026	49	11635753.948377358	diciembre
+Proyección	FRAMBUESA	2026	50	10123105.935088301	diciembre
+Proyección	FRAMBUESA	2026	51	14982196.783930685	diciembre
+Proyección	FRAMBUESA	2026	52	11236647.587948013	diciembre
+Proyección	FRAMBUESA	2027	1		enero
+Proyección	FRAMBUESA	2027	2		enero
+Proyección	FRAMBUESA	2027	3		enero
+Proyección	FRAMBUESA	2027	4		enero
+Proyección	FRAMBUESA	2027	5		enero
+Proyección	FRAMBUESA	2027	6		febrero
+Proyección	FRAMBUESA	2027	7		febrero
+Proyección	FRAMBUESA	2027	8		febrero
+Proyección	FRAMBUESA	2027	9		febrero
+Proyección	FRAMBUESA	2027	10		marzo
+Proyección	FRAMBUESA	2027	11		marzo
+Proyección	FRAMBUESA	2027	12		marzo
+Proyección	FRAMBUESA	2027	13		marzo
+Proyección	FRAMBUESA	2027	14		abril
+Proyección	FRAMBUESA	2027	15		abril
+Proyección	FRAMBUESA	2027	16		abril
+Proyección	FRAMBUESA	2027	17		abril
+Proyección	FRAMBUESA	2027	18		mayo
+Proyección	FRAMBUESA	2027	19		mayo
+Proyección	FRAMBUESA	2027	20		mayo
+Proyección	FRAMBUESA	2027	21		mayo
+Proyección	FRAMBUESA	2027	22		mayo
+Proyección	FRAMBUESA	2027	23		junio
+Proyección	FRAMBUESA	2027	24		junio
+Proyección	FRAMBUESA	2027	25		junio
+Proyección	FRAMBUESA	2027	26		junio
+Proyección	FRAMBUESA	2027	27		julio
+Proyección	FRESA	2026	26	0	junio
+Proyección	FRESA	2026	27	99443460	julio
+Proyección	FRESA	2026	28	17594036	julio
+Proyección	FRESA	2026	29	7851406	julio
+Proyección	FRESA	2026	30	20459933	julio
+Proyección	FRESA	2026	31	9129941	agosto
+Proyección	FRESA	2026	32	5825289	agosto
+Proyección	FRESA	2026	33	9613622	agosto
+Proyección	FRESA	2026	34	3613694	agosto
+Proyección	FRESA	2026	35	63131234.17999999	agosto
+Proyección	FRESA	2026	36	7575748.101599999	septiembre
+Proyección	FRESA	2026	37	8863625.278871998	septiembre
+Proyección	FRESA	2026	38	6204537.695210398	septiembre
+Proyección	FRESA	2026	39	7693626.742060894	septiembre
+Proyección	FRESA	2026	40	7616690.474640286	octubre
+Proyección	FRESA	2026	41	6550353.808190646	octubre
+Proyección	FRESA	2026	42	7139885.650927804	octubre
+Proyección	FRESA	2026	43	7925273.072529864	octubre
+Proyección	FRESA	2026	44	34078674.21187841	octubre
+Proyección	FRESA	2026	45	4771014.389662978	noviembre
+Proyección	FRESA	2026	46	7251941.872287727	noviembre
+Proyección	FRESA	2026	47	6816825.359950463	noviembre
+Proyección	FRESA	2026	48	10157069.78632619	noviembre
+Proyección	FRESA	2026	49	7617802.339744642	diciembre
+Proyección	FRESA	2026	50	6627488.035577839	diciembre
+Proyección	FRESA	2026	51	15839696.405031033	diciembre
+Proyección	FRESA	2026	52	11404581.411622344	diciembre
+Proyección	FRESA	2027	1		enero
+Proyección	FRESA	2027	2		enero
+Proyección	FRESA	2027	3		enero
+Proyección	FRESA	2027	4		enero
+Proyección	FRESA	2027	5		enero
+Proyección	FRESA	2027	6		febrero
+Proyección	FRESA	2027	7		febrero
+Proyección	FRESA	2027	8		febrero
+Proyección	FRESA	2027	9		febrero
+Proyección	FRESA	2027	10		marzo
+Proyección	FRESA	2027	11		marzo
+Proyección	FRESA	2027	12		marzo
+Proyección	FRESA	2027	13		marzo
+Proyección	FRESA	2027	14		abril
+Proyección	FRESA	2027	15		abril
+Proyección	FRESA	2027	16		abril
+Proyección	FRESA	2027	17		abril
+Proyección	FRESA	2027	18		mayo
+Proyección	FRESA	2027	19		mayo
+Proyección	FRESA	2027	20		mayo
+Proyección	FRESA	2027	21		mayo
+Proyección	FRESA	2027	22		mayo
+Proyección	FRESA	2027	23		junio
+Proyección	FRESA	2027	24		junio
+Proyección	FRESA	2027	25		junio
+Proyección	FRESA	2027	26		junio
+Proyección	FRESA	2027	27		julio
+Proyección	FRESA	2027	28	0	julio
+Proyección	PAPA	2026	26	0	junio
+Proyección	PAPA	2026	27	12796555	julio
+Proyección	PAPA	2026	28	2591433	julio
+Proyección	PAPA	2026	29	1275774	julio
+Proyección	PAPA	2026	30	3607349	julio
+Proyección	PAPA	2026	31	1570987	agosto
+Proyección	PAPA	2026	32	-616503	agosto
+Proyección	PAPA	2026	33	1931788	agosto
+Proyección	PAPA	2026	34	1244527	agosto
+Proyección	PAPA	2026	35	858723.6299999999	agosto
+Proyección	PAPA	2026	36	455123.5239	septiembre
+Proyección	PAPA	2026	37	801017.4020639999	septiembre
+Proyección	PAPA	2026	38	1457851.6717564797	septiembre
+Proyección	PAPA	2026	39	626876.2188552864	septiembre
+Proyección	PAPA	2026	40	758520.2248148965	octubre
+Proyección	PAPA	2026	41	925394.6742741737	octubre
+Proyección	PAPA	2026	42	962410.4612451406	octubre
+Proyección	PAPA	2026	43	1963317.3409400869	octubre
+Proyección	PAPA	2026	44	1649186.566389673	octubre
+Proyección	PAPA	2026	45	1533743.5067423957	noviembre
+Proyección	PAPA	2026	46	2361965.0003832895	noviembre
+Proyección	PAPA	2026	47	921166.350149483	noviembre
+Proyección	PAPA	2026	48	2008142.6433258725	noviembre
+Proyección	PAPA	2026	49	1425781.2767613693	diciembre
+Proyección	PAPA	2026	50	1297460.9618528462	diciembre
+Proyección	PAPA	2026	51	1569927.7638419438	diciembre
+Proyección	PAPA	2026	52	1161746.5452430383	diciembre
+Proyección	PAPA	2027	1		enero
+Proyección	PAPA	2027	2		enero
+Proyección	PAPA	2027	3		enero
+Proyección	PAPA	2027	4		enero
+Proyección	PAPA	2027	5		enero
+Proyección	PAPA	2027	6		febrero
+Proyección	PAPA	2027	7		febrero
+Proyección	PAPA	2027	8		febrero
+Proyección	PAPA	2027	9		febrero
+Proyección	PAPA	2027	10		marzo
+Proyección	PAPA	2027	11		marzo
+Proyección	PAPA	2027	12		marzo
+Proyección	PAPA	2027	13		marzo
+Proyección	PAPA	2027	14		abril
+Proyección	PAPA	2027	15		abril
+Proyección	PAPA	2027	16		abril
+Proyección	PAPA	2027	17		abril
+Proyección	PAPA	2027	18		mayo
+Proyección	PAPA	2027	19		mayo
+Proyección	PAPA	2027	20		mayo
+Proyección	PAPA	2027	21		mayo
+Proyección	PAPA	2027	22		mayo
+Proyección	PAPA	2027	23		junio
+Proyección	PAPA	2027	24		junio
+Proyección	PAPA	2027	25		junio
+Proyección	PAPA	2027	26		junio
+Proyección	PAPA	2027	27		julio
+Proyección	ZARZAMORA	2026	26	0	junio
+Proyección	ZARZAMORA	2026	27	7021160	julio
+Proyección	ZARZAMORA	2026	28	909857	julio
+Proyección	ZARZAMORA	2026	29	1982026	julio
+Proyección	ZARZAMORA	2026	30	4054402	julio
+Proyección	ZARZAMORA	2026	31	4210493	agosto
+Proyección	ZARZAMORA	2026	32	1035807	agosto
+Proyección	ZARZAMORA	2026	33	3372312	agosto
+Proyección	ZARZAMORA	2026	34	1287315	agosto
+Proyección	ZARZAMORA	2026	35	1428919.6500000001	agosto
+Proyección	ZARZAMORA	2026	36	671592.2355000001	septiembre
+Proyección	ZARZAMORA	2026	37	1148422.722705	septiembre
+Proyección	ZARZAMORA	2026	38	1332170.3583378	septiembre
+Proyección	ZARZAMORA	2026	39	919197.5472530819	septiembre
+Proyección	ZARZAMORA	2026	40	1222532.737846599	octubre
+Proyección	ZARZAMORA	2026	41	1723771.1603637044	octubre
+Proyección	ZARZAMORA	2026	42	1603107.179138245	octubre
+Proyección	ZARZAMORA	2026	43	3655084.368435199	octubre
+Proyección	ZARZAMORA	2026	44	2924067.4947481593	octubre
+Proyección	ZARZAMORA	2026	45	1725199.8219014143	noviembre
+Proyección	ZARZAMORA	2026	46	1673443.8272443719	noviembre
+Proyección	ZARZAMORA	2026	47	1639974.9506994844	noviembre
+Proyección	ZARZAMORA	2026	48	4263934.87181866	noviembre
+Proyección	ZARZAMORA	2026	49	2899475.7128366884	diciembre
+Proyección	ZARZAMORA	2026	50	1739685.427702013	diciembre
+Proyección	ZARZAMORA	2026	51	4749341.217626495	diciembre
+Proyección	ZARZAMORA	2026	52	3324538.8523385464	diciembre
+Proyección	ZARZAMORA	2027	1		enero
+Proyección	ZARZAMORA	2027	2		enero
+Proyección	ZARZAMORA	2027	3		enero
+Proyección	ZARZAMORA	2027	4		enero
+Proyección	ZARZAMORA	2027	5		enero
+Proyección	ZARZAMORA	2027	6		febrero
+Proyección	ZARZAMORA	2027	7		febrero
+Proyección	ZARZAMORA	2027	8		febrero
+Proyección	ZARZAMORA	2027	9		febrero
+Proyección	ZARZAMORA	2027	10		marzo
+Proyección	ZARZAMORA	2027	11		marzo
+Proyección	ZARZAMORA	2027	12		marzo
+Proyección	ZARZAMORA	2027	13		marzo
+Proyección	ZARZAMORA	2027	14		abril
+Proyección	ZARZAMORA	2027	15		abril
+Proyección	ZARZAMORA	2027	16		abril
+Proyección	ZARZAMORA	2027	17		abril
+Proyección	ZARZAMORA	2027	18		mayo
+Proyección	ZARZAMORA	2027	19		mayo
+Proyección	ZARZAMORA	2027	20		mayo
+Proyección	ZARZAMORA	2027	21		mayo
+Proyección	ZARZAMORA	2027	22		mayo
+Proyección	ZARZAMORA	2027	23		junio
+Proyección	ZARZAMORA	2027	24		junio
+Proyección	ZARZAMORA	2027	25		junio
+Proyección	ZARZAMORA	2027	26		junio
+Proyección	ZARZAMORA	2027	27		julio
+Proyección	ZARZAMORA	2027	28	0	julio
+Proyección	EMPAQUE	2026	26	0	junio
+Proyección	EMPAQUE	2026	27	120449	julio
+Proyección	EMPAQUE	2026	28	420738	julio
+Proyección	EMPAQUE	2026	29	339804	julio
+Proyección	EMPAQUE	2026	30	222040	julio
+Proyección	EMPAQUE	2026	31	1045543	agosto
+Proyección	EMPAQUE	2026	32	327605	agosto
+Proyección	EMPAQUE	2026	33	366123	agosto
+Proyección	EMPAQUE	2026	34	3820233	agosto
+Proyección	EMPAQUE	2026	35	3973042.3200000003	agosto
+Proyección	EMPAQUE	2026	36	4489537.8216	septiembre
+Proyección	EMPAQUE	2026	37	5432340.764136001	septiembre
+Proyección	EMPAQUE	2026	38	5921251.432908241	septiembre
+Proyección	EMPAQUE	2026	39	6217314.004553653	septiembre
+Proyección	EMPAQUE	2026	40	7958161.925828677	octubre
+Proyección	EMPAQUE	2026	41	8276488.402861824	octubre
+Proyección	EMPAQUE	2026	42	9435196.779262481	octubre
+Proyección	EMPAQUE	2026	43	8019917.262373108	octubre
+Proyección	EMPAQUE	2026	44	10425892.44108504	octubre
+Proyección	EMPAQUE	2026	45	15638838.66162756	noviembre
+Proyección	EMPAQUE	2026	46	16733557.367941491	noviembre
+Proyección	EMPAQUE	2026	47	17570235.236338567	noviembre
+Proyección	EMPAQUE	2026	48	14056188.189070854	noviembre
+Proyección	EMPAQUE	2026	49	15040121.362305814	diciembre
+Proyección	EMPAQUE	2026	50	15641726.216798047	diciembre
+Proyección	EMPAQUE	2026	51	16736647.051973911	diciembre
+Proyección	EMPAQUE	2026	52	17406112.93405287	diciembre
+Proyección	EMPAQUE	2027	1		enero
+Proyección	EMPAQUE	2027	2		enero
+Proyección	EMPAQUE	2027	3		enero
+Proyección	EMPAQUE	2027	4		enero
+Proyección	EMPAQUE	2027	5		enero
+Proyección	EMPAQUE	2027	6		febrero
+Proyección	EMPAQUE	2027	7		febrero
+Proyección	EMPAQUE	2027	8		febrero
+Proyección	EMPAQUE	2027	9		febrero
+Proyección	EMPAQUE	2027	10		marzo
+Proyección	EMPAQUE	2027	11		marzo
+Proyección	EMPAQUE	2027	12		marzo
+Proyección	EMPAQUE	2027	13		marzo
+Proyección	EMPAQUE	2027	14		abril
+Proyección	EMPAQUE	2027	15		abril
+Proyección	EMPAQUE	2027	16		abril
+Proyección	EMPAQUE	2027	17		abril
+Proyección	EMPAQUE	2027	18		mayo
+Proyección	EMPAQUE	2027	19		mayo
+Proyección	EMPAQUE	2027	20		mayo
+Proyección	EMPAQUE	2027	21		mayo
+Proyección	EMPAQUE	2027	22		mayo
+Proyección	EMPAQUE	2027	23		junio
+Proyección	EMPAQUE	2027	24		junio
+Proyección	EMPAQUE	2027	25		junio
+Proyección	EMPAQUE	2027	26		junio
+Proyección	EMPAQUE	2027	27		julio
+Proyección	EMPAQUE	2027	28	0	julio`,
+  // Hoja "Variación Egreso" (% semanal por cultivo) — la llena el Apps Script actualizarForecast()
+  variacion: ``
  },
  ingreso: {
   real: ``,
@@ -4409,6 +3936,7 @@ Proyección	ESPARRAGO	2027	28	0	julio`
  }
 };
 
+
 function slotId(tipo,variable){ return `slot_${tipo}_${variable}`; }
 
 function buildLoaderGrid(){
@@ -4417,12 +3945,12 @@ function buildLoaderGrid(){
   VARIABLES.forEach(variable=>{
     const col = document.createElement('div'); col.className = 'loadercol';
     col.innerHTML = `<div class="colhead">${VAR_LABEL[variable]}</div>`;
-    TIPOS.forEach(tipo=>{
+    SLOT_DEFS.filter(s=>s.variable===variable).forEach(({tipo})=>{
       const id = slotId(tipo,variable);
-      const slot = document.createElement('div'); slot.className='slot';
+      const slot = document.createElement('div'); slot.className = 'slot' + (tipo==='variacion' ? ' new' : '');
       slot.innerHTML = `
         <div class="slothead"><span>${TIPO_LABEL[tipo]}</span><span class="count" id="${id}_count">0 filas</span></div>
-        <textarea id="${id}_text" placeholder="cultivo,ejercicio,semana,importe"></textarea>
+        <textarea id="${id}_text" placeholder="${tipo==='variacion' ? 'Variación Egreso, Cultivo, ejercicio, semana, Variación, Mes' : 'Tipo, Cultivo, ejercicio, semana, Importe, Mes'}"></textarea>
         <div class="slotfoot"><input type="file" accept=".csv,.tsv,.txt" id="${id}_file"></div>`;
       col.appendChild(slot);
     });
@@ -4442,8 +3970,7 @@ function buildLoaderGrid(){
 function loadDemoIntoSlots(){
   const rows = generateDemoRows();
   SLOT_DEFS.forEach(({tipo,variable})=>{
-    const id = slotId(tipo,variable);
-    document.getElementById(id+'_text').value = rowsToCsv(rows[variable], tipo);
+    document.getElementById(slotId(tipo,variable)+'_text').value = rowsToCsv(rows[variable], tipo);
   });
   state.isDemo = true;
   document.getElementById('dataTag').textContent = 'demo';
@@ -4451,13 +3978,8 @@ function loadDemoIntoSlots(){
 }
 
 function loadBakedDefaults(){
-  // Carga los datos base (BAKED_DATA) en las 9 casillas — las combinaciones que aún no
-  // llegaron del Google Sheet quedan vacías. Esto es lo que corre solo al abrir la
-  // herramienta, y lo que reescribe la tarea programada cada vez que se refresca.
-  VARIABLES.forEach(variable=>{
-    TIPOS.forEach(tipo=>{
-      document.getElementById(slotId(tipo,variable)+'_text').value = (BAKED_DATA[variable] && BAKED_DATA[variable][tipo]) || '';
-    });
+  SLOT_DEFS.forEach(({tipo,variable})=>{
+    document.getElementById(slotId(tipo,variable)+'_text').value = (BAKED_DATA[variable] && BAKED_DATA[variable][tipo]) || '';
   });
   state.isDemo = false;
   const loadedVars = VARIABLES.filter(v=> TIPOS.some(t=> (BAKED_DATA[v] && BAKED_DATA[v][t])));
@@ -4469,48 +3991,60 @@ function loadBakedDefaults(){
   processAllSlots();
 }
 
+// Lee las 10 casillas y arma state.raw / state.variacion / state.weekMes.
+//  · Real: si la hoja Real de una variable trae algún importe distinto de 0, el real sale de ahí
+//    (semanas ya transcurridas, importe ≠ 0). Si viene vacía, se conserva el comportamiento anterior:
+//    las semanas ya transcurridas de Proyección (importe > 0) hacen de real.
+//  · Proyección: siempre se conserva con origTipo:'proyeccion'.
+//  · Variación Egreso: % semanal por cultivo que usa el método "Variación estacional".
 function processAllSlots(){
-  // Decisión de Rafael (18 sep, tarde): dejar de usar la hoja "Real" — su casilla se queda en la
-  // pestaña Datos por si alguien pega algo ahí por costumbre, pero ya no se procesa (ver
-  // TIPO_LABEL.real). En su lugar, la hoja "Proyección" (la misma que ya se pegaba antes) hace las
-  // dos funciones: Rafael la mantiene con el egreso REAL ya ocurrido en las semanas que pasaron y el
-  // egreso PROYECTADO por su Excel en las semanas que faltan, todo en una sola columna. Por eso, al
-  // leerla, se separa por fecha: las filas de semanas que ya pasaron (fecha <= hoy) alimentan el
-  // mismo lugar que antes alimentaba "Real" (re-etiquetadas tipo:'real' — el resto de la herramienta,
-  // que ya sabe leer tipo:'real' para ajustar los métodos de proyección, la tabla, los KPIs y el
-  // corte "¿ya hay dato de este mes?", no necesita ningún otro cambio); las filas de semanas futuras
-  // siguen siendo la referencia "Proyección equipo", igual que antes, solo que ya sin duplicar filas
-  // de semanas pasadas. Un $0 en una semana que ya pasó se trata como "todavía no capturada" (mismo
-  // criterio que ya se usaba en toda la herramienta) y no se cuenta como real.
-  const newRaw = { egreso:[], ingreso:[], produccion:[] };
+  const parsed = {};
   const errors = [], notes = [];
   SLOT_DEFS.forEach(({tipo,variable})=>{
     const id = slotId(tipo,variable);
-    if(tipo==='real'){
-      document.getElementById(id+'_count').textContent = 'no se usa';
-      document.getElementById(id+'_count').classList.remove('has');
-      return;
-    }
-    const text = document.getElementById(id+'_text').value;
-    const { records, errors: errs, notes: nts } = parseSlot(text, tipo);
-    if(tipo==='proyeccion'){
-      // origTipo queda fijo en 'proyeccion' PARA SIEMPRE, sin importar que `tipo` se reetiquete a
-      // 'real' en cuanto la fecha de la fila queda en el pasado (ver comentario de arriba) -- así,
-      // "Proyección equipo" (tabla Histórico y forecast mensual, decimonovena iteración) puede
-      // seguir sumando exactamente lo que el equipo pegó en esta casilla para un mes ya transcurrido,
-      // en vez de perder esas filas apenas se reclasifican como reales (pedido explícito de Rafael:
-      // que ese número no "se mueva" una vez que el mes ya terminó).
-      const pasadas = records.filter(r=>r.date<=NOW_UTC && r.importe>0).map(r=>Object.assign({}, r, {tipo:'real', origTipo:'proyeccion'}));
-      const futuras = records.filter(r=>r.date>NOW_UTC).map(r=>Object.assign({}, r, {origTipo:'proyeccion'}));
-      newRaw[variable] = newRaw[variable].concat(pasadas, futuras);
-    } else {
-      newRaw[variable] = newRaw[variable].concat(records);
-    }
+    const { records, errors: errs, notes: nts } = parseSlot(document.getElementById(id+'_text').value, tipo);
+    parsed[variable+'|'+tipo] = records;
     errs.forEach(e=> errors.push(`[${VAR_LABEL[variable]} · ${TIPO_LABEL[tipo]}] ${e}`));
     (nts||[]).forEach(n=> notes.push(`[${VAR_LABEL[variable]} · ${TIPO_LABEL[tipo]}] ${n}`));
     document.getElementById(id+'_count').textContent = records.length+' filas';
     document.getElementById(id+'_count').classList.toggle('has', records.length>0);
   });
+
+  // Mapa semana → Mes con la columna Mes de Real/Presupuesto/Proyección (en ese orden de prioridad);
+  // la hoja de Variación solo se usa si ninguna otra hoja trae esa semana.
+  state.weekMes = {};
+  ['real','presupuesto','proyeccion','variacion'].forEach(t=> VARIABLES.forEach(v=> (parsed[v+'|'+t]||[]).forEach(r=>{
+    const k = mesToMonthKey(r.mes, r.date);
+    if(!k) return;
+    const wk = weekKey(r.date);
+    if(!(wk in state.weekMes)) state.weekMes[wk] = k;
+  })));
+  Object.values(parsed).forEach(list=> list.forEach(r=>{ r.mk = monthKeyForWeek(r.date, r.mes); }));
+
+  const newRaw = { egreso:[], ingreso:[], produccion:[] };
+  state.realFromSheet = {};
+  VARIABLES.forEach(variable=>{
+    const real = parsed[variable+'|real'] || [];
+    const proy = parsed[variable+'|proyeccion'] || [];
+    const pres = parsed[variable+'|presupuesto'] || [];
+    const useReal = real.some(r=>r.importe!==0);
+    state.realFromSheet[variable] = useReal;
+    if(useReal){
+      newRaw[variable].push(...real.filter(r=>r.date<=NOW_UTC && r.importe!==0));
+      newRaw[variable].push(...proy.map(r=>Object.assign({}, r, {origTipo:'proyeccion'})));
+    } else {
+      newRaw[variable].push(...proy.filter(r=>r.date<=NOW_UTC && r.importe>0).map(r=>Object.assign({}, r, {tipo:'real', origTipo:'proyeccion'})));
+      newRaw[variable].push(...proy.filter(r=>r.date>NOW_UTC).map(r=>Object.assign({}, r, {origTipo:'proyeccion'})));
+    }
+    newRaw[variable].push(...pres);
+  });
+
+  state.variacion = {};
+  (parsed['egreso|variacion']||[]).forEach(r=>{
+    (state.variacion[r.cultivo] = state.variacion[r.cultivo]||[]).push({ date:r.date, rate:r.importe, mk:r.mk });
+  });
+  Object.values(state.variacion).forEach(list=> list.sort((a,b)=>a.date-b.date));
+
   state.raw = newRaw;
   state.errors = errors;
   state.notes = notes;
@@ -4521,21 +4055,10 @@ function processAllSlots(){
 }
 
 function clearAllSlots(){
-  SLOT_DEFS.forEach(({tipo,variable})=>{
-    const id = slotId(tipo,variable);
-    document.getElementById(id+'_text').value='';
-    document.getElementById(id+'_count').textContent='0 filas';
-    document.getElementById(id+'_count').classList.remove('has');
-  });
-  state.raw = { egreso:[], ingreso:[], produccion:[] };
-  state.errors = [];
-  state.notes = [];
+  SLOT_DEFS.forEach(({tipo,variable})=>{ document.getElementById(slotId(tipo,variable)+'_text').value=''; });
   state.isDemo = false;
   document.getElementById('dataTag').textContent = 'vacío';
-  clearForecastCache();
-  state.monthly = buildMonthlyIndex();
-  renderStatus();
-  renderAll();
+  processAllSlots();
 }
 
 function renderStatus(){
@@ -4543,14 +4066,15 @@ function renderStatus(){
   const totalRows = VARIABLES.reduce((a,v)=>a+state.raw[v].length,0);
   const cropsSeen = new Set();
   VARIABLES.forEach(v=>state.raw[v].forEach(r=>{ if(CROPS.includes(r.cultivo)) cropsSeen.add(r.cultivo); }));
-  const seasonsSeen = new Set(); VARIABLES.forEach(v=>state.raw[v].forEach(r=>seasonsSeen.add(getSeasonLabel(r.date))));
-  const otrosTotal = VARIABLES.reduce((sum,v)=> sum + state.raw[v].filter(r=>r.cultivo===OTHER_LABEL && r.tipo==='real').reduce((a,r)=>a+r.importe,0), 0);
+  const varRows = Object.values(state.variacion).reduce((a,l)=>a+l.length,0);
+  const varCrops = Object.keys(state.variacion).length;
+  const otrosTotal = state.raw.egreso.filter(r=>r.cultivo===OTHER_LABEL && r.tipo==='real').reduce((a,r)=>a+r.importe,0);
   box.innerHTML = `
     <div class="statusitem"><div class="n">${fmtNum(totalRows)}</div><div class="l">Filas cargadas</div></div>
     <div class="statusitem"><div class="n">${cropsSeen.size}/7</div><div class="l">Cultivos detectados</div></div>
-    <div class="statusitem"><div class="n">${seasonsSeen.size}</div><div class="l">Temporadas detectadas</div></div>
+    <div class="statusitem"><div class="n">${fmtNum(varRows)}</div><div class="l">Semanas con % de variación (${varCrops} cultivos)</div></div>
     <div class="statusitem"><div class="n">${state.errors.length}</div><div class="l">Filas con error</div></div>
-    <div class="statusitem"><div class="n">${fmtMXN(otrosTotal)}</div><div class="l">Otros/Overhead (real, no asignado a cultivo)</div></div>`;
+    <div class="statusitem"><div class="n">${fmtM(otrosTotal)}</div><div class="l">Empaque (egreso real)</div></div>`;
   const noteWrap = document.getElementById('noteBoxWrap');
   const noteList = document.getElementById('noteList');
   if(state.notes && state.notes.length){
@@ -4569,33 +4093,11 @@ function renderStatus(){
 /* ============================================================
    13. FILTER UI + WIRING
    ============================================================ */
-// No todos los filtros del panel izquierdo aplican en todas las pestañas -- mostrarlos siempre,
-// aunque no muevan nada en la pestaña activa, es justo lo que generó la confusión que Rafael
-// reportó el 22 sep (décima primera y decimocuarta iteración): seleccionar un cultivo en "Cultivo
-// enfocado" no cambia nada en 🏢 Comparativo de cultivos, porque esa pestaña siempre compara los
-// cultivos marcados en "Cultivos incluidos" (`includedCropsOrdered()`) sin importar el valor de
-// `focalCrop` (ver `perCropTotals()`); en cambio "Mes de referencia" (`periodMonths()`) SOLO lo usa
-// esa misma pestaña. Esta función revela/oculta cada control según en qué pestaña está el usuario,
-// para que lo que se ve en el panel siempre pueda mover algo en la vista activa.
 function syncFilterVisibility(){
   const tab = document.querySelector('.tabbtn.active').dataset.tab;
   const enComparativo = tab==='comparativo';
-
-  // El selector de "Cultivo enfocado" del panel puede quedar desactualizado si el cambio vino del
-  // selector gemelo dentro de la tarjeta "Histórico y forecast mensual" (decimoctava iteración) --
-  // este es el único punto que corre después de CUALQUIER cambio de focalCrop, así que es donde se
-  // mantienen ambos selectores sincronizados con el estado real.
   document.getElementById('focalCrop').value = state.filters.focalCrop;
-
-  // "Cultivo enfocado": no tiene ningún efecto en Comparativo (esa pestaña siempre compara TODOS
-  // los cultivos incluidos a la vez) -- se oculta ahí, se muestra en Forecast/Escenarios.
   document.getElementById('focalCropField').hidden = enComparativo;
-
-  // "¿Cuáles cultivos entran al consolidado?": en Forecast/Escenarios solo aplica cuando "Cultivo
-  // enfocado" está en Consolidado (igual que antes). En Comparativo, es el ÚNICO control que decide
-  // qué cultivos aparecen en la comparación (independiente de "Cultivo enfocado", que ahí ni se
-  // muestra), así que se muestra siempre -- con su título y sangría ajustados para no leerse como
-  // "dependiente de un dropdown" que en esa pestaña no está.
   const includedField = document.getElementById('includedField');
   const includedTitle = document.getElementById('includedFieldTitle');
   if(enComparativo){
@@ -4607,50 +4109,46 @@ function syncFilterVisibility(){
     includedField.classList.add('indented');
     includedTitle.textContent = '¿Cuáles cultivos entran al consolidado?';
   }
-
-  // "Mes de referencia": solo lo usa `periodMonths()`, y solo lo consume la pestaña Comparativo
-  // (ver `perCropTotals()`) -- en Forecast/Escenarios los KPIs y gráficas siempre son el total de
-  // los 3 meses de pronóstico sin importar este filtro, así que ahí se esconde.
   document.getElementById('mesField').hidden = !enComparativo;
-
-  // Todo el bloque "Escenario" (los 3 botones Pesimista/Base/Optimista + la tabla mini de %) no
-  // mueve NADA en la pestaña Escenarios: `renderEscenariosChart()` y `renderScenarioTableNumbers()`
-  // calculan los 3 escenarios a la vez sin leer `state.filters.escenario` en ningún momento (esa
-  // pestaña siempre los muestra lado a lado), y la tabla mini de % ya es redundante ahí frente a
-  // "Supuestos por escenario" (misma `state.scenarios`, decimoquinta iteración). Rafael lo confirmó
-  // señalando que ya tiene la tabla grande arriba (decimosexta iteración) -- se oculta el campo
-  // completo en Escenarios; en Forecast/Comparativo ambos SÍ filtran (`ebitdaSet`/`perCropTotals`
-  // leen `state.filters.escenario`), así que ahí se quedan visibles como siempre.
   document.getElementById('escenarioField').hidden = (tab==='escenarios');
+  // Mensual/Acumulado solo afecta las gráficas y la tabla de la pestaña Forecast.
+  document.getElementById('vistaField').hidden = (tab!=='forecast');
+}
+
+// Aviso bajo "Método de proyección": de dónde sale el cálculo del método elegido.
+function renderMetodoHint(){
+  const el = document.getElementById('metodoHint');
+  const crops = currentCropsSelection();
+  const method = state.filters.metodo;
+  let anchor = null;
+  crops.forEach(c=>{ const s = realWeeklyFor('egreso', c); if(s.length){ const d = s[s.length-1].date; if(!anchor || d>anchor) anchor = d; } });
+  const anchorTxt = anchor ? `semana ${dateToWeekYear(anchor).w} (${fmtDateHuman(anchor)})` : 'sin semanas reales';
+  el.classList.remove('warn');
+  if(method==='estacional'){
+    const sinVar = crops.filter(c=> estacionalSourceFor('egreso', c)!=='variacion' && realWeeklyFor('egreso', c).length);
+    if(!Object.keys(state.variacion).length){
+      el.classList.add('warn');
+      el.innerHTML = '⚠️ No hay hoja <b>Variación Egreso</b> cargada — mientras tanto, el egreso de las semanas por venir se toma tal cual de Proyección Egreso.';
+    } else if(sinVar.length){
+      el.classList.add('warn');
+      el.innerHTML = `Egreso = semana anterior × (1 + % Variación), desde la última real: ${anchorTxt}. ⚠️ Sin % en la hoja de Variación: ${sinVar.map(c=>DISPLAY[c]).join(', ')} — para esos se usa Proyección Egreso.`;
+    } else {
+      el.innerHTML = `Egreso = semana anterior × (1 + % Variación Egreso), encadenado desde la última semana real: ${anchorTxt}. Ingreso y Producción usan su hoja de Proyección.`;
+    }
+  } else {
+    el.innerHTML = `Ajustado sobre las semanas reales; proyecta desde la semana siguiente a la última real (${anchorTxt}).`;
+  }
 }
 
 function buildFilterUI(){
   const focal = document.getElementById('focalCrop');
   focal.innerHTML = cropSelectOptionsHTML('Consolidado (todos)');
   focal.value = state.filters.focalCrop;
-  focal.addEventListener('change', ()=>{
-    state.filters.focalCrop = focal.value;
-    syncFilterVisibility();
-    renderAll();
-  });
-  // Selector gemelo dentro de la tarjeta "Histórico y forecast mensual" (decimoctava iteración):
-  // mismo cambio, mismo estado (`state.filters.focalCrop`) -- syncFilterVisibility() se encarga de
-  // que el selector del panel (`focal`) quede al día cuando el cambio viene de aquí.
-  document.getElementById('tableCropSelect').addEventListener('change', e=>{
-    state.filters.focalCrop = e.target.value;
-    syncFilterVisibility();
-    renderAll();
-  });
-  // Selector de variable de la tarjeta "Histórico y forecast mensual" (decimonovena iteración):
-  // el estado "on" de los 4 botones se decide dentro de renderHistoricoTable() en cada render, no
-  // aquí -- el click solo mueve el estado y pide un re-render.
+  focal.addEventListener('change', ()=>{ state.filters.focalCrop = focal.value; renderAll(); });
+  document.getElementById('tableCropSelect').addEventListener('change', e=>{ state.filters.focalCrop = e.target.value; renderAll(); });
   document.getElementById('tableVariableSeg').querySelectorAll('button').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      state.filters.tablaVariable = btn.dataset.var;
-      renderAll();
-    });
+    btn.addEventListener('click', ()=>{ state.filters.tablaVariable = btn.dataset.var; renderAll(); });
   });
-  syncFilterVisibility();
 
   const chipwrap = document.getElementById('includedChips');
   const chipItems = CROPS.concat([OTHER_LABEL]);
@@ -4661,9 +4159,8 @@ function buildFilterUI(){
   chipwrap.querySelectorAll('.chip').forEach(chip=>{
     const cb = chip.querySelector('input');
     cb.addEventListener('change', ()=>{
-      const c = cb.value;
-      if(cb.checked){ state.filters.included.add(c); chip.classList.add('on'); }
-      else { state.filters.included.delete(c); chip.classList.remove('on'); }
+      if(cb.checked){ state.filters.included.add(cb.value); chip.classList.add('on'); }
+      else { state.filters.included.delete(cb.value); chip.classList.remove('on'); }
       renderAll();
     });
   });
@@ -4685,19 +4182,21 @@ function buildFilterUI(){
   document.getElementById('escenarioSeg').querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       state.filters.escenario = btn.dataset.sc;
-      document.querySelectorAll('#escenarioSeg button').forEach(b=>b.classList.remove('on'));
+      document.querySelectorAll('#escenarioSeg button').forEach(b=>b.classList.remove('on','base','optimista','pesimista'));
       btn.classList.add('on', btn.dataset.sc);
       renderAll();
     });
   });
 
   document.getElementById('metodoProyeccion').addEventListener('change', e=>{
-    state.filters.metodo = e.target.value; clearForecastCache(); renderAll();
+    state.filters.metodo = e.target.value; renderAll();
   });
 
-  document.getElementById('tcBase').addEventListener('change', e=>{
-    state.tcBase = parseFloat(e.target.value)||16.9;
+  document.getElementById('vistaSeg').querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.filters.vista = btn.dataset.vista; renderAll(); });
   });
+
+  document.getElementById('tcBase').addEventListener('change', e=>{ state.tcBase = parseFloat(e.target.value)||16.9; });
 }
 
 function buildTabs(){
@@ -4715,10 +4214,8 @@ function buildTabs(){
 /* ============================================================
    14. MASTER RENDER
    ============================================================ */
-function hasIngresoData(){ return state.raw.ingreso.length>0; }
-
 function syncIngresoBanners(){
-  const hide = hasIngresoData();
+  const hide = state.raw.ingreso.length>0;
   ['ingresoWarnBanner','ingresoWarnBannerEsc','ingresoWarnBannerComp'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.hidden = hide;
@@ -4729,10 +4226,9 @@ function renderAll(){
   refreshThemeColors();
   syncIngresoBanners();
   syncFilterVisibility();
-  // La tabla mini de % en el panel de Filtros está siempre a la vista (no importa qué pestaña esté
-  // activa), así que se refresca aquí siempre -- distinto de renderScenarioTable(), que solo se
-  // llama cuando la pestaña Escenarios está activa (dentro de renderEscenariosTab).
   renderScenarioMiniTable();
+  renderMetodoHint();
+  document.querySelectorAll('#vistaSeg button').forEach(b=> b.classList.toggle('on', b.dataset.vista===state.filters.vista));
   const activeTab = document.querySelector('.tabbtn.active').dataset.tab;
   if(activeTab==='forecast') renderForecastTab();
   else if(activeTab==='escenarios') renderEscenariosTab();
@@ -4743,23 +4239,25 @@ function init(){
   document.getElementById('seasonLabelTop').textContent = CURRENT_SEASON;
   document.getElementById('badgeToday').textContent = fmtDateHuman(NOW_UTC);
   document.getElementById('badgeForecastRange').textContent = monthLabel(FORECAST_MONTHS[0])+' – '+monthLabel(FORECAST_MONTHS[2]);
-
   buildFilterUI();
   buildTabs();
   buildLoaderGrid();
-
   document.getElementById('btnDemo').addEventListener('click', loadDemoIntoSlots);
   document.getElementById('btnProcesar').addEventListener('click', ()=>{ state.isDemo=false; document.getElementById('dataTag').textContent='tus datos'; processAllSlots(); });
   document.getElementById('btnLimpiar').addEventListener('click', clearAllSlots);
   document.getElementById('btnEgresoReal').addEventListener('click', loadBakedDefaults);
-
   loadBakedDefaults();
-
   if(window.matchMedia){
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
   }
 }
 
+// Solo para pruebas automáticas (Node); en el navegador no hace nada.
+if(typeof window!=='undefined' && window.__FORECAST_TEST__){
+  window.__FORECAST_TEST__.api = { state, parseSlot, parsePercent, processAllSlots, projectedWeeks, monthlyParts, kindSeries, scenarioForecastConsolidated, ebitdaSet, fmtM, DISPLAY_MONTHS, FORECAST_MONTHS, renderAll, BAKED_DATA, estacionalSourceFor };
+}
+
 document.addEventListener('DOMContentLoaded', init);
 })();
-</script></html>
+</script>
+</body></html>
