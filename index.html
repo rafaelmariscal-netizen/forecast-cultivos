@@ -376,16 +376,16 @@
           ⚠️ Falta cargar <b>Ingreso</b> — el EBITDA y la participación de esta vista todavía no son representativos, solo reflejan el Egreso.
         </div>
         <div class="card">
-          <h4>Comparación de los 7 cultivos</h4>
+          <h4>Comparación de los 7 cultivos — <span data-comp-periodo></span></h4>
           <p class="cardsub" id="comparativoSub"></p>
           <div class="chartbox tall"><canvas id="chartCultivos"></canvas></div>
         </div>
         <div class="card">
-          <h4>Participación de cada cultivo en ingresos, egresos y EBITDA</h4>
+          <h4>Participación de cada cultivo en ingresos, egresos y EBITDA — <span data-comp-periodo></span></h4>
           <div class="chartbox wide"><canvas id="chartParticipacion"></canvas></div>
         </div>
         <div class="card">
-          <h4>Detalle por cultivo</h4>
+          <h4>Detalle por cultivo — <span data-comp-periodo></span></h4>
           <div class="tablewrap">
             <table id="tablaCultivos"><thead></thead><tbody></tbody></table>
           </div>
@@ -1106,6 +1106,53 @@ function baseScales(extra){
     y: { grid:{ color:CH.grid }, ticks:{ color:CH.muted }, border:{ color:CH.baseline } }
   }, extra||{});
 }
+// Etiqueta de % dentro de cada tramo de la gráfica "Participación de cada cultivo".
+// Se dibuja en cada render, así que siempre refleja los datos actuales (filtros, método, escenario).
+// Si el tramo es muy angosto para que quepa el texto, no se escribe (el % sigue en el tooltip).
+function textColorFor(bg){
+  const h = (bg||'').trim();
+  if(h[0]!=='#') return '#fff';
+  const x = h.length===4 ? h.slice(1).split('').map(c=>c+c).join('') : h.slice(1,7);
+  const r=parseInt(x.slice(0,2),16), g=parseInt(x.slice(2,4),16), b=parseInt(x.slice(4,6),16);
+  return (0.299*r+0.587*g+0.114*b) > 160 ? '#1f2328' : '#ffffff';
+}
+const participacionLabelsPlugin = {
+  id:'participacionLabels',
+  afterDatasetsDraw(chart){
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.font = '600 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const narrowCount = {}; // tramos angostos por barra, para alternar arriba/abajo y no encimarlos
+    chart.data.datasets.forEach((ds, di)=>{
+      const meta = chart.getDatasetMeta(di);
+      if(meta.hidden || !chart.isDatasetVisible(di)) return;
+      meta.data.forEach((bar, i)=>{
+        const v = ds.data[i];
+        if(v==null || !isFinite(v) || v<=0) return;
+        const txt = v.toFixed(1)+'%';
+        const w = Math.abs(bar.x - bar.base);
+        const cx = (bar.x + bar.base)/2;
+        if(w >= ctx.measureText(txt).width + 6){
+          ctx.fillStyle = textColorFor(ds.backgroundColor);
+          ctx.fillText(txt, cx, bar.y);
+        } else {
+          // No cabe dentro: se escribe fuera del tramo (arriba, y si hay otro angosto al lado, abajo),
+          // con el color del cultivo para que se identifique.
+          const k = narrowCount[i] = (narrowCount[i]||0) + 1;
+          const off = (bar.height||20)/2 + 9;
+          const y = k % 2 ? bar.y - off : bar.y + off;
+          const tw = ctx.measureText(txt).width;
+          const x = Math.min(Math.max(cx, chart.chartArea.left + tw/2), chart.chartArea.right - tw/2 + 12);
+          ctx.fillStyle = ds.backgroundColor;
+          ctx.fillText(txt, x, y);
+        }
+      });
+    });
+    ctx.restore();
+  }
+};
+
 function hexA(hex, alpha){
   if(!hex) return 'rgba(0,0,0,'+alpha+')';
   hex = hex.trim();
@@ -1409,6 +1456,11 @@ function perCropTotals(){
   });
 }
 function renderComparativoTab(){
+  // Periodo en el título de cada gráfica/tabla: deja claro que son datos PROYECTADOS, no del presente.
+  const periodoTxt = state.filters.mes==='TOTAL3'
+    ? `Proyección de los próximos 3 meses (${monthLabel(FORECAST_MONTHS[0])} – ${monthLabel(FORECAST_MONTHS[FORECAST_MONTHS.length-1])})`
+    : `Proyección de ${monthLabel(state.filters.mes)}`;
+  document.querySelectorAll('[data-comp-periodo]').forEach(el=> el.textContent = periodoTxt);
   document.getElementById('comparativoSub').textContent =
     `Escenario ${state.filters.escenario} · ${METODO_LABEL[state.filters.metodo]} · ${state.filters.mes==='TOTAL3' ? 'Total de los 3 meses proyectados' : monthLabel(state.filters.mes)}`;
   const totals = perCropTotals();
@@ -1454,7 +1506,8 @@ function renderComparativoTab(){
         plugins:{ legend:{ position:'top', labels:{ boxWidth:10, color:CH.text, font:{size:10.5} } },
           tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+c.raw.toFixed(1)+'%' } } },
         scales:{ x:{ stacked:true, max:100, grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>v+'%' } }, y:{ stacked:true, grid:{color:'transparent'}, ticks:{ color:CH.muted } } }
-      }
+      },
+      plugins:[ participacionLabelsPlugin ]
     });
   }
 
