@@ -260,6 +260,11 @@
           <option value="movil">🔄 Promedio móvil (12 semanas)</option>
           <option value="estacional">📐 Variación estacional (método Excel)</option>
         </select>
+        <div class="field indented" id="castigoField" hidden>
+          <label for="castigoMovil">Castigo (%)</label>
+          <input type="number" id="castigoMovil" class="textinput" min="0" max="100" step="any" placeholder="Sin castigo" inputmode="decimal">
+          <p class="hint">Solo aplica al Promedio móvil. Ej.: 20 = la proyección queda al 80% del promedio. Vacío = sin castigo.</p>
+        </div>
         <p class="hint" id="metodoHint"></p>
       </div>
       <div class="field" id="vistaField">
@@ -611,7 +616,7 @@ const state = {
   realFromSheet: {},                                // variable → true si el real sale de la hoja Real
   weekMes: {},                                      // 'AAAA-S' → 'AAAA-MM'
   monthly: null,
-  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat([OTHER_LABEL])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial', tablaVariable:'egreso', vista:'mensual' },
+  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat([OTHER_LABEL])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial', castigoMovil:'', tablaVariable:'egreso', vista:'mensual' },
   scenarios: {
     base:      { ingreso:0, egreso:0, produccion:0, tc:0 },
     optimista: { ingreso:8, egreso:-5, produccion:5, tc:5 },
@@ -862,6 +867,14 @@ function solveLinear(A, B){
   return M.map((row,i)=> row[n]/row[i]);
 }
 
+// Castigo aplicado únicamente al método "Promedio móvil": sale de la casilla "Castigo (%)".
+// Vacío o 0 = sin castigo; 20 = 20%; se limita a 0–100.
+function castigoMovilPct(){
+  const v = Number(state.filters.castigoMovil);
+  if(!isFinite(v) || v<=0) return 0;
+  return Math.min(100, v);
+}
+
 // Modelos estadísticos (polinomial / móvil / promedio) ajustados sobre las semanas reales.
 function computeMethodModel(sortedRecords, method){
   if(!sortedRecords.length) return ()=>0;
@@ -900,9 +913,12 @@ function computeMethodModel(sortedRecords, method){
     };
   }
   if(method==='movil'){
+    // Promedio móvil de las últimas 12 semanas reales, con el castigo opcional de la casilla:
+    //   Proyección = Promedio(12 semanas) × (1 − Castigo%/100)
     const lastN = sortedRecords.slice(-12);
     const avg = lastN.reduce((a,r)=>a+r.importe,0)/lastN.length;
-    return ()=>avg;
+    const castigado = avg*(1-castigoMovilPct()/100);
+    return ()=>castigado;
   }
   const avg = sortedRecords.reduce((a,r)=>a+r.importe,0)/sortedRecords.length;
   return ()=>avg;
@@ -922,7 +938,7 @@ function estacionalSourceFor(variable, crop){
 }
 
 function projectedWeeks(variable, crop, method){
-  const key = variable+'|'+crop+'|'+method;
+  const key = variable+'|'+crop+'|'+method+(method==='movil' ? '|c'+castigoMovilPct() : '');
   if(projCache[key]) return projCache[key];
   const series = realWeeklyFor(variable, crop);
   const anchor = series.length ? series[series.length-1] : null;
@@ -4590,6 +4606,9 @@ function renderMetodoHint(){
     } else {
       el.innerHTML = `Egreso = semana anterior × (1 + % Variación Egreso), encadenado desde la última semana real: ${anchorTxt}. Ingreso y Producción usan su hoja de Proyección.` + incTxt;
     }
+  } else if(method==='movil'){
+    const c = castigoMovilPct();
+    el.innerHTML = `Promedio de las últimas 12 semanas reales${c ? ` × ${(100-c).toLocaleString('es-MX',{maximumFractionDigits:2})}% (castigo ${c.toLocaleString('es-MX',{maximumFractionDigits:2})}%)` : ' (sin castigo)'}; proyecta desde la semana siguiente a la última real (${anchorTxt}).` + incTxt;
   } else {
     el.innerHTML = `Ajustado sobre las semanas reales; proyecta desde la semana siguiente a la última real (${anchorTxt}).` + incTxt;
   }
@@ -4644,7 +4663,13 @@ function buildFilterUI(){
   });
 
   document.getElementById('metodoProyeccion').addEventListener('change', e=>{
-    state.filters.metodo = e.target.value; renderAll();
+    state.filters.metodo = e.target.value;
+    document.getElementById('castigoField').hidden = e.target.value!=='movil';
+    renderAll();
+  });
+  document.getElementById('castigoMovil').addEventListener('input', e=>{
+    state.filters.castigoMovil = e.target.value.trim();
+    renderAll();
   });
 
   document.getElementById('vistaSeg').querySelectorAll('button').forEach(btn=>{
