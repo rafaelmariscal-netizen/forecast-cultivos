@@ -1183,7 +1183,7 @@ function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
     data:{
       labels: months.map(monthLabel),
       datasets:[
-        { label:'Presupuesto', data:presArr, borderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:0, fill:false, tension:0.25 },
+        { label:'Presupuesto', data:presArr, borderColor:CH.muted, backgroundColor:CH.muted, pointBackgroundColor:CH.muted, pointBorderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:3, fill:false, tension:0.25 },
         { label:'Pesimista', data:pesArr, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.12), pointRadius:0, fill:false, tension:0.25 },
         { label:'Optimista', data:optArr, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
         { label:'Real', data:realArr, borderColor:CH.primary, backgroundColor:CH.primary, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
