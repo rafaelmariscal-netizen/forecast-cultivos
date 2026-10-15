@@ -790,6 +790,9 @@ function parseMoney(v){
 }
 // % de la hoja Variación Egreso: "1647%" → 16.47 · "-88%" → -0.88 · "0.05" (decimal, p. ej. desde
 // el Apps Script) → 0.05. Celda vacía → NaN (se trata como 0% al encadenar, igual que en Excel).
+// % de la hoja Variación Egreso. Con signo "%" siempre se divide entre 100 ("12%" → 0.12).
+// Sin signo se devuelve el número tal cual; la escala de esos valores (decimal 0.12 o entero 12) se
+// decide para toda la hoja en normalizeFactorScale(), no celda por celda.
 function parsePercent(v){
   if(v==null) return NaN;
   const s = String(v).trim();
@@ -797,6 +800,15 @@ function parsePercent(v){
   const n = parseMoney(s);
   if(!Number.isFinite(n)) return NaN;
   return s.includes('%') ? n/100 : n;
+}
+// Normaliza la hoja de variación: si algún valor capturado SIN "%" es mayor a 1 en valor absoluto
+// (p. ej. 12), la hoja viene en puntos porcentuales y esos valores se dividen entre 100 (12 → 0.12).
+// Si todos están entre -1 y 1 (p. ej. 0.12), la hoja ya viene en decimal y se usan tal cual.
+function normalizeFactorScale(records){
+  const plain = records.filter(r=>!r.pctSign);
+  const enteros = plain.some(r=>Math.abs(r.importe)>1);
+  if(enteros) plain.forEach(r=>{ r.importe = r.importe/100; });
+  return enteros ? 'enteros' : 'decimal';
 }
 function decumulate(records){
   // Convierte "importe acumulado" en importe semanal; ver notas de diseño en la bitácora del proyecto.
@@ -860,7 +872,8 @@ function parseSlot(text, tipo){
       cultivo = OTHER_LABEL;
       notes.push(`Fila ${rownum}: "${cleaned}" no es uno de los 7 cultivos — se agrupó como Empaque/Otros.`);
     }
-    records.push({ tipo, cultivo, ejercicio:String(ejercicioRaw).trim(), semana, importe, date, mes });
+    records.push({ tipo, cultivo, cultivoRaw:String(cultivoRaw||'').trim().toUpperCase(), ejercicio:String(ejercicioRaw).trim(), semana, importe, date, mes,
+      pctSign: isVar && String(rawImporte).includes('%') });
   }
   const finalRecords = cumulative ? decumulate(records) : records;
   return { records: finalRecords, errors, notes };
@@ -4609,20 +4622,35 @@ function processAllSlots(){
     newRaw[variable].push(...pres);
   });
 
-  // ---- Mapas por semana (ejercicio + semana ISO) para el cálculo granular ----
+  // ---- Mapas por semana para el cálculo granular ----
+  // Llave del cruce PPTO Egreso ↔ Variación Egreso: [cultivo, ejercicio, semana]. El ejercicio y la
+  // semana se convierten a la fecha del lunes de esa semana ISO (resolveRowDate) y de ahí a la llave
+  // 'AAAA-S' (weekKey), así "2026 / 42" en una hoja empata con "2026 / 42" en la otra, y el cruce
+  // dic→ene (2026/52 → 2027/1) queda en semanas distintas.
+  // Cada combinación [cultivo de la hoja, ejercicio, semana] se toma UNA sola vez: si una hoja trae la
+  // misma fila repetida se usa la primera y se avisa (así un duplicado no infla el consolidado).
+  // Nombres distintos que se agrupan en Empaque (p. ej. EMPAQUE y otro concepto) sí se suman.
+  function weekMap(records, label, sumarGrupo){
+    const out = {}, seen = new Set(); let dup = 0;
+    records.forEach(r=>{
+      const wk = weekKey(r.date);
+      const id = r.cultivoRaw+'|'+wk;
+      if(seen.has(id)){ dup++; return; }
+      seen.add(id);
+      const c = out[r.cultivo] = out[r.cultivo]||{};
+      c[wk] = sumarGrupo ? (c[wk]||0) + r.importe : r.importe;
+    });
+    if(dup) notes.push(`[${label}] ${dup} fila(s) repetida(s) (mismo cultivo, ejercicio y semana) — se tomó solo la primera.`);
+    return out;
+  }
   state.weekVal = { presupuesto:{}, proyeccion:{} };
   ['presupuesto','proyeccion'].forEach(t=> VARIABLES.forEach(v=>{
-    const m = state.weekVal[t][v] = {};
-    (parsed[v+'|'+t]||[]).forEach(r=>{
-      const c = m[r.cultivo] = m[r.cultivo]||{};
-      const wk = weekKey(r.date);
-      c[wk] = (c[wk]||0) + r.importe;
-    });
+    state.weekVal[t][v] = weekMap(parsed[v+'|'+t]||[], `${VAR_LABEL[v]} · ${TIPO_LABEL[t]}`, true);
   }));
-  state.factor = {};
-  (parsed['egreso|variacion']||[]).forEach(r=>{
-    (state.factor[r.cultivo] = state.factor[r.cultivo]||{})[weekKey(r.date)] = r.importe;
-  });
+  const varRecs = parsed['egreso|variacion']||[];
+  state.factorScale = varRecs.length ? normalizeFactorScale(varRecs) : null;
+  if(state.factorScale==='enteros') notes.push('[Variación Egreso] Los % vienen como enteros (p. ej. 12 = 12%) — se dividieron entre 100.');
+  state.factor = weekMap(varRecs, 'Variación Egreso', false);
 
   state.variacion = {};
   (parsed['egreso|variacion']||[]).forEach(r=>{
