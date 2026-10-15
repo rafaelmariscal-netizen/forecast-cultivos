@@ -103,6 +103,16 @@
   .tablevar-seg{ margin:10px 0 12px; max-width:640px; }
   .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.5; margin:0; }
   .hint.warn{ color:var(--warning); font-weight:600; }
+  .cierre-box{ border:1px solid var(--border); border-radius:8px; background:var(--surface); }
+  .cierre-box > summary{ cursor:pointer; list-style:none; padding:8px 10px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .cierre-box > summary::-webkit-details-marker{ display:none; }
+  .cierre-box > summary::after{ content:'▾'; font-size:12px; }
+  .cierre-box[open] > summary::after{ content:'▴'; }
+  .cierre-box .cierre-count{ font-size:10px; font-weight:700; letter-spacing:0; text-transform:none; color:var(--accent-strong); margin-left:auto; }
+  .cierre-body{ padding:2px 10px 10px; display:flex; flex-direction:column; gap:6px; }
+  .cierre-row{ display:grid; grid-template-columns:minmax(0,1fr) 108px; gap:6px; align-items:center; font-size:12px; font-weight:600; color:var(--text-secondary); }
+  .cierre-row select{ padding:4px 6px; font-size:11.5px; }
+  .cierre-row select.set{ border-color:var(--accent); color:var(--accent-strong); font-weight:700; }
   .chartband-hint{ display:flex; align-items:flex-start; gap:7px; margin:2px 0 4px; }
   .chartband-swatch{ flex:none; width:11px; height:11px; margin-top:1px; border-radius:3px; background:var(--good-soft); border:1px solid var(--good); }
 
@@ -275,7 +285,16 @@
         </div>
         <p class="hint">Acumulado suma mes a mes desde el inicio de la temporada (gráficas y tabla).</p>
       </div>
-      <p class="hint">El forecast corre semana a semana desde la última semana <b>Real</b> y se agrupa por la columna <b>Mes</b> de tus hojas. El tipo de cambio solo afecta a los cultivos de exportación — papa se vende en mercado nacional.</p>
+      <div class="field" id="cierreField">
+        <details class="cierre-box" id="cierreBox">
+          <summary>Cierre de temporada <span class="cierre-count" id="cierreCount"></span></summary>
+          <div class="cierre-body">
+            <p class="hint">Mes desde el que la proyección del cultivo es $0 (aunque siga dentro de los 3 meses). "Sin cierre" = se proyecta todo el horizonte.</p>
+            <div id="cierreRows"></div>
+          </div>
+        </details>
+      </div>
+      <p class="hint">El forecast corre semana a semana desde la primera semana sin egreso <b>Real</b> (total de todos los cultivos = 0), cubre el resto de ese mes + los 3 meses siguientes, y se agrupa por la columna <b>Mes</b> de tus hojas. El tipo de cambio solo afecta a los cultivos de exportación — papa se vende en mercado nacional.</p>
     </aside>
 
     <main>
@@ -573,20 +592,35 @@ function monthKeyForWeek(date, mesHint){
 const NOW = new Date();
 const NOW_UTC = new Date(Date.UTC(NOW.getFullYear(), NOW.getMonth(), NOW.getDate()));
 const CURRENT_SEASON = getSeasonLabel(NOW_UTC);
-const CURRENT_MONTH_KEY = monthKeyFromDate(NOW_UTC);
-const FORECAST_MONTHS = nextMonths(NOW_UTC,3);
-const HORIZON_MK = FORECAST_MONTHS[FORECAST_MONTHS.length-1];
 const SEASON_MONTHS_LIST = seasonMonths(CURRENT_SEASON);
 const CURRENT_WEEK_OF_SEASON = Math.max(1, Math.min(52, Math.floor((NOW_UTC - seasonStartDate(CURRENT_SEASON))/(7*DAY_MS))+1));
 
-function recentHistoricalMonths(n){
-  const idxNow = SEASON_MONTHS_LIST.indexOf(CURRENT_MONTH_KEY);
-  const start = Math.max(0, idxNow-n+1);
-  return SEASON_MONTHS_LIST.slice(start, idxNow+1);
+function addMonths(mk, n){
+  const [y,m] = mk.split('-').map(Number);
+  return monthKeyFromDate(new Date(Date.UTC(y, m-1+n, 1)));
 }
-// Meses que muestran gráficas y tabla: la temporada hasta el mes actual + los 3 de forecast.
-const DISPLAY_MONTHS = recentHistoricalMonths(6).concat(FORECAST_MONTHS);
-const PROJECTION_MONTHS = Array.from(new Set(recentHistoricalMonths(12).concat(FORECAST_MONTHS)));
+function monthRange(fromMk, toMk){
+  const out = []; let mk = fromMk;
+  while(mk<=toMk && out.length<36){ out.push(mk); mk = addMonths(mk,1); }
+  return out;
+}
+
+// ---------- Horizonte de proyección (se recalcula en setHorizon() cada vez que se procesan datos) ----------
+// CURRENT_MONTH_KEY = mes de la primera semana sin egreso real (mes en curso del forecast)
+// FORECAST_MONTHS   = los 3 meses calendario completos siguientes; HORIZON_MK = el último.
+// Después de HORIZON_MK toda proyección es $0.
+let CURRENT_MONTH_KEY, FORECAST_MONTHS, HORIZON_MK, DISPLAY_MONTHS, PROJECTION_MONTHS;
+function setHorizon(currentMk, seasonLabel){
+  CURRENT_MONTH_KEY = currentMk;
+  FORECAST_MONTHS = [1,2,3].map(i=>addMonths(currentMk,i));
+  HORIZON_MK = FORECAST_MONTHS[2];
+  const seasonStartMk = monthKeyFromDate(seasonStartDate(seasonLabel || CURRENT_SEASON));
+  const from = addMonths(currentMk,-5) < seasonStartMk ? seasonStartMk : addMonths(currentMk,-5);
+  // Gráficas y tabla: hasta 6 meses con real (incluye el mes en curso) + los 3 de forecast
+  DISPLAY_MONTHS = monthRange(from > currentMk ? currentMk : from, HORIZON_MK);
+  PROJECTION_MONTHS = DISPLAY_MONTHS;
+}
+setHorizon(monthKeyFromDate(NOW_UTC), CURRENT_SEASON);
 
 /* ============================================================
    3. FORMATTERS
@@ -615,6 +649,10 @@ const state = {
   variacion: {},                                    // cultivo → [{date, rate, mk}] (hoja Variación Egreso)
   realFromSheet: {},                                // variable → true si el real sale de la hoja Real
   weekMes: {},                                      // 'AAAA-S' → 'AAAA-MM'
+  cutoff: {},                                       // variable → fecha (lunes) de la 1a semana proyectada
+  weekVal: { presupuesto:{}, proyeccion:{} },       // tipo → variable → cultivo → 'AAAA-S' → importe
+  factor: {},                                       // cultivo → 'AAAA-S' → % (hoja Variación Egreso)
+  cierre: {},                                       // cultivo → 'AAAA-MM' desde el que la proyección es $0
   monthly: null,
   filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat([OTHER_LABEL])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial', castigoMovil:'', tablaVariable:'egreso', vista:'mensual' },
   scenarios: {
@@ -847,7 +885,9 @@ function buildMonthlyIndex(){
 
 // Semanas reales (ya transcurridas y con importe distinto de 0) de un cultivo, en orden.
 function realWeeklyFor(variable, crop){
-  return state.raw[variable].filter(r=>r.tipo==='real' && r.cultivo===crop && r.date<=NOW_UTC).sort((a,b)=>a.date-b.date);
+  // Semanas reales del cultivo con importe ≠ 0 (para ajustar los modelos). El corte Real/Proyección
+  // ya se aplicó en processAllSlots: aquí solo llegan semanas anteriores al corte.
+  return state.raw[variable].filter(r=>r.tipo==='real' && r.cultivo===crop && r.importe!==0).sort((a,b)=>a.date-b.date);
 }
 
 // Resuelve A·x = B (n×n) por eliminación gaussiana con pivoteo parcial. Devuelve null si A es singular.
@@ -925,58 +965,61 @@ function computeMethodModel(sortedRecords, method){
 }
 
 // ---------- Semanas proyectadas (escenario Base) por [variable, cultivo, método] ----------
-// Devuelve [{date, mk, v}] solo para las semanas POSTERIORES a la última semana real del cultivo,
-// hasta el último mes del horizonte de forecast. Todo se calcula a nivel [semana, cultivo]; la suma
-// entre cultivos y la agrupación por Mes se hacen después (monthlyParts).
+// Nivel granular [ejercicio, semana, cultivo]: devuelve [{date, mk, v}] para cada semana del horizonte,
+// desde la semana de corte (primera semana con egreso real consolidado = 0) hasta el último día de
+// HORIZON_MK. Pasado el horizonte no se genera nada (= $0). Si el cultivo tiene mes de cierre, cada
+// semana desde ese mes vale $0. La suma entre cultivos y la agrupación por Mes van después (monthlyParts).
 const projCache = {};
 function clearForecastCache(){ Object.keys(projCache).forEach(k=>delete projCache[k]); }
 
-// Diagnóstico por cultivo del método estacional (para el aviso bajo "Método de proyección").
+// Semanas del horizonte para una variable: [{date, wk, mk}]
+function horizonWeeks(variable){
+  const start = state.cutoff[variable];
+  if(!start) return [];
+  const out = [];
+  for(let t = start.getTime(); out.length<80; t += 7*DAY_MS){
+    const d = new Date(t);
+    const mk = monthKeyForWeek(d, null);
+    if(mk>HORIZON_MK) break;
+    out.push({ date:d, wk:weekKey(d), mk });
+  }
+  return out;
+}
+
+// De dónde sale el método "Variación estacional" para cada variable/cultivo (para el aviso del panel).
+//  · Egreso: 'variacion' si el cultivo trae % en la hoja Variación Egreso; si no, 'ppto' (factor 0).
+//  · Ingreso / Producción: 'proyeccion' (hoja Proyección de esa variable, tal cual).
 function estacionalSourceFor(variable, crop){
-  if(variable==='egreso' && state.variacion[crop] && state.variacion[crop].length) return 'variacion';
-  return 'proyeccion';
+  if(variable!=='egreso') return 'proyeccion';
+  return state.factor[crop] && Object.keys(state.factor[crop]).length ? 'variacion' : 'ppto';
 }
 
 function projectedWeeks(variable, crop, method){
-  const key = variable+'|'+crop+'|'+method+(method==='movil' ? '|c'+castigoMovilPct() : '');
+  const cierre = state.cierre[crop] || '';
+  const key = [variable, crop, method, method==='movil' ? castigoMovilPct() : '', cierre].join('|');
   if(projCache[key]) return projCache[key];
-  const series = realWeeklyFor(variable, crop);
-  const anchor = series.length ? series[series.length-1] : null;
-  const out = [];
+  const weeks = horizonWeeks(variable);
+  let valueAt;
 
   if(method==='estacional'){
-    if(estacionalSourceFor(variable, crop)==='variacion'){
-      // Método "Variación estacional" (Egreso): encadenado semana a semana desde la última semana
-      // real:  Egreso_t = Egreso_{t-1} × (1 + %Variación_t)   — el % sale de la hoja Variación Egreso.
-      if(anchor){
-        let v = anchor.importe;
-        state.variacion[crop].forEach(r=>{
-          if(r.date<=anchor.date || r.mk>HORIZON_MK) return;
-          v = v*(1+r.rate);
-          out.push({ date:r.date, mk:r.mk, v });
-        });
-      }
+    if(variable==='egreso'){
+      // Egreso proyectado_t = Presupuesto_t × (1 + Factor_t)
+      //   Presupuesto_t → hoja PPTO Egreso; Factor_t → hoja Variación Egreso (misma semana y ejercicio).
+      //   Semana sin factor = 0% (queda el presupuesto); semana sin presupuesto = $0.
+      const ppto = (state.weekVal.presupuesto.egreso[crop]) || {};
+      const fac  = state.factor[crop] || {};
+      valueAt = w => (ppto[w.wk]||0) * (1 + (fac[w.wk]||0));
     } else {
-      // Sin hoja de variación para esta variable/cultivo (Ingreso, Producción, o Egreso aún sin
-      // cargar): se toman tal cual los importes de la hoja Proyección para las semanas por venir.
-      const from = anchor ? anchor.date : NOW_UTC;
-      state.raw[variable].forEach(r=>{
-        if((r.origTipo||r.tipo)!=='proyeccion' || r.cultivo!==crop) return;
-        if(r.date<=from || r.mk>HORIZON_MK) return;
-        out.push({ date:r.date, mk:r.mk, v:r.importe });
-      });
-      out.sort((a,b)=>a.date-b.date);
+      const proy = (state.weekVal.proyeccion[variable][crop]) || {};
+      valueAt = w => proy[w.wk]||0;
     }
-  } else if(anchor){
-    const model = computeMethodModel(series, method);
-    const stop = monthEndDate(HORIZON_MK).getTime() + 7*DAY_MS;
-    for(let t = anchor.date.getTime()+7*DAY_MS; t<=stop; t+=7*DAY_MS){
-      const d = new Date(t);
-      const mk = monthKeyForWeek(d, null);
-      if(mk>HORIZON_MK) break;
-      out.push({ date:d, mk, v: Math.max(0, model(d)) });
-    }
+  } else {
+    const series = realWeeklyFor(variable, crop);
+    const model = series.length ? computeMethodModel(series, method) : ()=>0;
+    valueAt = w => Math.max(0, model(w.date));
   }
+
+  const out = weeks.map(w=>({ date:w.date, mk:w.mk, v: (cierre && w.mk>=cierre) ? 0 : valueAt(w) }));
   projCache[key] = out;
   return out;
 }
@@ -1352,7 +1395,7 @@ function renderHistoricoTable(){
 
   const vistaTxt = vista==='acumulado' ? 'Cifras <b>acumuladas</b> mes a mes desde el inicio de la temporada.' : 'Cifras del mes.';
   document.getElementById('tablaSub').innerHTML =
-    `${vistaTxt} Las 3 columnas de método muestran el total estimado del mes (real capturado + semanas proyectadas con ese método), escenario <b>${sc}</b>. ` +
+    `${vistaTxt} Las 3 columnas de método muestran el total estimado del mes (real capturado + semanas proyectadas con ese método; después de ${monthLabel(HORIZON_MK)} la proyección es $0), escenario <b>${sc}</b>. ` +
     `La columna resaltada es el método seleccionado en el panel. ` +
     (vista==='mensual' ? 'En el renglón Total, la variación compara el real solo contra el presupuesto de los meses que ya tienen real.' : '');
 }
@@ -4529,47 +4572,67 @@ function processAllSlots(){
   })));
   Object.values(parsed).forEach(list=> list.forEach(r=>{ r.mk = monthKeyForWeek(r.date, r.mes); }));
 
+  // ---- Real vs Proyección: corte dinámico por variable ----
+  // Candidatos a real: la hoja Real si trae algún importe ≠ 0; si viene vacía, las semanas ya
+  // transcurridas de Proyección (comportamiento anterior). Una semana es Real si el TOTAL de todos los
+  // cultivos (Empaque incluido) es > 0 — un cultivo puede estar en $0 y seguir siendo real. La
+  // proyección arranca en la primera semana, después de la primera semana real, cuyo total = 0.
   const newRaw = { egreso:[], ingreso:[], produccion:[] };
   state.realFromSheet = {};
+  state.cutoff = {};
   VARIABLES.forEach(variable=>{
     const real = parsed[variable+'|real'] || [];
     const proy = parsed[variable+'|proyeccion'] || [];
     const pres = parsed[variable+'|presupuesto'] || [];
     const useReal = real.some(r=>r.importe!==0);
     state.realFromSheet[variable] = useReal;
-    if(useReal){
-      newRaw[variable].push(...real.filter(r=>r.date<=NOW_UTC && r.importe!==0));
-      newRaw[variable].push(...proy.map(r=>Object.assign({}, r, {origTipo:'proyeccion'})));
-    } else {
-      newRaw[variable].push(...proy.filter(r=>r.date<=NOW_UTC && r.importe>0).map(r=>Object.assign({}, r, {tipo:'real', origTipo:'proyeccion'})));
-      newRaw[variable].push(...proy.filter(r=>r.date>NOW_UTC).map(r=>Object.assign({}, r, {origTipo:'proyeccion'})));
+    const candidates = useReal
+      ? real.slice()
+      : proy.filter(r=>r.date<=NOW_UTC && r.importe>0).map(r=>Object.assign({}, r, {tipo:'real'}));
+
+    const totals = {}; let first = null;
+    candidates.forEach(r=>{ const wk = weekKey(r.date); totals[wk] = (totals[wk]||0) + r.importe; });
+    candidates.forEach(r=>{ if(totals[weekKey(r.date)]>0 && (!first || r.date<first)) first = r.date; });
+    let cutoff = null;
+    if(first){
+      for(let t = first.getTime(); ; t += 7*DAY_MS){
+        const d = new Date(t);
+        if(!(totals[weekKey(d)]>0)){ cutoff = d; break; }
+      }
+    } else if(proy.length || pres.length){
+      const {y,w} = dateToWeekYear(NOW_UTC); cutoff = isoWeekToDate(y,w);
     }
+    state.cutoff[variable] = cutoff;
+    newRaw[variable].push(...candidates.filter(r=> totals[weekKey(r.date)]>0 && (!cutoff || r.date<cutoff))
+      .map(r=>Object.assign({}, r, {tipo:'real'})));
+    newRaw[variable].push(...proy.map(r=>Object.assign({}, r, {tipo:'proyeccion', origTipo:'proyeccion'})));
     newRaw[variable].push(...pres);
   });
 
-  // Semana real incompleta (Egreso): si la ÚLTIMA semana real de un cultivo es menor al 10% de la
-  // semana anterior, se toma como captura parcial (la semana todavía no se cierra en el Sheet). Se
-  // saca del real y la proyección arranca desde la semana anterior, que sí está completa; esa semana
-  // se proyecta con el método elegido en lugar de usar el importe parcial.
-  state.incompletas = [];
-  const UMBRAL_INCOMPLETA = 0.10;
-  const realPorCultivo = {};
-  newRaw.egreso.forEach(r=>{ if(r.tipo==='real') (realPorCultivo[r.cultivo] = realPorCultivo[r.cultivo]||[]).push(r); });
-  Object.entries(realPorCultivo).forEach(([crop, list])=>{
-    list.sort((a,b)=>a.date-b.date);
-    if(list.length<2) return;
-    const last = list[list.length-1], prev = list[list.length-2];
-    if(prev.importe>0 && Math.abs(last.importe) < UMBRAL_INCOMPLETA*prev.importe){
-      last.tipo = 'real_incompleta';
-      state.incompletas.push({ crop, semana: dateToWeekYear(last.date).w, importe: last.importe, previo: prev.importe });
-    }
+  // ---- Mapas por semana (ejercicio + semana ISO) para el cálculo granular ----
+  state.weekVal = { presupuesto:{}, proyeccion:{} };
+  ['presupuesto','proyeccion'].forEach(t=> VARIABLES.forEach(v=>{
+    const m = state.weekVal[t][v] = {};
+    (parsed[v+'|'+t]||[]).forEach(r=>{
+      const c = m[r.cultivo] = m[r.cultivo]||{};
+      const wk = weekKey(r.date);
+      c[wk] = (c[wk]||0) + r.importe;
+    });
+  }));
+  state.factor = {};
+  (parsed['egreso|variacion']||[]).forEach(r=>{
+    (state.factor[r.cultivo] = state.factor[r.cultivo]||{})[weekKey(r.date)] = r.importe;
   });
 
   state.variacion = {};
   (parsed['egreso|variacion']||[]).forEach(r=>{
     (state.variacion[r.cultivo] = state.variacion[r.cultivo]||[]).push({ date:r.date, rate:r.importe, mk:r.mk });
   });
-  Object.values(state.variacion).forEach(list=> list.sort((a,b)=>a.date-b.date));
+
+  // ---- Horizonte: mes en curso = mes de la semana de corte de Egreso ----
+  const cutRef = state.cutoff.egreso || state.cutoff.ingreso || state.cutoff.produccion;
+  setHorizon(cutRef ? monthKeyForWeek(cutRef, null) : monthKeyFromDate(NOW_UTC), cutRef ? getSeasonLabel(cutRef) : CURRENT_SEASON);
+  refreshHorizonUI();
 
   state.raw = newRaw;
   state.errors = errors;
@@ -4646,29 +4709,67 @@ function renderMetodoHint(){
   const el = document.getElementById('metodoHint');
   const crops = currentCropsSelection();
   const method = state.filters.metodo;
-  let anchor = null;
-  crops.forEach(c=>{ const s = realWeeklyFor('egreso', c); if(s.length){ const d = s[s.length-1].date; if(!anchor || d>anchor) anchor = d; } });
-  const anchorTxt = anchor ? `semana ${dateToWeekYear(anchor).w} (${fmtDateHuman(anchor)})` : 'sin semanas reales';
+  const cut = state.cutoff.egreso;
+  const cutTxt = cut ? `semana ${dateToWeekYear(cut).w}/${dateToWeekYear(cut).y} (${fmtDateHuman(cut)})` : 'sin semanas reales';
+  const horTxt = `resto de ${monthLabel(CURRENT_MONTH_KEY)} + ${FORECAST_MONTHS.map(monthLabel).join(', ')}; después, $0`;
+  const cerrados = crops.filter(c=>state.cierre[c]).map(c=>`${DISPLAY[c]} (desde ${monthLabel(state.cierre[c])})`);
+  const cierreTxt = cerrados.length ? `<br>🔒 Cierre: ${cerrados.join(', ')}.` : '';
   el.classList.remove('warn');
-  const inc = (state.incompletas||[]).filter(x=>crops.includes(x.crop));
-  const incTxt = inc.length ? ` <br>ℹ️ Semana ${[...new Set(inc.map(x=>x.semana))].join(', ')} tomada como <b>incompleta</b> (menos del 10% de la semana anterior) en ${inc.map(x=>DISPLAY[x.crop]).join(', ')}: se proyecta en lugar de usar el importe parcial.` : '';
   if(method==='estacional'){
-    const sinVar = crops.filter(c=> estacionalSourceFor('egreso', c)!=='variacion' && realWeeklyFor('egreso', c).length);
-    if(!Object.keys(state.variacion).length){
+    const sinVar = crops.filter(c=> estacionalSourceFor('egreso', c)!=='variacion' && state.weekVal.presupuesto.egreso[c]);
+    const base = `Egreso = PPTO Egreso × (1 + % Variación Egreso) de cada semana, desde la ${cutTxt}. Horizonte: ${horTxt}. Ingreso y Producción usan su hoja de Proyección.`;
+    if(sinVar.length){
       el.classList.add('warn');
-      el.innerHTML = '⚠️ No hay hoja <b>Variación Egreso</b> cargada — mientras tanto, el egreso de las semanas por venir se toma tal cual de Proyección Egreso.' + incTxt;
-    } else if(sinVar.length){
-      el.classList.add('warn');
-      el.innerHTML = `Egreso = semana anterior × (1 + % Variación), desde la última real: ${anchorTxt}. ⚠️ Sin % en la hoja de Variación: ${sinVar.map(c=>DISPLAY[c]).join(', ')} — para esos se usa Proyección Egreso.` + incTxt;
-    } else {
-      el.innerHTML = `Egreso = semana anterior × (1 + % Variación Egreso), encadenado desde la última semana real: ${anchorTxt}. Ingreso y Producción usan su hoja de Proyección.` + incTxt;
-    }
+      el.innerHTML = base + ` ⚠️ Sin % en la hoja de Variación: ${sinVar.map(c=>DISPLAY[c]).join(', ')} — se usa el presupuesto tal cual (0%).` + cierreTxt;
+    } else el.innerHTML = base + cierreTxt;
   } else if(method==='movil'){
     const c = castigoMovilPct();
-    el.innerHTML = `Promedio de las últimas 12 semanas reales${c ? ` × ${(100-c).toLocaleString('es-MX',{maximumFractionDigits:2})}% (castigo ${c.toLocaleString('es-MX',{maximumFractionDigits:2})}%)` : ' (sin castigo)'}; proyecta desde la semana siguiente a la última real (${anchorTxt}).` + incTxt;
+    el.innerHTML = `Promedio de las últimas 12 semanas reales${c ? ` × ${(100-c).toLocaleString('es-MX',{maximumFractionDigits:2})}% (castigo ${c.toLocaleString('es-MX',{maximumFractionDigits:2})}%)` : ' (sin castigo)'}; proyecta desde la ${cutTxt}. Horizonte: ${horTxt}.` + cierreTxt;
   } else {
-    el.innerHTML = `Ajustado sobre las semanas reales; proyecta desde la semana siguiente a la última real (${anchorTxt}).` + incTxt;
+    el.innerHTML = `Recta ajustada sobre las semanas reales (sin la semana 27); proyecta desde la ${cutTxt}. Horizonte: ${horTxt}.` + cierreTxt;
   }
+}
+
+// ---------- Horizonte en la UI: filtro de mes, badge y panel de cierre por cultivo ----------
+const CIERRE_KEY = 'forecast_cierre_v1';
+function loadCierre(){
+  try { const o = JSON.parse(localStorage.getItem(CIERRE_KEY)||'{}'); if(o && typeof o==='object') state.cierre = o; } catch(e){}
+}
+function saveCierre(){
+  try { localStorage.setItem(CIERRE_KEY, JSON.stringify(state.cierre)); } catch(e){}
+}
+function buildMesOptions(){
+  const mes = document.getElementById('mesFiltro');
+  if(!mes) return;
+  if(state.filters.mes!=='TOTAL3' && !FORECAST_MONTHS.includes(state.filters.mes)) state.filters.mes = 'TOTAL3';
+  mes.innerHTML = '<option value="TOTAL3">Total próximos 3 meses</option>' + FORECAST_MONTHS.map(mk=>`<option value="${mk}">${monthLabel(mk)}</option>`).join('');
+  mes.value = state.filters.mes;
+}
+function renderCierreRows(){
+  const wrap = document.getElementById('cierreRows');
+  if(!wrap) return;
+  const months = monthRange(CURRENT_MONTH_KEY, HORIZON_MK);
+  wrap.innerHTML = CROPS.concat([OTHER_LABEL]).map(c=>{
+    const val = state.cierre[c] || '';
+    const opts = months.slice();
+    if(val && !opts.includes(val)) opts.push(val);
+    return `<label class="cierre-row"><span>${ICONS[c]} ${DISPLAY[c]}</span>
+      <select data-crop="${c}" class="${val?'set':''}"><option value="">Sin cierre</option>${opts.sort().map(mk=>`<option value="${mk}" ${mk===val?'selected':''}>$0 desde ${monthLabel(mk)}</option>`).join('')}</select></label>`;
+  }).join('');
+  wrap.querySelectorAll('select').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      if(sel.value) state.cierre[sel.dataset.crop] = sel.value; else delete state.cierre[sel.dataset.crop];
+      saveCierre(); clearForecastCache(); renderCierreRows(); renderAll();
+    });
+  });
+  const n = Object.keys(state.cierre).length;
+  document.getElementById('cierreCount').textContent = n ? `${n} activo${n>1?'s':''}` : '';
+}
+function refreshHorizonUI(){
+  buildMesOptions();
+  const badge = document.getElementById('badgeForecastRange');
+  if(badge) badge.textContent = monthLabel(FORECAST_MONTHS[0])+' – '+monthLabel(FORECAST_MONTHS[2]);
+  renderCierreRows();
 }
 
 function buildFilterUI(){
@@ -4707,7 +4808,7 @@ function buildFilterUI(){
   });
 
   const mes = document.getElementById('mesFiltro');
-  mes.innerHTML = '<option value="TOTAL3">Total próximos 3 meses</option>' + FORECAST_MONTHS.map(mk=>`<option value="${mk}">${monthLabel(mk)}</option>`).join('');
+  buildMesOptions();
   mes.addEventListener('change', ()=>{ state.filters.mes = mes.value; renderAll(); });
 
   document.getElementById('escenarioSeg').querySelectorAll('button').forEach(btn=>{
@@ -4776,6 +4877,7 @@ function init(){
   document.getElementById('seasonLabelTop').textContent = CURRENT_SEASON;
   document.getElementById('badgeToday').textContent = fmtDateHuman(NOW_UTC);
   document.getElementById('badgeForecastRange').textContent = monthLabel(FORECAST_MONTHS[0])+' – '+monthLabel(FORECAST_MONTHS[2]);
+  loadCierre();
   buildFilterUI();
   buildTabs();
   buildLoaderGrid();
@@ -4791,7 +4893,9 @@ function init(){
 
 // Solo para pruebas automáticas (Node); en el navegador no hace nada.
 if(typeof window!=='undefined' && window.__FORECAST_TEST__){
-  window.__FORECAST_TEST__.api = { realWeeklyFor: (typeof realWeeklyFor!=='undefined'?realWeeklyFor:null), state, parseSlot, parsePercent, processAllSlots, projectedWeeks, monthlyParts, kindSeries, scenarioForecastConsolidated, ebitdaSet, fmtM, DISPLAY_MONTHS, FORECAST_MONTHS, renderAll, BAKED_DATA, estacionalSourceFor };
+  window.__FORECAST_TEST__.api = { realWeeklyFor: (typeof realWeeklyFor!=='undefined'?realWeeklyFor:null), state, parseSlot, parsePercent, processAllSlots, projectedWeeks, monthlyParts, kindSeries, scenarioForecastConsolidated, ebitdaSet, fmtM, renderAll, BAKED_DATA, estacionalSourceFor, horizonWeeks, renderCierreRows,
+    get DISPLAY_MONTHS(){ return DISPLAY_MONTHS; }, get FORECAST_MONTHS(){ return FORECAST_MONTHS; },
+    get CURRENT_MONTH_KEY(){ return CURRENT_MONTH_KEY; }, get HORIZON_MK(){ return HORIZON_MK; } };
 }
 
 document.addEventListener('DOMContentLoaded', init);
