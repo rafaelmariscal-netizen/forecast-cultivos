@@ -417,7 +417,8 @@
           <h4>Cargar información desde tu Google Sheet</h4>
           <p class="dataintro">
             Pega o sube cada hoja en su casilla: Real, Presupuesto y Proyección para Egreso, Ingreso y Producción, más la hoja
-            <b>Variación Egreso</b> (casilla verde, columna de Egreso), que es la que usa el método "Variación estacional".
+            <b>Variación Egreso</b> y <b>Factor Producción</b> (casillas verdes de Egreso y Producción), que son las que usa el método "Variación estacional".
+            Factor Producción acepta las columnas <code>cultivo, ejercicio, semana, mes, %_variacion</code> (con encabezado) y el % como <code>10%</code>, <code>10</code> o <code>0.10</code>.
             Formato de columnas: <code>Tipo, Cultivo, ejercicio, semana, Importe, Mes</code> (la columna Mes es opcional pero recomendada).
             En la hoja de Variación la columna de importe es el <b>%</b>: acepta <code>5%</code>, <code>-88%</code>, <code>1647%</code> o el decimal <code>0.05</code>.
             <code>ejercicio</code> puede ser el año calendario (ej. <code>2026</code>, con semana ISO) o la temporada <code>25-26</code>.
@@ -622,6 +623,29 @@ function setHorizon(currentMk, seasonLabel){
 }
 setHorizon(monthKeyFromDate(NOW_UTC), CURRENT_SEASON);
 
+// ---------- Horizonte propio de PRODUCCIÓN ----------
+// Mismas reglas que egreso, pero tomando como "mes en curso" el mes de la semana de corte de
+// Producción (primera semana con producción real consolidada = 0): resto de ese mes + 3 meses
+// completos; del 4.º mes en adelante la proyección de producción es 0 kg.
+// Egreso e Ingreso siguen usando el horizonte global (setHorizon) sin cambios.
+const VAR_HORIZON = {};
+function computeHorizon(currentMk, seasonLabel){
+  const forecastMonths = [1,2,3].map(i=>addMonths(currentMk,i));
+  const horizonMk = forecastMonths[2];
+  const seasonStartMk = monthKeyFromDate(seasonStartDate(seasonLabel || CURRENT_SEASON));
+  const from = addMonths(currentMk,-5) < seasonStartMk ? seasonStartMk : addMonths(currentMk,-5);
+  return { currentMk, forecastMonths, horizonMk, displayMonths: monthRange(from > currentMk ? currentMk : from, horizonMk) };
+}
+function setVarHorizon(variable, cutoff){
+  if(!cutoff){ delete VAR_HORIZON[variable]; return; }
+  VAR_HORIZON[variable] = computeHorizon(monthKeyForWeek(cutoff, null), getSeasonLabel(cutoff));
+}
+function horizonFor(variable){
+  return VAR_HORIZON[variable] || { currentMk:CURRENT_MONTH_KEY, forecastMonths:FORECAST_MONTHS, horizonMk:HORIZON_MK, displayMonths:DISPLAY_MONTHS };
+}
+// Meses que muestra la gráfica/tabla de cada "kind" (producción usa su propio horizonte).
+function monthsForKind(kind){ return kind==='produccion' ? horizonFor('produccion').displayMonths : DISPLAY_MONTHS; }
+
 /* ============================================================
    3. FORMATTERS
    ============================================================ */
@@ -647,6 +671,7 @@ const OTHER_LABEL = 'OTROS';
 const state = {
   raw: { egreso:[], ingreso:[], produccion:[] },   // {tipo,cultivo,ejercicio,semana,importe,date,mes,mk}
   variacion: {},                                    // cultivo → [{date, rate, mk}] (hoja Variación Egreso)
+  factorProd: {},                                   // cultivo → 'AAAA-S' → % decimal (hoja Factor Producción)
   realFromSheet: {},                                // variable → true si el real sale de la hoja Real
   weekMes: {},                                      // 'AAAA-S' → 'AAAA-MM'
   cutoff: {},                                       // variable → fecha (lunes) de la 1a semana proyectada
@@ -724,6 +749,8 @@ function generateDemoRows(){
       rows.egreso.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(egresoP), date });
       rows.ingreso.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(ingresoP), date });
       rows.produccion.push({ tipo:'proyeccion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:Math.round(kgP), date });
+      // Factor Producción de ejemplo: % de la proyección de ejemplo contra el presupuesto de la MISMA semana
+      rows.produccion.push({ tipo:'variacion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:((kgP/kgB-1)*100).toFixed(2)+'%', date });
       // Hoja de variación de ejemplo: % semana contra semana de la proyección de ejemplo
       const rate = prevEgresoP ? egresoP/prevEgresoP-1 : 0;
       rows.egreso.push({ tipo:'variacion', cultivo:crop, ejercicio:CURRENT_SEASON, semana:week, importe:(rate*100).toFixed(2)+'%', date });
@@ -775,6 +802,19 @@ function detectLayout(row){
     return { cultivoIdx:1, ejercicioIdx:2, semanaIdx:3, importeIdx:4 };
   }
   return null;
+}
+// Encabezado de una hoja de variación/factor → índices de columna. Permite cualquier orden, p. ej.
+// "cultivo, ejercicio, semana, mes, %_variacion" (Factor Producción) o el formato de Variación Egreso.
+// La columna del % es la ÚLTIMA cuyo nombre contenga variación / factor / %.
+function layoutFromHeader(row){
+  const norm = row.map(h=> String(h||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim());
+  const find = re => norm.findIndex(h=> re.test(h));
+  const cultivoIdx = find(/^cultivo$/), ejercicioIdx = find(/^(ejercicio|ano|anio|año|year)$/), semanaIdx = find(/^semana$/);
+  const mesIdx = find(/^mes$/);
+  let importeIdx = -1;
+  norm.forEach((h,i)=>{ if(i!==cultivoIdx && i!==ejercicioIdx && i!==semanaIdx && i!==mesIdx && /variaci|factor|%/.test(h)) importeIdx = i; });
+  if(cultivoIdx<0 || ejercicioIdx<0 || semanaIdx<0 || importeIdx<0) return null;
+  return { cultivoIdx, ejercicioIdx, semanaIdx, importeIdx, mesIdx: mesIdx<0 ? null : mesIdx };
 }
 function parseMoney(v){
   if(v==null) return NaN;
@@ -841,10 +881,11 @@ function parseSlot(text, tipo){
     dataStart = 1;
   }
   const isVar = tipo==='variacion';
+  const headerLayout = (isVar && dataStart===1) ? layoutFromHeader(rows[0]) : null;
   for(let i=dataStart;i<rows.length;i++){
     const row = rows[i];
     const rownum = i+1;
-    const layout = detectLayout(row);
+    const layout = headerLayout || detectLayout(row);
     if(!layout){ errors.push(`Fila ${rownum}: no se reconoció el formato de columnas, se omitió`); continue; }
     const cultivoRaw = row[layout.cultivoIdx];
     const ejercicioRaw = row[layout.ejercicioIdx];
@@ -989,11 +1030,12 @@ function clearForecastCache(){ Object.keys(projCache).forEach(k=>delete projCach
 function horizonWeeks(variable){
   const start = state.cutoff[variable];
   if(!start) return [];
+  const horizonMk = horizonFor(variable).horizonMk;   // producción: su propio horizonte
   const out = [];
   for(let t = start.getTime(); out.length<80; t += 7*DAY_MS){
     const d = new Date(t);
     const mk = monthKeyForWeek(d, null);
-    if(mk>HORIZON_MK) break;
+    if(mk>horizonMk) break;          // 4.º mes en adelante: no se genera semana (= 0)
     out.push({ date:d, wk:weekKey(d), mk });
   }
   return out;
@@ -1001,10 +1043,12 @@ function horizonWeeks(variable){
 
 // De dónde sale el método "Variación estacional" para cada variable/cultivo (para el aviso del panel).
 //  · Egreso: 'variacion' si el cultivo trae % en la hoja Variación Egreso; si no, 'ppto' (factor 0).
-//  · Ingreso / Producción: 'proyeccion' (hoja Proyección de esa variable, tal cual).
+//  · Producción: 'variacion' si el cultivo trae % en la hoja Factor Producción; si no, 'ppto' (factor 0).
+//  · Ingreso: 'proyeccion' (hoja Proyección de ingreso, tal cual).
 function estacionalSourceFor(variable, crop){
-  if(variable!=='egreso') return 'proyeccion';
-  return state.factor[crop] && Object.keys(state.factor[crop]).length ? 'variacion' : 'ppto';
+  if(variable==='ingreso') return 'proyeccion';
+  const fac = variable==='produccion' ? state.factorProd : state.factor;
+  return fac && fac[crop] && Object.keys(fac[crop]).length ? 'variacion' : 'ppto';
 }
 
 function projectedWeeks(variable, crop, method){
@@ -1021,6 +1065,15 @@ function projectedWeeks(variable, crop, method){
       //   Semana sin factor = 0% (queda el presupuesto); semana sin presupuesto = $0.
       const ppto = (state.weekVal.presupuesto.egreso[crop]) || {};
       const fac  = state.factor[crop] || {};
+      valueAt = w => (ppto[w.wk]||0) * (1 + (fac[w.wk]||0));
+    } else if(variable==='produccion'){
+      // Producción proyectada_t = Presupuesto_t × (1 + Factor_t)   — cálculo INDEPENDIENTE por semana
+      //   Presupuesto_t → hoja PPTO Producción; Factor_t → hoja Factor Producción, cruzadas por la llave
+      //   [cultivo, ejercicio, semana] (weekKey). Cada semana se calcula sobre SU presupuesto, nunca
+      //   sobre la proyección de la semana anterior (no recursivo). Factor ya normalizado a decimal.
+      //   Semana sin factor = 0% (queda el presupuesto); semana sin presupuesto = 0 kg.
+      const ppto = (state.weekVal.presupuesto.produccion[crop]) || {};
+      const fac  = (state.factorProd && state.factorProd[crop]) || {};
       valueAt = w => (ppto[w.wk]||0) * (1 + (fac[w.wk]||0));
     } else {
       const proy = (state.weekVal.proyeccion[variable][crop]) || {};
@@ -1280,7 +1333,7 @@ function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
   if(!chartsAvailable()){ chartFallback(canvasId); return; }
   const crops = currentCropsSelection();
   const method = state.filters.metodo, sc = state.filters.escenario, vista = state.filters.vista;
-  const months = DISPLAY_MONTHS;
+  const months = monthsForKind(kind);   // producción: meses de su propio horizonte
   const act = kindSeries(kind, method, sc, crops, months, vista);
   const opt = kindSeries(kind, method, 'optimista', crops, months, vista);
   const pes = kindSeries(kind, method, 'pesimista', crops, months, vista);
@@ -1358,7 +1411,8 @@ function renderHistoricoTable(){
   const meta = TABLE_VAR_META[v];
   document.querySelectorAll('#tableVariableSeg button').forEach(btn=> btn.classList.toggle('on', btn.dataset.var===v));
 
-  const months = DISPLAY_MONTHS;
+  const months = monthsForKind(v);
+  const H = v==='produccion' ? horizonFor('produccion') : { forecastMonths:FORECAST_MONTHS, currentMk:CURRENT_MONTH_KEY, horizonMk:HORIZON_MK };
   const S = {};
   TABLE_METHODS.forEach(m=> S[m.key] = kindSeries(v, m.key, sc, crops, months, vista));
   const base = S.estacional; // Real y Presupuesto no dependen del método
@@ -1373,7 +1427,7 @@ function renderHistoricoTable(){
 
   let totReal=0, totPresReal=0, totPres=0; const totM = {polinomial:0, movil:0, estacional:0}; let anyReal=false;
   months.forEach(mk=>{
-    const isForecast = FORECAST_MONTHS.includes(mk);
+    const isForecast = H.forecastMonths.includes(mk);
     const realV = base.hasReal[mk] ? base.real[mk] : null;
     const presV = hasPres ? base.pres[mk] : null;
     let diff=null, pct=null;
@@ -1384,7 +1438,7 @@ function renderHistoricoTable(){
       TABLE_METHODS.forEach(m=> totM[m.key] += S[m.key].full[mk]||0);
     }
     const tr = document.createElement('tr');
-    if(mk===CURRENT_MONTH_KEY) tr.className='now';
+    if(mk===H.currentMk) tr.className='now';
     tr.innerHTML = `<td>${monthLabel(mk)}${isForecast?' 🔮':''}</td>
       <td>${realV==null?'—':meta.fmt(realV)}</td>
       <td>${presV==null?'—':meta.fmt(presV)}</td>
@@ -1408,7 +1462,7 @@ function renderHistoricoTable(){
 
   const vistaTxt = vista==='acumulado' ? 'Cifras <b>acumuladas</b> mes a mes desde el inicio de la temporada.' : 'Cifras del mes.';
   document.getElementById('tablaSub').innerHTML =
-    `${vistaTxt} Las 3 columnas de método muestran el total estimado del mes (real capturado + semanas proyectadas con ese método; después de ${monthLabel(HORIZON_MK)} la proyección es $0), escenario <b>${sc}</b>. ` +
+    `${vistaTxt} Las 3 columnas de método muestran el total estimado del mes (real capturado + semanas proyectadas con ese método; después de ${monthLabel(H.horizonMk)} la proyección es ${v==='produccion'?'0 kg':'$0'}), escenario <b>${sc}</b>. ` +
     `La columna resaltada es el método seleccionado en el panel. ` +
     (vista==='mensual' ? 'En el renglón Total, la variación compara el real solo contra el presupuesto de los meses que ya tienen real.' : '');
 }
@@ -1586,8 +1640,13 @@ const SLOT_DEFS = [
   { tipo:'real', variable:'egreso' }, { tipo:'real', variable:'ingreso' }, { tipo:'real', variable:'produccion' },
   { tipo:'presupuesto', variable:'egreso' }, { tipo:'presupuesto', variable:'ingreso' }, { tipo:'presupuesto', variable:'produccion' },
   { tipo:'proyeccion', variable:'egreso' }, { tipo:'proyeccion', variable:'ingreso' }, { tipo:'proyeccion', variable:'produccion' },
-  { tipo:'variacion', variable:'egreso' }
+  { tipo:'variacion', variable:'egreso' }, { tipo:'variacion', variable:'produccion' }
 ];
+// Nombre de la casilla de variación según la variable (Egreso: "Variación Egreso"; Producción: "Factor Producción").
+function slotLabel(tipo, variable){
+  if(tipo==='variacion') return variable==='produccion' ? 'Factor Producción (método estacional)' : 'Variación Egreso (método estacional)';
+  return TIPO_LABEL[tipo];
+}
 const TIPO_LABEL = { real:'Real', presupuesto:'Presupuesto', proyeccion:'Proyección equipo', variacion:'Variación % (método estacional)' };
 const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción' };
 
@@ -4513,8 +4572,8 @@ function buildLoaderGrid(){
       const id = slotId(tipo,variable);
       const slot = document.createElement('div'); slot.className = 'slot' + (tipo==='variacion' ? ' new' : '');
       slot.innerHTML = `
-        <div class="slothead"><span>${TIPO_LABEL[tipo]}</span><span class="count" id="${id}_count">0 filas</span></div>
-        <textarea id="${id}_text" placeholder="${tipo==='variacion' ? 'Variación Egreso, Cultivo, ejercicio, semana, Variación, Mes' : 'Tipo, Cultivo, ejercicio, semana, Importe, Mes'}"></textarea>
+        <div class="slothead"><span>${slotLabel(tipo,variable)}</span><span class="count" id="${id}_count">0 filas</span></div>
+        <textarea id="${id}_text" placeholder="${tipo==='variacion' ? (variable==='produccion' ? 'cultivo, ejercicio, semana, mes, %_variacion' : 'Variación Egreso, Cultivo, ejercicio, semana, Variación, Mes') : 'Tipo, Cultivo, ejercicio, semana, Importe, Mes'}"></textarea>
         <div class="slotfoot"><input type="file" accept=".csv,.tsv,.txt" id="${id}_file"></div>`;
       col.appendChild(slot);
     });
@@ -4555,7 +4614,7 @@ function loadBakedDefaults(){
   processAllSlots();
 }
 
-// Lee las 10 casillas y arma state.raw / state.variacion / state.weekMes.
+// Lee las 11 casillas y arma state.raw / state.variacion / state.weekMes.
 //  · Real: si la hoja Real de una variable trae algún importe distinto de 0, el real sale de ahí
 //    (semanas ya transcurridas, importe ≠ 0). Si viene vacía, se conserva el comportamiento anterior:
 //    las semanas ya transcurridas de Proyección (importe > 0) hacen de real.
@@ -4568,8 +4627,8 @@ function processAllSlots(){
     const id = slotId(tipo,variable);
     const { records, errors: errs, notes: nts } = parseSlot(document.getElementById(id+'_text').value, tipo);
     parsed[variable+'|'+tipo] = records;
-    errs.forEach(e=> errors.push(`[${VAR_LABEL[variable]} · ${TIPO_LABEL[tipo]}] ${e}`));
-    (nts||[]).forEach(n=> notes.push(`[${VAR_LABEL[variable]} · ${TIPO_LABEL[tipo]}] ${n}`));
+    errs.forEach(e=> errors.push(`[${VAR_LABEL[variable]} · ${slotLabel(tipo,variable)}] ${e}`));
+    (nts||[]).forEach(n=> notes.push(`[${VAR_LABEL[variable]} · ${slotLabel(tipo,variable)}] ${n}`));
     document.getElementById(id+'_count').textContent = records.length+' filas';
     document.getElementById(id+'_count').classList.toggle('has', records.length>0);
   });
@@ -4652,6 +4711,14 @@ function processAllSlots(){
   if(state.factorScale==='enteros') notes.push('[Variación Egreso] Los % vienen como enteros (p. ej. 12 = 12%) — se dividieron entre 100.');
   state.factor = weekMap(varRecs, 'Variación Egreso', false);
 
+  // ---- Factor Producción (método "Variación estacional" de Producción) ----
+  // Misma normalización que egreso: si la hoja trae enteros (10 = 10%) se dividen entre 100.
+  // weekMap toma UNA vez cada [cultivo, ejercicio, semana] → el cruce con PPTO Producción no duplica.
+  const prodVarRecs = parsed['produccion|variacion']||[];
+  state.factorScaleProd = prodVarRecs.length ? normalizeFactorScale(prodVarRecs) : null;
+  if(state.factorScaleProd==='enteros') notes.push('[Factor Producción] Los % vienen como enteros (p. ej. 10 = 10%) — se dividieron entre 100.');
+  state.factorProd = weekMap(prodVarRecs, 'Factor Producción', false);
+
   state.variacion = {};
   (parsed['egreso|variacion']||[]).forEach(r=>{
     (state.variacion[r.cultivo] = state.variacion[r.cultivo]||[]).push({ date:r.date, rate:r.importe, mk:r.mk });
@@ -4660,6 +4727,8 @@ function processAllSlots(){
   // ---- Horizonte: mes en curso = mes de la semana de corte de Egreso ----
   const cutRef = state.cutoff.egreso || state.cutoff.ingreso || state.cutoff.produccion;
   setHorizon(cutRef ? monthKeyForWeek(cutRef, null) : monthKeyFromDate(NOW_UTC), cutRef ? getSeasonLabel(cutRef) : CURRENT_SEASON);
+  // Producción: horizonte propio a partir de SU semana de corte (real consolidado = 0).
+  setVarHorizon('produccion', state.cutoff.produccion);
   refreshHorizonUI();
 
   state.raw = newRaw;
@@ -4690,6 +4759,7 @@ function renderStatus(){
     <div class="statusitem"><div class="n">${fmtNum(totalRows)}</div><div class="l">Filas cargadas</div></div>
     <div class="statusitem"><div class="n">${cropsSeen.size}/7</div><div class="l">Cultivos detectados</div></div>
     <div class="statusitem"><div class="n">${fmtNum(varRows)}</div><div class="l">Semanas con % de variación (${varCrops} cultivos)</div></div>
+    <div class="statusitem"><div class="n">${fmtNum(Object.values(state.factorProd||{}).reduce((a,o)=>a+Object.keys(o).length,0))}</div><div class="l">Semanas con Factor Producción (${Object.keys(state.factorProd||{}).length} cultivos)</div></div>
     <div class="statusitem"><div class="n">${state.errors.length}</div><div class="l">Filas con error</div></div>
     <div class="statusitem"><div class="n">${fmtM(otrosTotal)}</div><div class="l">Empaque (egreso real)</div></div>`;
   const noteWrap = document.getElementById('noteBoxWrap');
@@ -4745,11 +4815,15 @@ function renderMetodoHint(){
   el.classList.remove('warn');
   if(method==='estacional'){
     const sinVar = crops.filter(c=> estacionalSourceFor('egreso', c)!=='variacion' && state.weekVal.presupuesto.egreso[c]);
-    const base = `Egreso = PPTO Egreso × (1 + % Variación Egreso) de cada semana, desde la ${cutTxt}. Horizonte: ${horTxt}. Ingreso y Producción usan su hoja de Proyección.`;
-    if(sinVar.length){
-      el.classList.add('warn');
-      el.innerHTML = base + ` ⚠️ Sin % en la hoja de Variación: ${sinVar.map(c=>DISPLAY[c]).join(', ')} — se usa el presupuesto tal cual (0%).` + cierreTxt;
-    } else el.innerHTML = base + cierreTxt;
+    const base = `Egreso = PPTO Egreso × (1 + % Variación Egreso) de cada semana, desde la ${cutTxt}. Horizonte: ${horTxt}. Ingreso usa su hoja de Proyección.`;
+    // Producción: mismo método con su propio corte y horizonte.
+    const Hp = horizonFor('produccion'), cutP = state.cutoff.produccion;
+    const cutPTxt = cutP ? `semana ${dateToWeekYear(cutP).w}/${dateToWeekYear(cutP).y}` : 'sin semanas reales';
+    const sinFacP = crops.filter(c=> estacionalSourceFor('produccion', c)!=='variacion' && state.weekVal.presupuesto.produccion && state.weekVal.presupuesto.produccion[c]);
+    const prodTxt = `<br>🌱 Producción = PPTO Producción × (1 + Factor Producción) de cada semana, desde la ${cutPTxt}. Horizonte: resto de ${monthLabel(Hp.currentMk)} + ${Hp.forecastMonths.map(monthLabel).join(', ')}; después, 0 kg.`
+      + (sinFacP.length ? ` ⚠️ Sin factor: ${sinFacP.map(c=>DISPLAY[c]).join(', ')} — se usa el presupuesto tal cual (0%).` : '');
+    if(sinVar.length || sinFacP.length) el.classList.add('warn');
+    el.innerHTML = base + (sinVar.length ? ` ⚠️ Sin % en la hoja de Variación: ${sinVar.map(c=>DISPLAY[c]).join(', ')} — se usa el presupuesto tal cual (0%).` : '') + prodTxt + cierreTxt;
   } else if(method==='movil'){
     const c = castigoMovilPct();
     el.innerHTML = `Promedio de las últimas 12 semanas reales${c ? ` × ${(100-c).toLocaleString('es-MX',{maximumFractionDigits:2})}% (castigo ${c.toLocaleString('es-MX',{maximumFractionDigits:2})}%)` : ' (sin castigo)'}; proyecta desde la ${cutTxt}. Horizonte: ${horTxt}.` + cierreTxt;
@@ -4921,7 +4995,7 @@ function init(){
 
 // Solo para pruebas automáticas (Node); en el navegador no hace nada.
 if(typeof window!=='undefined' && window.__FORECAST_TEST__){
-  window.__FORECAST_TEST__.api = { realWeeklyFor: (typeof realWeeklyFor!=='undefined'?realWeeklyFor:null), state, parseSlot, parsePercent, processAllSlots, projectedWeeks, monthlyParts, kindSeries, scenarioForecastConsolidated, ebitdaSet, fmtM, renderAll, BAKED_DATA, estacionalSourceFor, horizonWeeks, renderCierreRows,
+  window.__FORECAST_TEST__.api = { realWeeklyFor: (typeof realWeeklyFor!=='undefined'?realWeeklyFor:null), state, parseSlot, parsePercent, processAllSlots, projectedWeeks, monthlyParts, kindSeries, scenarioForecastConsolidated, ebitdaSet, fmtM, renderAll, BAKED_DATA, estacionalSourceFor, horizonWeeks, renderCierreRows, horizonFor, layoutFromHeader,
     get DISPLAY_MONTHS(){ return DISPLAY_MONTHS; }, get FORECAST_MONTHS(){ return FORECAST_MONTHS; },
     get CURRENT_MONTH_KEY(){ return CURRENT_MONTH_KEY; }, get HORIZON_MK(){ return HORIZON_MK; } };
 }
