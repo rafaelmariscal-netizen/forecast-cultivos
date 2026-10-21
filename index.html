@@ -12,6 +12,7 @@
     --good-soft:#e2f5e1; --warning-soft:#faf0d9; --critical-soft:#fbe4e1;
     --m-ingreso:#1baf7a; --m-egreso:#eb6834; --m-ebitda:#2a78d6;
     --crop-1:#2a78d6; --crop-2:#eb6834; --crop-3:#1baf7a; --crop-4:#c98500; --crop-5:#d1548a; --crop-6:#3a8c1c; --crop-7:#4a3aa7;
+    --zone-fresa:#d62839; --zone-frambuesa:#f27aae; --zone-zarzamora:#5b2a86; --zone-arandano:#2f6fd6; --zone-esparrago:#3a8f3e; --zone-aguacate:#b3b630; --zone-papa:#8a5a2b; --zone-alpha:0.10;
     --shadow-1: 0 1px 2px rgba(11,11,11,0.06), 0 1px 1px rgba(11,11,11,0.04);
     --shadow-2: 0 6px 20px rgba(11,11,11,0.08);
     --radius: 10px;
@@ -28,6 +29,7 @@
       --good-soft:#123018; --warning-soft:#332812; --critical-soft:#3a1a17;
       --m-ingreso:#3fcf9a; --m-egreso:#f08a5c; --m-ebitda:#5b9ee8;
       --crop-1:#5b9ee8; --crop-2:#f08a5c; --crop-3:#3fcf9a; --crop-4:#e0ab3c; --crop-5:#e284ac; --crop-6:#7dc85a; --crop-7:#9085e9;
+      --zone-fresa:#f0505c; --zone-frambuesa:#f597c2; --zone-zarzamora:#a77bd1; --zone-arandano:#6a9bf0; --zone-esparrago:#5cc265; --zone-aguacate:#d2d45a; --zone-papa:#c08a52; --zone-alpha:0.16;
       color-scheme: dark;
     }
   }
@@ -41,6 +43,7 @@
     --good-soft:#123018; --warning-soft:#332812; --critical-soft:#3a1a17;
     --m-ingreso:#3fcf9a; --m-egreso:#f08a5c; --m-ebitda:#5b9ee8;
     --crop-1:#5b9ee8; --crop-2:#f08a5c; --crop-3:#3fcf9a; --crop-4:#e0ab3c; --crop-5:#e284ac; --crop-6:#7dc85a; --crop-7:#9085e9;
+      --zone-fresa:#f0505c; --zone-frambuesa:#f597c2; --zone-zarzamora:#a77bd1; --zone-arandano:#6a9bf0; --zone-esparrago:#5cc265; --zone-aguacate:#d2d45a; --zone-papa:#c08a52; --zone-alpha:0.16;
     color-scheme: dark;
   }
 
@@ -165,6 +168,20 @@
   .tablewrap{ overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); }
   .tablewrap table{ min-width:640px; }
   #tablaHistorico{ min-width:900px; }
+  /* Tabla Kg por hectárea + recuadro de hectáreas */
+  .kgha-layout{ display:grid; grid-template-columns:minmax(0,1fr) 230px; gap:14px; align-items:start; }
+  @media (max-width:1100px){ .kgha-layout{ grid-template-columns:minmax(0,1fr); } }
+  #tablaKgHa{ min-width:860px; }
+  .kgha-chartcol{ display:flex; flex-direction:column; gap:8px; min-width:0; }
+  td .subkg{ display:block; font-size:10.5px; font-weight:400; color:var(--text-muted); margin-top:1px; }
+  .kgha-box{ border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); padding:12px; display:flex; flex-direction:column; gap:8px; }
+  .kgha-box h5{ margin:0; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); }
+  .kgha-row{ display:grid; grid-template-columns:minmax(0,1fr) 92px; gap:6px; align-items:center; font-size:12px; font-weight:600; color:var(--text-secondary); }
+  .kgha-row input{ width:100%; padding:5px 7px; font-size:12px; text-align:right; border:1px solid var(--border-strong); border-radius:6px; background:var(--surface-raised); color:var(--text-primary); font-family:'IBM Plex Mono',monospace; }
+  .kgha-row input:focus{ outline:2px solid var(--accent-soft-2); border-color:var(--accent); }
+  .kgha-total{ display:flex; justify-content:space-between; border-top:1px solid var(--border-strong); padding-top:7px; font-size:12px; font-weight:700; color:var(--text-primary); }
+  .kgha-total b{ font-family:'IBM Plex Mono',monospace; }
+  .kgha-row[hidden], .kgha-total[hidden]{ display:none; }
 
   .scenariotable input{ width:64px; padding:5px 6px; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary); font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right; }
   .scenariotable input:disabled{ opacity:.5; }
@@ -356,6 +373,27 @@
           <p class="cardsub" id="tablaSub"></p>
           <div class="tablewrap">
             <table id="tablaHistorico"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Kg por hectárea — <select id="kghaCropSelect" class="tablecrop-select"></select> <span class="hint" id="kghaCropHa"></span></h4>
+          <div class="kgha-layout">
+            <div class="kgha-chartcol">
+              <div class="chartbox tall"><canvas id="chartKgHa"></canvas></div>
+              <div class="legend-inline" id="legendKgHa"></div>
+            </div>
+            <div class="kgha-box">
+              <h5>Hectáreas por cultivo</h5>
+              <div id="kghaInputs"></div>
+              <p class="hint" id="kghaEmpaqueMsg" hidden>📦 Empaque no lleva hectáreas.</p>
+              <div class="kgha-total" id="kghaTotalRow"><span>Total</span><b id="kghaTotal">0 ha</b></div>
+              <p class="hint">Escribe las hectáreas de cada cultivo. Se guardan en este navegador y no se borran al recargar la página ni al actualizar los datos. Mientras un cultivo no tenga hectáreas, la gráfica y la tabla muestran sus kg.</p>
+            </div>
+          </div>
+          <p class="cardsub" id="kghaSub"></p>
+          <div class="tablewrap">
+            <table id="tablaKgHa"><thead></thead><tbody></tbody></table>
           </div>
         </div>
       </section>
@@ -678,6 +716,7 @@ const state = {
   weekVal: { presupuesto:{}, proyeccion:{} },       // tipo → variable → cultivo → 'AAAA-S' → importe
   factor: {},                                       // cultivo → 'AAAA-S' → % (hoja Variación Egreso)
   cierre: {},                                       // cultivo → 'AAAA-MM' desde el que la proyección es $0
+  hectareas: {},                                    // cultivo → hectáreas (recuadro de Kg por hectárea, se guarda en el navegador)
   monthly: null,
   filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat([OTHER_LABEL])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial', castigoMovil:'', tablaVariable:'egreso', vista:'mensual' },
   scenarios: {
@@ -811,8 +850,16 @@ function layoutFromHeader(row){
   const find = re => norm.findIndex(h=> re.test(h));
   const cultivoIdx = find(/^cultivo$/), ejercicioIdx = find(/^(ejercicio|ano|anio|año|year)$/), semanaIdx = find(/^semana$/);
   const mesIdx = find(/^mes$/);
-  let importeIdx = -1;
-  norm.forEach((h,i)=>{ if(i!==cultivoIdx && i!==ejercicioIdx && i!==semanaIdx && i!==mesIdx && /variaci|factor|%/.test(h)) importeIdx = i; });
+  // Columna del %: la última columna (que no sea llave) cuyo título diga variación / factor / %.
+  // La columna 0 suele ser solo la etiqueta de la hoja ("Factor Producción", "Variación Egreso"), así que
+  // no se usa si hay otra opción. Si ningún título coincide (p. ej. la columna del % se llama "Producción"),
+  // se toma la primera columna después de "semana" que no sea llave.
+  const keyCol = i => i===cultivoIdx || i===ejercicioIdx || i===semanaIdx || i===mesIdx;
+  const cand = norm.map((h,i)=>i).filter(i=> !keyCol(i));
+  const matches = cand.filter(i=> /variaci|factor|%/.test(norm[i]));
+  const nonLabel = matches.filter(i=> i!==0);
+  let importeIdx = nonLabel.length ? nonLabel[nonLabel.length-1] : -1;
+  if(importeIdx<0){ const after = cand.filter(i=> i>semanaIdx); importeIdx = after.length ? after[0] : (matches.length ? matches[matches.length-1] : -1); }
   if(cultivoIdx<0 || ejercicioIdx<0 || semanaIdx<0 || importeIdx<0) return null;
   return { cultivoIdx, ejercicioIdx, semanaIdx, importeIdx, mesIdx: mesIdx<0 ? null : mesIdx };
 }
@@ -835,8 +882,10 @@ function parseMoney(v){
 // decide para toda la hoja en normalizeFactorScale(), no celda por celda.
 function parsePercent(v){
   if(v==null) return NaN;
-  const s = String(v).trim();
+  let s = String(v).trim();
   if(s==='') return NaN;
+  // Coma decimal ("3,95%" o "0,0395"): sin punto en el texto, la coma es el decimal → "3.95%".
+  if(s.includes(',') && !s.includes('.')) s = s.replace(/,/g,'.');
   const n = parseMoney(s);
   if(!Number.isFinite(n)) return NaN;
   return s.includes('%') ? n/100 : n;
@@ -847,6 +896,12 @@ function parsePercent(v){
 function normalizeFactorScale(records){
   const plain = records.filter(r=>!r.pctSign);
   const enteros = plain.some(r=>Math.abs(r.importe)>1);
+  // Aviso: hoja mezclada (unos valores como entero 3.95 y otros como decimal 0.0395). La escala se decide
+  // para toda la hoja; los decimales chicos quedarían divididos entre 100 → revisar la hoja.
+  if(enteros){
+    const chicos = plain.filter(r=> r.importe!==0 && Math.abs(r.importe)<0.2 && !Number.isInteger(r.importe));
+    records._mezcla = chicos.length;
+  }
   if(enteros) plain.forEach(r=>{ r.importe = r.importe/100; });
   return enteros ? 'enteros' : 'decimal';
 }
@@ -1271,6 +1326,33 @@ function hexA(hex, alpha){
   return `rgba(${r},${g},${b},${alpha})`;
 }
 const charts = {};
+// Fondo por cultivo en "Comparación de los 7 cultivos": cada zona (la columna de un cultivo) se pinta
+// muy suave con un color relacionado al cultivo. No cambia las barras ni sus colores.
+const ZONE_VAR = { FRESA:'--zone-fresa', FRAMBUESA:'--zone-frambuesa', ZARZAMORA:'--zone-zarzamora', ARANDANO:'--zone-arandano', ESPARRAGO:'--zone-esparrago', AGUACATE:'--zone-aguacate', PAPA:'--zone-papa' };
+function zoneColor(crop){ return cssVar(ZONE_VAR[crop]); }
+const cropZonesPlugin = {
+  id:'cropZones',
+  beforeDatasetsDraw(chart, args, opts){
+    const crops = (opts && opts.crops) || [];
+    const x = chart.scales.x, area = chart.chartArea;
+    if(!x || !crops.length) return;
+    const alpha = parseFloat(cssVar('--zone-alpha')) || 0.10;
+    const ctx = chart.ctx;
+    ctx.save();
+    crops.forEach((crop, i)=>{
+      const c = x.getPixelForValue(i);
+      const prev = i>0 ? x.getPixelForValue(i-1) : null, next = i<crops.length-1 ? x.getPixelForValue(i+1) : null;
+      const left  = prev==null ? area.left  : (prev+c)/2;
+      const right = next==null ? area.right : (c+next)/2;
+      const col = zoneColor(crop);
+      ctx.fillStyle = hexA(col, alpha);
+      ctx.fillRect(left+1, area.top, right-left-2, area.bottom-area.top);
+      ctx.fillStyle = hexA(col, Math.min(1, alpha*5));   // línea de color arriba de cada zona
+      ctx.fillRect(left+1, area.top, right-left-2, 3);
+    });
+    ctx.restore();
+  }
+};
 function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
 
 /* ============================================================
@@ -1467,6 +1549,202 @@ function renderHistoricoTable(){
     (vista==='mensual' ? 'En el renglón Total, la variación compara el real solo contra el presupuesto de los meses que ya tienen real.' : '');
 }
 
+// ---------- Kg por hectárea ----------
+// Kg/ha = Kg (real, presupuesto o proyectados por cada método) ÷ hectáreas del cultivo.
+// En Consolidado: suma de kg de los cultivos que tienen hectáreas ÷ suma de esas hectáreas.
+// Empaque no aplica (no produce kg). Las hectáreas se guardan en el navegador (localStorage).
+const HECTAREAS_KEY = 'forecast_hectareas_v1';
+function loadHectareas(){
+  try { const o = JSON.parse(localStorage.getItem(HECTAREAS_KEY)||'{}'); if(o && typeof o==='object') state.hectareas = o; } catch(e){}
+}
+function saveHectareas(){
+  try { localStorage.setItem(HECTAREAS_KEY, JSON.stringify(state.hectareas)); } catch(e){}
+}
+function hectareasDe(crop){ const v = Number(state.hectareas[crop]); return isFinite(v) && v>0 ? v : 0; }
+const fmtKgHa = v => new Intl.NumberFormat('es-MX',{maximumFractionDigits: Math.abs(v||0)<100 ? 1 : 0}).format(v||0)+' kg/ha';
+
+function buildHectareasBox(){
+  const wrap = document.getElementById('kghaInputs');
+  if(!wrap) return;
+  wrap.innerHTML = CROPS.map(c=>{
+    const v = state.hectareas[c];
+    return `<label class="kgha-row" data-crop="${c}"><span>${ICONS[c]} ${DISPLAY[c]}</span>
+      <input type="number" min="0" step="any" inputmode="decimal" placeholder="ha" data-crop="${c}" value="${v!=null && v!=='' ? v : ''}"></label>`;
+  }).join('');
+  wrap.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const raw = inp.value.trim();
+      if(raw==='') delete state.hectareas[inp.dataset.crop]; else state.hectareas[inp.dataset.crop] = raw;
+      saveHectareas();
+      refreshThemeColors();
+      renderKgHa();
+    });
+  });
+}
+
+// Datos de la sección Kg por hectárea para el cultivo / consolidado seleccionado.
+//  · Con hectáreas: kg de los cultivos que tienen hectáreas ÷ suma de esas hectáreas (unidad kg/ha).
+//  · Sin hectáreas: se muestran los kg tal cual (unidad kg) — la tabla y la gráfica nunca quedan vacías.
+function kgHaContext(){
+  const sel = currentCropsSelection();
+  const isCons = state.filters.focalCrop==='CONSOLIDADO';
+  const cropsSel = sel.filter(c=>CROPS.includes(c));
+  const cropsHa = cropsSel.filter(c=>hectareasDe(c)>0);
+  const ha = cropsHa.reduce((a,c)=>a+hectareasDe(c),0);
+  const useHa = ha>0;
+  return {
+    isCons, cropsSel, ha, useHa,
+    crops: useHa ? cropsHa : cropsSel,
+    sinHa: cropsSel.filter(c=>hectareasDe(c)===0),
+    div: useHa ? ha : 1,
+    fmtU: useHa ? fmtKgHa : fmtKg,
+    unit: useHa ? 'Kg/ha' : 'Kg',
+    haTxt: new Intl.NumberFormat('es-MX',{maximumFractionDigits:2}).format(ha)+' ha'
+  };
+}
+
+function renderKgHa(){
+  const sel = document.getElementById('kghaCropSelect');
+  if(sel){
+    sel.innerHTML = cropSelectOptionsHTML(`Consolidado (${includedCropsOrdered().length} cultivos)`);
+    sel.value = state.filters.focalCrop;
+  }
+  // Recuadro de hectáreas: en Consolidado se ven los 7 cultivos; con un cultivo enfocado, solo ese.
+  const focal = state.filters.focalCrop;
+  document.querySelectorAll('#kghaInputs .kgha-row').forEach(row=>{
+    row.hidden = !(focal==='CONSOLIDADO' || row.dataset.crop===focal);
+  });
+  document.getElementById('kghaTotalRow').hidden = focal!=='CONSOLIDADO';
+  document.getElementById('kghaEmpaqueMsg').hidden = focal!==OTHER_LABEL;
+  const totHaAll = CROPS.reduce((a,c)=>a+hectareasDe(c),0);
+  document.getElementById('kghaTotal').textContent = new Intl.NumberFormat('es-MX',{maximumFractionDigits:2}).format(totHaAll)+' ha';
+  const ctx = kgHaContext();
+  document.getElementById('kghaCropHa').textContent = state.filters.focalCrop===OTHER_LABEL ? '' :
+    ctx.useHa ? (ctx.isCons ? `${ctx.haTxt} de ${ctx.crops.length} cultivo${ctx.crops.length===1?'':'s'}` : ctx.haTxt) : 'sin hectáreas · mostrando kg';
+  renderKgHaChart(ctx);
+  renderKgHaTable(ctx);
+}
+
+function renderKgHaChart(ctx){
+  destroyChart('chartKgHa');
+  const legend = document.getElementById('legendKgHa');
+  if(state.filters.focalCrop===OTHER_LABEL || !ctx.crops.length){ legend.innerHTML = ''; return; }
+  if(!chartsAvailable()){ chartFallback('chartKgHa'); return; }
+  const method = state.filters.metodo, sc = state.filters.escenario, vista = state.filters.vista;
+  const months = DISPLAY_MONTHS;
+  const act = kindSeries('produccion', method, sc, ctx.crops, months, vista);
+  const opt = kindSeries('produccion', method, 'optimista', ctx.crops, months, vista);
+  const pes = kindSeries('produccion', method, 'pesimista', ctx.crops, months, vista);
+  let lastRealIdx = -1;
+  months.forEach((mk,i)=>{ if(act.hasReal[mk]) lastRealIdx = i; });
+  const projStart = Math.max(0, lastRealIdx);
+  const d = v => v/ctx.div;
+  const realArr = months.map(mk=> act.hasReal[mk] ? d(act.real[mk]) : null);
+  const projArr = months.map((mk,i)=> i>=projStart ? d(act.full[mk]) : null);
+  const optArr  = months.map((mk,i)=> i>=projStart ? d(opt.full[mk]) : null);
+  const pesArr  = months.map((mk,i)=> i>=projStart ? d(pes.full[mk]) : null);
+  const presArr = hasTipo('produccion','presupuesto') ? months.map(mk=> d(act.pres[mk])) : months.map(()=>null);
+  const lineColor = scenarioLineColor(sc);
+  const projLabel = `Proyección · ${METODO_LABEL[method]} (${sc})`;
+  const fmtU = ctx.fmtU;
+  charts.chartKgHa = new Chart(document.getElementById('chartKgHa').getContext('2d'), {
+    type:'line',
+    data:{
+      labels: months.map(monthLabel),
+      datasets:[
+        { label:'Presupuesto', data:presArr, borderColor:CH.muted, backgroundColor:CH.muted, pointBackgroundColor:CH.muted, pointBorderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:3, fill:false, tension:0.25 },
+        { label:'Pesimista', data:pesArr, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.12), pointRadius:0, fill:false, tension:0.25 },
+        { label:'Optimista', data:optArr, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
+        { label:'Real', data:realArr, borderColor:CH.primary, backgroundColor:CH.primary, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
+        { label:projLabel, data:projArr, borderColor:lineColor, backgroundColor:lineColor, borderWidth:2.5, pointRadius:3, pointBackgroundColor:lineColor, tension:0.25, fill:false }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ display:false },
+        tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, padding:10,
+          callbacks:{ label: c => c.dataset.label+': '+(c.raw==null?'—':fmtU(c.raw)) } } },
+      scales: baseScales({ y: { grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=> fmtU(v) } } })
+    }
+  });
+  legend.innerHTML = `
+    <span class="sw" style="color:${CH.muted}"><span class="dashed"></span>Presupuesto</span>
+    <span class="sw" style="color:${CH.primary}"><span class="line" style="background:${CH.primary}"></span>Real</span>
+    <span class="sw" style="color:${lineColor}"><span class="line" style="background:${lineColor}"></span>${projLabel}</span>
+    <span class="sw" style="color:${CH.good}"><span class="dot" style="background:${hexA(CH.good,0.5)}"></span>Rango Pesimista–Optimista</span>
+    <span class="sw">Unidad: ${ctx.useHa ? 'kg por hectárea' : 'kg (sin hectáreas capturadas)'}</span>`;
+}
+
+function renderKgHaTable(ctx){
+  ctx = ctx || kgHaContext();
+  const tbl = document.getElementById('tablaKgHa');
+  const sc = state.filters.escenario, vista = state.filters.vista, activeMethod = state.filters.metodo;
+  const months = DISPLAY_MONTHS;
+  const thead = tbl.querySelector('thead'), tbody = tbl.querySelector('tbody');
+  const mcls = k => k===activeMethod ? ' class="active-method"' : '';
+  const U = ctx.unit;
+  thead.innerHTML = `<tr><th>Mes</th><th>${U} real</th><th>${U} presupuesto</th><th>Variación vs presupuesto</th>` +
+    TABLE_METHODS.map(m=>`<th${mcls(m.key)}>${m.label}</th>`).join('') + '</tr>';
+  tbody.innerHTML = '';
+  const sub = document.getElementById('kghaSub');
+  if(state.filters.focalCrop===OTHER_LABEL){
+    tbody.innerHTML = `<tr><td colspan="${4+TABLE_METHODS.length}">📦 Empaque no produce kg — elige un cultivo o Consolidado.</td></tr>`;
+    sub.textContent = ''; return;
+  }
+
+  const S = {};
+  TABLE_METHODS.forEach(m=> S[m.key] = kindSeries('produccion', m.key, sc, ctx.crops, months, vista));
+  const base = S.estacional; // Real y Presupuesto no dependen del método
+  const hasPres = hasTipo('produccion','presupuesto');
+  const meta = { fmt:ctx.fmtU, favorableWhenAbove:true };
+  const cell = (kg, extra) => ctx.useHa
+    ? `<td${extra||''}>${fmtKgHa(kg/ctx.ha)}<span class="subkg">${fmtKg(kg)}</span></td>`
+    : `<td${extra||''}>${fmtKg(kg)}</td>`;
+
+  let totReal=0, totPresReal=0, totPres=0, anyReal=false; const totM = {}; TABLE_METHODS.forEach(m=>totM[m.key]=0);
+  months.forEach(mk=>{
+    const isForecast = FORECAST_MONTHS.includes(mk);
+    const realKg = base.hasReal[mk] ? base.real[mk] : null;
+    const presKg = hasPres ? base.pres[mk] : null;
+    let diff=null, pct=null;
+    if(realKg!=null && presKg!=null){ diff = (realKg - presKg)/ctx.div; pct = presKg!==0 ? (realKg-presKg)/presKg*100 : null; }
+    if(vista==='mensual'){
+      if(realKg!=null){ totReal += realKg; anyReal = true; if(presKg!=null) totPresReal += presKg; }
+      if(presKg!=null) totPres += presKg;
+      TABLE_METHODS.forEach(m=> totM[m.key] += S[m.key].full[mk]||0);
+    }
+    const tr = document.createElement('tr');
+    if(mk===CURRENT_MONTH_KEY) tr.className='now';
+    tr.innerHTML = `<td>${monthLabel(mk)}${isForecast?' 🔮':''}</td>` +
+      (realKg==null ? '<td>—</td>' : cell(realKg)) +
+      (presKg==null ? '<td>—</td>' : cell(presKg)) +
+      `<td>${varianceCellHTML(diff, pct, meta)}</td>` +
+      TABLE_METHODS.map(m=> cell(S[m.key].full[mk]||0, mcls(m.key))).join('');
+    tbody.appendChild(tr);
+  });
+
+  if(vista==='mensual'){
+    let totDiff=null, totPct=null;
+    if(anyReal && hasPres){ totDiff = (totReal - totPresReal)/ctx.div; totPct = totPresReal!==0 ? (totReal-totPresReal)/totPresReal*100 : null; }
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'total-row';
+    totalRow.innerHTML = `<td>Total ${monthLabel(months[0])} – ${monthLabel(months[months.length-1])}</td>` +
+      (anyReal ? cell(totReal) : '<td>—</td>') +
+      (hasPres ? cell(totPres) : '<td>—</td>') +
+      `<td>${varianceCellHTML(totDiff, totPct, meta)}</td>` +
+      TABLE_METHODS.map(m=> cell(totM[m.key], mcls(m.key))).join('');
+    tbody.appendChild(totalRow);
+  }
+
+  const vistaTxt = vista==='acumulado' ? 'Cifras <b>acumuladas</b> desde el inicio de la temporada.' : 'Cifras del mes.';
+  const unidadTxt = ctx.useHa
+    ? `Cada celda = kg ÷ ${ctx.haTxt}; abajo, en gris, los kg.`
+    : `<span class="hint warn">Sin hectáreas capturadas${ctx.isCons?'':' para '+DISPLAY[state.filters.focalCrop]}: se muestran los kg. Escribe las hectáreas en el recuadro para ver kg/ha.</span>`;
+  sub.innerHTML = `${vistaTxt} ${unidadTxt} Las 3 columnas de método usan los kg proyectados con ese método (real capturado + semanas proyectadas), escenario <b>${sc}</b>. La columna resaltada es el método seleccionado en el panel.` +
+    (ctx.isCons && ctx.useHa && ctx.sinHa.length ? ` <span class="hint warn">Sin hectáreas (no entran al kg/ha): ${ctx.sinHa.map(c=>DISPLAY[c]).join(', ')}.</span>` : '');
+}
+
 function renderForecastTab(){
   renderKpis();
   const money = v=>fmtM(v);
@@ -1477,6 +1755,7 @@ function renderForecastTab(){
   renderLineWithBand('chartProduccion','legendProduccion', 'produccion', fmtKg, false);
   document.querySelectorAll('[data-vista-label]').forEach(el=> el.textContent = state.filters.vista==='acumulado' ? '· acumulado' : '· mensual');
   renderHistoricoTable();
+  renderKgHa();
 }
 
 /* ============================================================
@@ -1590,9 +1869,11 @@ function renderComparativoTab(){
       },
       options:{ responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{ position:'top', labels:{ boxWidth:10, color:CH.text } },
+          cropZones:{ crops: totals.map(t=>t.crop) },
           tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, callbacks:{ label:c=>c.dataset.label+': '+fmtM(c.raw) } } },
         scales: baseScales({ y:{ grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=>fmtM(v) } } })
-      }
+      },
+      plugins:[ cropZonesPlugin ]
     });
   }
 
@@ -1609,7 +1890,7 @@ function renderComparativoTab(){
         datasets: totals.map(t=>({
           label: ICONS[t.crop]+' '+DISPLAY[t.crop],
           data:[ Math.max(0,t.ingreso)/sumIngreso*100, Math.max(0,t.egreso)/sumEgreso*100, Math.max(0,t.ebitda)/sumEbitda*100 ],
-          backgroundColor: cropColor(t.crop), borderWidth:0
+          backgroundColor: zoneColor(t.crop), borderColor: CH.surface, borderWidth:{ left:1, right:1 }
         }))
       },
       options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
@@ -3412,9 +3693,9 @@ Real	FRESA	2026	36	0	Septiembre
 Real	FRESA	2026	37	980.84	Septiembre
 Real	FRESA	2026	38	0	Septiembre
 Real	FRESA	2026	39	85523.15	Septiembre
-Real	FRESA	2026	40	290571.08	Octubre
+Real	FRESA	2026	40	290571.07999999996	Octubre
 Real	FRESA	2026	41	465363.67999999993	Octubre
-Real	FRESA	2026	42	476771.08999999997	Octubre
+Real	FRESA	2026	42	409740.39	Octubre
 Real	FRESA	2026	43	0	Octubre
 Real	FRESA	2026	44	0	Octubre
 Real	FRESA	2026	45	0	Noviembre
@@ -3521,9 +3802,9 @@ Real	FRAMBUESA	2026	36	0	Septiembre
 Real	FRAMBUESA	2026	37	9258.14	Septiembre
 Real	FRAMBUESA	2026	38	44917.01	Septiembre
 Real	FRAMBUESA	2026	39	113124.09	Septiembre
-Real	FRAMBUESA	2026	40	252071.86999999997	Octubre
+Real	FRAMBUESA	2026	40	252071.87	Octubre
 Real	FRAMBUESA	2026	41	241881.40999999997	Octubre
-Real	FRAMBUESA	2026	42	223462.87	Octubre
+Real	FRAMBUESA	2026	42	186408.02	Octubre
 Real	FRAMBUESA	2026	43	0	Octubre
 Real	FRAMBUESA	2026	44	0	Octubre
 Real	FRAMBUESA	2026	45	0	Noviembre
@@ -3577,7 +3858,7 @@ Real	ZARZAMORA	2026	38	0	Septiembre
 Real	ZARZAMORA	2026	39	0	Septiembre
 Real	ZARZAMORA	2026	40	1938.56	Octubre
 Real	ZARZAMORA	2026	41	7775.1	Octubre
-Real	ZARZAMORA	2026	42	9699.759999999998	Octubre
+Real	ZARZAMORA	2026	42	8279.38	Octubre
 Real	ZARZAMORA	2026	43	0	Octubre
 Real	ZARZAMORA	2026	44	0	Octubre
 Real	ZARZAMORA	2026	45	0	Noviembre
@@ -3624,11 +3905,11 @@ Real	AGUACATE	2026	23	0
 Real	AGUACATE	2026	24	0	
 Real	AGUACATE	2026	25	0	
 Real	AGUACATE	2026	26	0	Junio
-Real	AGUACATE	2026	27	984449.8099999998	Julio
+Real	AGUACATE	2026	27	984449.8099999999	Julio
 Real	AGUACATE	2026	28	182394.99	Julio
 Real	AGUACATE	2026	29	248825.01	Julio
 Real	AGUACATE	2026	30	246345.01	Julio
-Real	AGUACATE	2026	31	248244.96	Agosto
+Real	AGUACATE	2026	31	248244.95999999996	Agosto
 Real	AGUACATE	2026	32	66690.01000000001	Agosto
 Real	AGUACATE	2026	33	134060.02000000002	Agosto
 Real	AGUACATE	2026	34	287000.01	Agosto
@@ -3637,9 +3918,9 @@ Real	AGUACATE	2026	36	259520.01	Septiembre
 Real	AGUACATE	2026	37	392150.01	Septiembre
 Real	AGUACATE	2026	38	314720	Septiembre
 Real	AGUACATE	2026	39	431365	Septiembre
-Real	AGUACATE	2026	40	314742.28	Octubre
+Real	AGUACATE	2026	40	327672.28	Octubre
 Real	AGUACATE	2026	41	253105	Octubre
-Real	AGUACATE	2026	42	313190	Octubre
+Real	AGUACATE	2026	42	242395	Octubre
 Real	AGUACATE	2026	43	0	Octubre
 Real	AGUACATE	2026	44	0	Octubre
 Real	AGUACATE	2026	45	0	Noviembre
@@ -3797,43 +4078,43 @@ Presupuesto	FRESA	2026	35	0	Agosto
 Presupuesto	FRESA	2026	36	0	Septiembre
 Presupuesto	FRESA	2026	37	0	Septiembre
 Presupuesto	FRESA	2026	38	0	Septiembre
-Presupuesto	FRESA	2026	39	11219	Septiembre
+Presupuesto	FRESA	2026	39	11218	Septiembre
 Presupuesto	FRESA	2026	40	79564	Octubre
-Presupuesto	FRESA	2026	41	206062	Octubre
-Presupuesto	FRESA	2026	42	351730	Octubre
+Presupuesto	FRESA	2026	41	206066	Octubre
+Presupuesto	FRESA	2026	42	351727	Octubre
 Presupuesto	FRESA	2026	43	585302	Octubre
-Presupuesto	FRESA	2026	44	677250	Octubre
-Presupuesto	FRESA	2026	45	777033	Noviembre
-Presupuesto	FRESA	2026	46	823008	Noviembre
-Presupuesto	FRESA	2026	47	841958	Noviembre
-Presupuesto	FRESA	2026	48	910959	Noviembre
-Presupuesto	FRESA	2026	49	946102	Diciembre
-Presupuesto	FRESA	2026	50	1015613	Diciembre
-Presupuesto	FRESA	2026	51	1071542	Diciembre
-Presupuesto	FRESA	2026	52	1153098	Diciembre
-Presupuesto	FRESA	2027	1	1229213	Enero
-Presupuesto	FRESA	2027	2	1255205	Enero
-Presupuesto	FRESA	2027	3	1264169	Enero
-Presupuesto	FRESA	2027	4	1230480	Enero
-Presupuesto	FRESA	2027	5	1199205	Enero
+Presupuesto	FRESA	2026	44	677245	Octubre
+Presupuesto	FRESA	2026	45	777036	Noviembre
+Presupuesto	FRESA	2026	46	823005	Noviembre
+Presupuesto	FRESA	2026	47	841953	Noviembre
+Presupuesto	FRESA	2026	48	910962	Noviembre
+Presupuesto	FRESA	2026	49	946100	Diciembre
+Presupuesto	FRESA	2026	50	1015616	Diciembre
+Presupuesto	FRESA	2026	51	1071541	Diciembre
+Presupuesto	FRESA	2026	52	1153096	Diciembre
+Presupuesto	FRESA	2027	1	1229212	Enero
+Presupuesto	FRESA	2027	2	1255200	Enero
+Presupuesto	FRESA	2027	3	1264161	Enero
+Presupuesto	FRESA	2027	4	1230477	Enero
+Presupuesto	FRESA	2027	5	1199204	Enero
 Presupuesto	FRESA	2027	6	1174840	Febrero
-Presupuesto	FRESA	2027	7	1162677	Febrero
-Presupuesto	FRESA	2027	8	1113710	Febrero
-Presupuesto	FRESA	2027	9	1057667	Febrero
+Presupuesto	FRESA	2027	7	1162674	Febrero
+Presupuesto	FRESA	2027	8	1113702	Febrero
+Presupuesto	FRESA	2027	9	1057674	Febrero
 Presupuesto	FRESA	2027	10	967865	Marzo
-Presupuesto	FRESA	2027	11	861635	Marzo
-Presupuesto	FRESA	2027	12	795000	Marzo
-Presupuesto	FRESA	2027	13	734153	Marzo
-Presupuesto	FRESA	2027	14	674335	Abril
-Presupuesto	FRESA	2027	15	607061	Abril
-Presupuesto	FRESA	2027	16	541332	Abril
-Presupuesto	FRESA	2027	17	424482	Abril
-Presupuesto	FRESA	2027	18	325846	Mayo
-Presupuesto	FRESA	2027	19	211368	Mayo
-Presupuesto	FRESA	2027	20	114626	Mayo
-Presupuesto	FRESA	2027	21	54781	Mayo
-Presupuesto	FRESA	2027	22	17115	Mayo
-Presupuesto	FRESA	2027	23	4109	Junio
+Presupuesto	FRESA	2027	11	861628	Marzo
+Presupuesto	FRESA	2027	12	794991	Marzo
+Presupuesto	FRESA	2027	13	734156	Marzo
+Presupuesto	FRESA	2027	14	674337	Abril
+Presupuesto	FRESA	2027	15	607053	Abril
+Presupuesto	FRESA	2027	16	541330	Abril
+Presupuesto	FRESA	2027	17	424479	Abril
+Presupuesto	FRESA	2027	18	325844	Mayo
+Presupuesto	FRESA	2027	19	211366	Mayo
+Presupuesto	FRESA	2027	20	114630	Mayo
+Presupuesto	FRESA	2027	21	54775	Mayo
+Presupuesto	FRESA	2027	22	17111	Mayo
+Presupuesto	FRESA	2027	23	4106	Junio
 Presupuesto	FRESA	2027	24	0	Junio
 Presupuesto	FRESA	2027	25	448	Junio
 Presupuesto	FRESA	2027	26	136	Junio
@@ -3850,49 +4131,49 @@ Presupuesto	ARANDANO	2026	34	6332	Agosto
 Presupuesto	ARANDANO	2026	35	5862	Agosto
 Presupuesto	ARANDANO	2026	36	9850	Septiembre
 Presupuesto	ARANDANO	2026	37	15536	Septiembre
-Presupuesto	ARANDANO	2026	38	13362	Septiembre
+Presupuesto	ARANDANO	2026	38	13361	Septiembre
 Presupuesto	ARANDANO	2026	39	13731	Septiembre
 Presupuesto	ARANDANO	2026	40	5331	Octubre
 Presupuesto	ARANDANO	2026	41	9510	Octubre
-Presupuesto	ARANDANO	2026	42	8895	Octubre
+Presupuesto	ARANDANO	2026	42	8894	Octubre
 Presupuesto	ARANDANO	2026	43	22224	Octubre
-Presupuesto	ARANDANO	2026	44	27748	Octubre
+Presupuesto	ARANDANO	2026	44	27747	Octubre
 Presupuesto	ARANDANO	2026	45	32506	Noviembre
-Presupuesto	ARANDANO	2026	46	45210	Noviembre
-Presupuesto	ARANDANO	2026	47	58561	Noviembre
+Presupuesto	ARANDANO	2026	46	45209	Noviembre
+Presupuesto	ARANDANO	2026	47	58562	Noviembre
 Presupuesto	ARANDANO	2026	48	66835	Noviembre
-Presupuesto	ARANDANO	2026	49	78224	Diciembre
-Presupuesto	ARANDANO	2026	50	73372	Diciembre
-Presupuesto	ARANDANO	2026	51	77180	Diciembre
-Presupuesto	ARANDANO	2026	52	79222	Diciembre
-Presupuesto	ARANDANO	2027	1	84860	Enero
-Presupuesto	ARANDANO	2027	2	84972	Enero
-Presupuesto	ARANDANO	2027	3	110523	Enero
-Presupuesto	ARANDANO	2027	4	115236	Enero
-Presupuesto	ARANDANO	2027	5	120940	Enero
-Presupuesto	ARANDANO	2027	6	128774	Febrero
-Presupuesto	ARANDANO	2027	7	171366	Febrero
-Presupuesto	ARANDANO	2027	8	141066	Febrero
-Presupuesto	ARANDANO	2027	9	240873	Febrero
-Presupuesto	ARANDANO	2027	10	196750	Marzo
-Presupuesto	ARANDANO	2027	11	193530	Marzo
-Presupuesto	ARANDANO	2027	12	262277	Marzo
-Presupuesto	ARANDANO	2027	13	246854	Marzo
-Presupuesto	ARANDANO	2027	14	246085	Abril
-Presupuesto	ARANDANO	2027	15	268398	Abril
-Presupuesto	ARANDANO	2027	16	215319	Abril
-Presupuesto	ARANDANO	2027	17	194217	Abril
+Presupuesto	ARANDANO	2026	49	78223	Diciembre
+Presupuesto	ARANDANO	2026	50	73425	Diciembre
+Presupuesto	ARANDANO	2026	51	77231	Diciembre
+Presupuesto	ARANDANO	2026	52	79221	Diciembre
+Presupuesto	ARANDANO	2027	1	85851	Enero
+Presupuesto	ARANDANO	2027	2	85805	Enero
+Presupuesto	ARANDANO	2027	3	110672	Enero
+Presupuesto	ARANDANO	2027	4	115406	Enero
+Presupuesto	ARANDANO	2027	5	121976	Enero
+Presupuesto	ARANDANO	2027	6	129523	Febrero
+Presupuesto	ARANDANO	2027	7	174396	Febrero
+Presupuesto	ARANDANO	2027	8	143461	Febrero
+Presupuesto	ARANDANO	2027	9	244088	Febrero
+Presupuesto	ARANDANO	2027	10	202342	Marzo
+Presupuesto	ARANDANO	2027	11	199210	Marzo
+Presupuesto	ARANDANO	2027	12	268730	Marzo
+Presupuesto	ARANDANO	2027	13	253390	Marzo
+Presupuesto	ARANDANO	2027	14	251456	Abril
+Presupuesto	ARANDANO	2027	15	272694	Abril
+Presupuesto	ARANDANO	2027	16	218757	Abril
+Presupuesto	ARANDANO	2027	17	196967	Abril
 Presupuesto	ARANDANO	2027	18	185388	Mayo
-Presupuesto	ARANDANO	2027	19	156942	Mayo
-Presupuesto	ARANDANO	2027	20	98273	Mayo
+Presupuesto	ARANDANO	2027	19	156943	Mayo
+Presupuesto	ARANDANO	2027	20	98275	Mayo
 Presupuesto	ARANDANO	2027	21	90980	Mayo
-Presupuesto	ARANDANO	2027	22	75174	Mayo
+Presupuesto	ARANDANO	2027	22	75173	Mayo
 Presupuesto	ARANDANO	2027	23	68241	Junio
 Presupuesto	ARANDANO	2027	24	59614	Junio
-Presupuesto	ARANDANO	2027	25	38368	Junio
-Presupuesto	ARANDANO	2027	26	24257	Junio
+Presupuesto	ARANDANO	2027	25	38369	Junio
+Presupuesto	ARANDANO	2027	26	24256	Junio
 Presupuesto	ARANDANO	2027	27	20633	Julio
-Presupuesto	ARANDANO	2027	28	13676	Julio
+Presupuesto	ARANDANO	2027	28	13677	Julio
 Presupuesto	ARANDANO	2027	29	0	Julio
 Presupuesto	FRAMBUESA	2026	27	0	Julio
 Presupuesto	FRAMBUESA	2026	28	0	Julio
@@ -3904,47 +4185,47 @@ Presupuesto	FRAMBUESA	2026	33	0	Agosto
 Presupuesto	FRAMBUESA	2026	34	0	Agosto
 Presupuesto	FRAMBUESA	2026	35	0	Agosto
 Presupuesto	FRAMBUESA	2026	36	2978	Septiembre
-Presupuesto	FRAMBUESA	2026	37	23010	Septiembre
+Presupuesto	FRAMBUESA	2026	37	23009	Septiembre
 Presupuesto	FRAMBUESA	2026	38	53446	Septiembre
 Presupuesto	FRAMBUESA	2026	39	80023	Septiembre
-Presupuesto	FRAMBUESA	2026	40	105380	Octubre
+Presupuesto	FRAMBUESA	2026	40	105379	Octubre
 Presupuesto	FRAMBUESA	2026	41	139589	Octubre
-Presupuesto	FRAMBUESA	2026	42	184134	Octubre
-Presupuesto	FRAMBUESA	2026	43	235352	Octubre
-Presupuesto	FRAMBUESA	2026	44	288400	Octubre
-Presupuesto	FRAMBUESA	2026	45	312166	Noviembre
+Presupuesto	FRAMBUESA	2026	42	184135	Octubre
+Presupuesto	FRAMBUESA	2026	43	235351	Octubre
+Presupuesto	FRAMBUESA	2026	44	288397	Octubre
+Presupuesto	FRAMBUESA	2026	45	312165	Noviembre
 Presupuesto	FRAMBUESA	2026	46	328735	Noviembre
-Presupuesto	FRAMBUESA	2026	47	344451	Noviembre
-Presupuesto	FRAMBUESA	2026	48	343564	Noviembre
-Presupuesto	FRAMBUESA	2026	49	310157	Diciembre
-Presupuesto	FRAMBUESA	2026	50	307859	Diciembre
-Presupuesto	FRAMBUESA	2026	51	282215	Diciembre
-Presupuesto	FRAMBUESA	2026	52	229672	Diciembre
-Presupuesto	FRAMBUESA	2027	1	153516	Enero
-Presupuesto	FRAMBUESA	2027	2	115985	Enero
-Presupuesto	FRAMBUESA	2027	3	95678	Enero
-Presupuesto	FRAMBUESA	2027	4	92129	Enero
+Presupuesto	FRAMBUESA	2026	47	344449	Noviembre
+Presupuesto	FRAMBUESA	2026	48	343563	Noviembre
+Presupuesto	FRAMBUESA	2026	49	310155	Diciembre
+Presupuesto	FRAMBUESA	2026	50	307858	Diciembre
+Presupuesto	FRAMBUESA	2026	51	282216	Diciembre
+Presupuesto	FRAMBUESA	2026	52	229671	Diciembre
+Presupuesto	FRAMBUESA	2027	1	153514	Enero
+Presupuesto	FRAMBUESA	2027	2	115983	Enero
+Presupuesto	FRAMBUESA	2027	3	95679	Enero
+Presupuesto	FRAMBUESA	2027	4	92128	Enero
 Presupuesto	FRAMBUESA	2027	5	75434	Enero
-Presupuesto	FRAMBUESA	2027	6	71083	Febrero
-Presupuesto	FRAMBUESA	2027	7	84834	Febrero
-Presupuesto	FRAMBUESA	2027	8	110733	Febrero
+Presupuesto	FRAMBUESA	2027	6	71084	Febrero
+Presupuesto	FRAMBUESA	2027	7	84835	Febrero
+Presupuesto	FRAMBUESA	2027	8	110734	Febrero
 Presupuesto	FRAMBUESA	2027	9	135967	Febrero
-Presupuesto	FRAMBUESA	2027	10	176993	Marzo
-Presupuesto	FRAMBUESA	2027	11	272713	Marzo
-Presupuesto	FRAMBUESA	2027	12	392430	Marzo
-Presupuesto	FRAMBUESA	2027	13	424334	Marzo
-Presupuesto	FRAMBUESA	2027	14	414593	Abril
-Presupuesto	FRAMBUESA	2027	15	414085	Abril
-Presupuesto	FRAMBUESA	2027	16	448802	Abril
-Presupuesto	FRAMBUESA	2027	17	559290	Abril
+Presupuesto	FRAMBUESA	2027	10	176992	Marzo
+Presupuesto	FRAMBUESA	2027	11	272712	Marzo
+Presupuesto	FRAMBUESA	2027	12	392429	Marzo
+Presupuesto	FRAMBUESA	2027	13	424332	Marzo
+Presupuesto	FRAMBUESA	2027	14	414594	Abril
+Presupuesto	FRAMBUESA	2027	15	414088	Abril
+Presupuesto	FRAMBUESA	2027	16	448800	Abril
+Presupuesto	FRAMBUESA	2027	17	559291	Abril
 Presupuesto	FRAMBUESA	2027	18	638515	Mayo
-Presupuesto	FRAMBUESA	2027	19	547258	Mayo
-Presupuesto	FRAMBUESA	2027	20	470481	Mayo
-Presupuesto	FRAMBUESA	2027	21	390865	Mayo
-Presupuesto	FRAMBUESA	2027	22	309127	Mayo
+Presupuesto	FRAMBUESA	2027	19	547257	Mayo
+Presupuesto	FRAMBUESA	2027	20	470479	Mayo
+Presupuesto	FRAMBUESA	2027	21	390867	Mayo
+Presupuesto	FRAMBUESA	2027	22	309126	Mayo
 Presupuesto	FRAMBUESA	2027	23	258933	Junio
-Presupuesto	FRAMBUESA	2027	24	220705	Junio
-Presupuesto	FRAMBUESA	2027	25	152926	Junio
+Presupuesto	FRAMBUESA	2027	24	220704	Junio
+Presupuesto	FRAMBUESA	2027	25	152928	Junio
 Presupuesto	FRAMBUESA	2027	26	73920	Junio
 Presupuesto	FRAMBUESA	2027	27	0	Julio
 Presupuesto	FRAMBUESA	2027	28	0	Julio
@@ -3957,90 +4238,90 @@ Presupuesto	ZARZAMORA	2026	32	0	Agosto
 Presupuesto	ZARZAMORA	2026	33	0	Agosto
 Presupuesto	ZARZAMORA	2026	34	623	Agosto
 Presupuesto	ZARZAMORA	2026	35	2090	Agosto
-Presupuesto	ZARZAMORA	2026	36	5264	Septiembre
+Presupuesto	ZARZAMORA	2026	36	5265	Septiembre
 Presupuesto	ZARZAMORA	2026	37	8212	Septiembre
 Presupuesto	ZARZAMORA	2026	38	12306	Septiembre
-Presupuesto	ZARZAMORA	2026	39	14678	Septiembre
+Presupuesto	ZARZAMORA	2026	39	14677	Septiembre
 Presupuesto	ZARZAMORA	2026	40	16136	Octubre
-Presupuesto	ZARZAMORA	2026	41	18433	Octubre
+Presupuesto	ZARZAMORA	2026	41	18432	Octubre
 Presupuesto	ZARZAMORA	2026	42	21312	Octubre
-Presupuesto	ZARZAMORA	2026	43	32612	Octubre
+Presupuesto	ZARZAMORA	2026	43	32613	Octubre
 Presupuesto	ZARZAMORA	2026	44	49591	Octubre
 Presupuesto	ZARZAMORA	2026	45	60056	Noviembre
-Presupuesto	ZARZAMORA	2026	46	73503	Noviembre
+Presupuesto	ZARZAMORA	2026	46	73502	Noviembre
 Presupuesto	ZARZAMORA	2026	47	80260	Noviembre
-Presupuesto	ZARZAMORA	2026	48	71613	Noviembre
-Presupuesto	ZARZAMORA	2026	49	68280	Diciembre
-Presupuesto	ZARZAMORA	2026	50	65288	Diciembre
+Presupuesto	ZARZAMORA	2026	48	71612	Noviembre
+Presupuesto	ZARZAMORA	2026	49	68279	Diciembre
+Presupuesto	ZARZAMORA	2026	50	65289	Diciembre
 Presupuesto	ZARZAMORA	2026	51	53293	Diciembre
-Presupuesto	ZARZAMORA	2026	52	37936	Diciembre
+Presupuesto	ZARZAMORA	2026	52	37935	Diciembre
 Presupuesto	ZARZAMORA	2027	1	26539	Enero
-Presupuesto	ZARZAMORA	2027	2	23964	Enero
-Presupuesto	ZARZAMORA	2027	3	27404	Enero
-Presupuesto	ZARZAMORA	2027	4	30308	Enero
-Presupuesto	ZARZAMORA	2027	5	47356	Enero
-Presupuesto	ZARZAMORA	2027	6	77642	Febrero
-Presupuesto	ZARZAMORA	2027	7	110316	Febrero
-Presupuesto	ZARZAMORA	2027	8	151732	Febrero
-Presupuesto	ZARZAMORA	2027	9	172426	Febrero
-Presupuesto	ZARZAMORA	2027	10	169570	Marzo
-Presupuesto	ZARZAMORA	2027	11	169612	Marzo
-Presupuesto	ZARZAMORA	2027	12	165693	Marzo
+Presupuesto	ZARZAMORA	2027	2	23965	Enero
+Presupuesto	ZARZAMORA	2027	3	27403	Enero
+Presupuesto	ZARZAMORA	2027	4	30310	Enero
+Presupuesto	ZARZAMORA	2027	5	47355	Enero
+Presupuesto	ZARZAMORA	2027	6	77643	Febrero
+Presupuesto	ZARZAMORA	2027	7	110317	Febrero
+Presupuesto	ZARZAMORA	2027	8	151733	Febrero
+Presupuesto	ZARZAMORA	2027	9	172425	Febrero
+Presupuesto	ZARZAMORA	2027	10	169571	Marzo
+Presupuesto	ZARZAMORA	2027	11	169611	Marzo
+Presupuesto	ZARZAMORA	2027	12	165692	Marzo
 Presupuesto	ZARZAMORA	2027	13	163664	Marzo
-Presupuesto	ZARZAMORA	2027	14	153485	Abril
-Presupuesto	ZARZAMORA	2027	15	155015	Abril
-Presupuesto	ZARZAMORA	2027	16	134517	Abril
-Presupuesto	ZARZAMORA	2027	17	113071	Abril
+Presupuesto	ZARZAMORA	2027	14	153483	Abril
+Presupuesto	ZARZAMORA	2027	15	155016	Abril
+Presupuesto	ZARZAMORA	2027	16	134518	Abril
+Presupuesto	ZARZAMORA	2027	17	113070	Abril
 Presupuesto	ZARZAMORA	2027	18	105282	Mayo
 Presupuesto	ZARZAMORA	2027	19	81737	Mayo
-Presupuesto	ZARZAMORA	2027	20	62833	Mayo
-Presupuesto	ZARZAMORA	2027	21	46877	Mayo
-Presupuesto	ZARZAMORA	2027	22	23581	Mayo
+Presupuesto	ZARZAMORA	2027	20	62832	Mayo
+Presupuesto	ZARZAMORA	2027	21	46876	Mayo
+Presupuesto	ZARZAMORA	2027	22	23579	Mayo
 Presupuesto	ZARZAMORA	2027	23	11976	Junio
-Presupuesto	ZARZAMORA	2027	24	7127	Junio
-Presupuesto	ZARZAMORA	2027	25	4849	Junio
+Presupuesto	ZARZAMORA	2027	24	7126	Junio
+Presupuesto	ZARZAMORA	2027	25	4848	Junio
 Presupuesto	ZARZAMORA	2027	26	3284	Junio
 Presupuesto	ZARZAMORA	2027	27	64	Julio
 Presupuesto	ZARZAMORA	2027	28	64	Julio
 Presupuesto	ZARZAMORA	2027	29	0	Julio
 Presupuesto	ZARZAMORA	2027	30	0	Julio
-Presupuesto	AGUACATE	2026	21	#N/A	
-Presupuesto	AGUACATE	2026	22	#N/A	
-Presupuesto	AGUACATE	2026	23	#N/A	
-Presupuesto	AGUACATE	2026	24	#N/A	
-Presupuesto	AGUACATE	2026	25	#N/A	
-Presupuesto	AGUACATE	2026	26	#N/A	Junio
-Presupuesto	AGUACATE	2026	27	420687	Julio
-Presupuesto	AGUACATE	2026	28	73091	Julio
-Presupuesto	AGUACATE	2026	29	38066	Julio
-Presupuesto	AGUACATE	2026	30	25479	Julio
-Presupuesto	AGUACATE	2026	31	181458	Agosto
-Presupuesto	AGUACATE	2026	32	282614	Agosto
-Presupuesto	AGUACATE	2026	33	89908	Agosto
-Presupuesto	AGUACATE	2026	34	100760	Agosto
-Presupuesto	AGUACATE	2026	35	131806	Agosto
-Presupuesto	AGUACATE	2026	36	203302	Septiembre
-Presupuesto	AGUACATE	2026	37	402568	Septiembre
-Presupuesto	AGUACATE	2026	38	240171	Septiembre
-Presupuesto	AGUACATE	2026	39	300779	Septiembre
-Presupuesto	AGUACATE	2026	40	319024	Octubre
-Presupuesto	AGUACATE	2026	41	335230	Octubre
-Presupuesto	AGUACATE	2026	42	373415	Octubre
-Presupuesto	AGUACATE	2026	43	242973	Octubre
-Presupuesto	AGUACATE	2026	44	385905	Octubre
-Presupuesto	AGUACATE	2026	45	179048	Noviembre
-Presupuesto	AGUACATE	2026	46	137743	Noviembre
-Presupuesto	AGUACATE	2026	47	277785	Noviembre
-Presupuesto	AGUACATE	2026	48	150087	Noviembre
-Presupuesto	AGUACATE	2026	49	430875	Diciembre
-Presupuesto	AGUACATE	2026	50	299716	Diciembre
-Presupuesto	AGUACATE	2026	51	290270	Diciembre
-Presupuesto	AGUACATE	2026	52	290270	Diciembre
-Presupuesto	AGUACATE	2027	1	292686	Enero
-Presupuesto	AGUACATE	2027	2	432568	Enero
-Presupuesto	AGUACATE	2027	3	407329	Enero
-Presupuesto	AGUACATE	2027	4	345464	Enero
-Presupuesto	AGUACATE	2027	5	42096	Enero
+Presupuesto	AGUACATE	2026	21	22246	
+Presupuesto	AGUACATE	2026	22	43163	
+Presupuesto	AGUACATE	2026	23	46151	
+Presupuesto	AGUACATE	2026	24	67068	
+Presupuesto	AGUACATE	2026	25	52237	
+Presupuesto	AGUACATE	2026	26	67068	Junio
+Presupuesto	AGUACATE	2026	27	59652	Julio
+Presupuesto	AGUACATE	2026	28	62127	Julio
+Presupuesto	AGUACATE	2026	29	32356	Julio
+Presupuesto	AGUACATE	2026	30	21657	Julio
+Presupuesto	AGUACATE	2026	31	154238	Agosto
+Presupuesto	AGUACATE	2026	32	240221	Agosto
+Presupuesto	AGUACATE	2026	33	76421	Agosto
+Presupuesto	AGUACATE	2026	34	85644	Agosto
+Presupuesto	AGUACATE	2026	35	112033	Agosto
+Presupuesto	AGUACATE	2026	36	172805	Septiembre
+Presupuesto	AGUACATE	2026	37	342182	Septiembre
+Presupuesto	AGUACATE	2026	38	204143	Septiembre
+Presupuesto	AGUACATE	2026	39	255660	Septiembre
+Presupuesto	AGUACATE	2026	40	271169	Octubre
+Presupuesto	AGUACATE	2026	41	284944	Octubre
+Presupuesto	AGUACATE	2026	42	317401	Octubre
+Presupuesto	AGUACATE	2026	43	206526	Octubre
+Presupuesto	AGUACATE	2026	44	328017	Octubre
+Presupuesto	AGUACATE	2026	45	152188	Noviembre
+Presupuesto	AGUACATE	2026	46	117081	Noviembre
+Presupuesto	AGUACATE	2026	47	236117	Noviembre
+Presupuesto	AGUACATE	2026	48	127573	Noviembre
+Presupuesto	AGUACATE	2026	49	366243	Diciembre
+Presupuesto	AGUACATE	2026	50	254759	Diciembre
+Presupuesto	AGUACATE	2026	51	246730	Diciembre
+Presupuesto	AGUACATE	2026	52	246730	Diciembre
+Presupuesto	AGUACATE	2027	1	248783	Enero
+Presupuesto	AGUACATE	2027	2	367683	Enero
+Presupuesto	AGUACATE	2027	3	346230	Enero
+Presupuesto	AGUACATE	2027	4	293644	Enero
+Presupuesto	AGUACATE	2027	5	35782	Enero
 Presupuesto	AGUACATE	2027	6	0	Febrero
 Presupuesto	AGUACATE	2027	7	0	Febrero
 Presupuesto	AGUACATE	2027	8	0	Febrero
@@ -4102,20 +4383,20 @@ Presupuesto	PAPA	2027	9	766652	Febrero
 Presupuesto	PAPA	2027	10	734708	Marzo
 Presupuesto	PAPA	2027	11	351382	Marzo
 Presupuesto	PAPA	2027	12	574989	Marzo
-Presupuesto	PAPA	2027	13	630168	Marzo
-Presupuesto	PAPA	2027	14	630168	Abril
-Presupuesto	PAPA	2027	15	630168	Abril
-Presupuesto	PAPA	2027	16	585156	Abril
-Presupuesto	PAPA	2027	17	585156	Abril
-Presupuesto	PAPA	2027	18	630168	Mayo
-Presupuesto	PAPA	2027	19	630168	Mayo
-Presupuesto	PAPA	2027	20	180048	Mayo
-Presupuesto	PAPA	2027	21	346500	Mayo
-Presupuesto	PAPA	2027	22	346500	Mayo
-Presupuesto	PAPA	2027	23	378000	Junio
-Presupuesto	PAPA	2027	24	346500	Junio
-Presupuesto	PAPA	2027	25	126000	Junio
-Presupuesto	PAPA	2027	26	31500	Junio
+Presupuesto	PAPA	2027	13	924000	Marzo
+Presupuesto	PAPA	2027	14	924000	Abril
+Presupuesto	PAPA	2027	15	924000	Abril
+Presupuesto	PAPA	2027	16	858000	Abril
+Presupuesto	PAPA	2027	17	1668000	Abril
+Presupuesto	PAPA	2027	18	1734000	Mayo
+Presupuesto	PAPA	2027	19	1734000	Mayo
+Presupuesto	PAPA	2027	20	1209000	Mayo
+Presupuesto	PAPA	2027	21	1188000	Mayo
+Presupuesto	PAPA	2027	22	1188000	Mayo
+Presupuesto	PAPA	2027	23	1296000	Junio
+Presupuesto	PAPA	2027	24	1188000	Junio
+Presupuesto	PAPA	2027	25	432000	Junio
+Presupuesto	PAPA	2027	26	108000	Junio
 Presupuesto	ESPARRAGO	2026	27	0	Julio
 Presupuesto	ESPARRAGO	2026	28	0	Julio
 Presupuesto	ESPARRAGO	2026	29	0	Julio
@@ -4184,28 +4465,28 @@ Proyección	FRESA	2026	36	0	Septiembre
 Proyección	FRESA	2026	37	980.84	Septiembre
 Proyección	FRESA	2026	38	0	Septiembre
 Proyección	FRESA	2026	39	85523.15	Septiembre
-Proyección	FRESA	2026	40	290571.08	Octubre
+Proyección	FRESA	2026	40	290571.07999999996	Octubre
 Proyección	FRESA	2026	41	465363.67999999993	Octubre
-Proyección	FRESA	2026	42	476771.08999999997	Octubre
-Proyección	FRESA	2026	43	608439.3542434889	Octubre
-Proyección	FRESA	2026	44	704022.1162090729	Octubre
-Proyección	FRESA	2026	45	807749.6006264815	Noviembre
-Proyección	FRESA	2026	46	855542.0211398992	Noviembre
-Proyección	FRESA	2026	47	875241.12649562	Noviembre
-Proyección	FRESA	2026	48	946969.7791948334	Noviembre
-Proyección	FRESA	2026	49	983502.0039714084	Diciembre
-Proyección	FRESA	2026	50	1055760.817289694	Diciembre
-Proyección	FRESA	2026	51	1113900.7256506495	Diciembre
-Proyección	FRESA	2026	52	1198680.685354669	Diciembre
-Proyección	FRESA	2027	1	1308534.8839246263	Enero
-Proyección	FRESA	2027	2	1336204.1639460456	Enero
-Proyección	FRESA	2027	3	1345746.6164742082	Enero
-Proyección	FRESA	2027	4	1309883.6442273015	Enero
-Proyección	FRESA	2027	5	1276590.44891067	Enero
-Proyección	FRESA	2027	6	1250653.1602171534	Febrero
-Proyección	FRESA	2027	7	1237705.274217595	Febrero
-Proyección	FRESA	2027	8	1185578.4030722873	Febrero
-Proyección	FRESA	2027	9	1125918.9132200095	Febrero
+Proyección	FRESA	2026	42	409740.39	Octubre
+Proyección	FRESA	2026	43	1119196.8128922083	Octubre
+Proyección	FRESA	2026	44	1295017.0023872259	Octubre
+Proyección	FRESA	2026	45	1485819.042326989	Noviembre
+Proyección	FRESA	2026	46	1573731.0492443056	Noviembre
+Proyección	FRESA	2026	47	1609966.6671036454	Noviembre
+Proyección	FRESA	2026	48	1741908.2960172237	Noviembre
+Proyección	FRESA	2026	49	1809107.6795755764	Diciembre
+Proyección	FRESA	2026	50	1942024.515091174	Diciembre
+Proyección	FRESA	2026	51	2048970.2602761355	Diciembre
+Proyección	FRESA	2026	52	2204919.1811276563	Diciembre
+Proyección	FRESA	2027	1	2350463.9860544982	Enero
+Proyección	FRESA	2027	2	2400165.1037009344	Enero
+Proyección	FRESA	2027	3	2417305.7938587773	Enero
+Proyección	FRESA	2027	4	2352886.7052010833	Enero
+Proyección	FRESA	2027	5	2293083.5944596133	Enero
+Proyección	FRESA	2027	6	2246493.577090599	Febrero
+Proyección	FRESA	2027	7	2223235.855717346	Febrero
+Proyección	FRESA	2027	8	2129602.6367348502	Febrero
+Proyección	FRESA	2027	9	2022438.9041917904	Febrero
 Proyección	FRESA	2027	10	0	Marzo
 Proyección	FRESA	2027	11	0	Marzo
 Proyección	FRESA	2027	12	0	Marzo
@@ -4243,23 +4524,23 @@ Proyección	ARANDANO	2026	41	4376.59	Octubre
 Proyección	ARANDANO	2026	42	5374.61	Octubre
 Proyección	ARANDANO	2026	43	6225.048299648563	Octubre
 Proyección	ARANDANO	2026	44	7772.347022077409	Octubre
-Proyección	ARANDANO	2026	45	25358.085494437375	Noviembre
-Proyección	ARANDANO	2026	46	35268.5364303056	Noviembre
-Proyección	ARANDANO	2026	47	45683.71514919544	Noviembre
-Proyección	ARANDANO	2026	48	52138.30197565747	Noviembre
-Proyección	ARANDANO	2026	49	88401.31514541528	Diciembre
-Proyección	ARANDANO	2026	50	82918.04682513564	Diciembre
-Proyección	ARANDANO	2026	51	87221.48577064778	Diciembre
-Proyección	ARANDANO	2026	52	89529.15970098806	Diciembre
-Proyección	ARANDANO	2027	1	95900.69036663865	Enero
-Proyección	ARANDANO	2027	2	87530.06210033016	Enero
-Proyección	ARANDANO	2027	3	113850.26895347633	Enero
-Proyección	ARANDANO	2027	4	118705.15271140667	Enero
-Proyección	ARANDANO	2027	5	124580.87029155405	Enero
-Proyección	ARANDANO	2027	6	113334.61102137077	Febrero
-Proyección	ARANDANO	2027	7	176524.93317663678	Febrero
-Proyección	ARANDANO	2027	8	145312.75879401655	Febrero
-Proyección	ARANDANO	2027	9	248124.4250846494	Febrero
+Proyección	ARANDANO	2026	45	9105.085494437373	Noviembre
+Proyección	ARANDANO	2026	46	12663.536430305596	Noviembre
+Proyección	ARANDANO	2026	47	16403.215149195443	Noviembre
+Proyección	ARANDANO	2026	48	18720.801975657476	Noviembre
+Proyección	ARANDANO	2026	49	21910.91514541528	Diciembre
+Proyección	ARANDANO	2026	50	20551.846825135635	Diciembre
+Proyección	ARANDANO	2026	51	21618.485770647774	Diciembre
+Proyección	ARANDANO	2026	52	22190.459700988053	Diciembre
+Proyección	ARANDANO	2027	1	23769.69036663864	Enero
+Proyección	ARANDANO	2027	2	23801.06210033017	Enero
+Proyección	ARANDANO	2027	3	30958.018953476338	Enero
+Proyección	ARANDANO	2027	4	32278.15271140667	Enero
+Proyección	ARANDANO	2027	5	33875.87029155405	Enero
+Proyección	ARANDANO	2027	6	36070.21102137077	Febrero
+Proyección	ARANDANO	2027	7	48000.433176636776	Febrero
+Proyección	ARANDANO	2027	8	39513.25879401657	Febrero
+Proyección	ARANDANO	2027	9	67469.67508464941	Febrero
 Proyección	ARANDANO	2027	10	0	Marzo
 Proyección	ARANDANO	2027	11	0	Marzo
 Proyección	ARANDANO	2027	12	0	Marzo
@@ -4293,28 +4574,28 @@ Proyección	FRAMBUESA	2026	36	0	Septiembre
 Proyección	FRAMBUESA	2026	37	9258.14	Septiembre
 Proyección	FRAMBUESA	2026	38	44917.01	Septiembre
 Proyección	FRAMBUESA	2026	39	113124.09	Septiembre
-Proyección	FRAMBUESA	2026	40	252071.86999999997	Octubre
+Proyección	FRAMBUESA	2026	40	252071.87	Octubre
 Proyección	FRAMBUESA	2026	41	241881.40999999997	Octubre
-Proyección	FRAMBUESA	2026	42	223462.87	Octubre
-Proyección	FRAMBUESA	2026	43	286979.8598418896	Octubre
-Proyección	FRAMBUESA	2026	44	351664.7046908501	Octubre
-Proyección	FRAMBUESA	2026	45	380644.119987947	Noviembre
-Proyección	FRAMBUESA	2026	46	400847.7694055014	Noviembre
-Proyección	FRAMBUESA	2026	47	420011.30095515953	Noviembre
-Proyección	FRAMBUESA	2026	48	418929.72469628026	Noviembre
-Proyección	FRAMBUESA	2026	49	378194.41682662966	Diciembre
-Proyección	FRAMBUESA	2026	50	375392.3173419571	Diciembre
-Proyección	FRAMBUESA	2026	51	344122.9356252714	Diciembre
-Proyección	FRAMBUESA	2026	52	280053.86981885205	Diciembre
-Proyección	FRAMBUESA	2027	1	187191.95147475917	Enero
-Proyección	FRAMBUESA	2027	2	141427.98465176232	Enero
-Proyección	FRAMBUESA	2027	3	116666.3509549624	Enero
-Proyección	FRAMBUESA	2027	4	112338.82655500462	Enero
-Proyección	FRAMBUESA	2027	5	91981.53721792506	Enero
-Proyección	FRAMBUESA	2027	6	86676.08253654542	Febrero
-Proyección	FRAMBUESA	2027	7	103443.56296027593	Febrero
-Proyección	FRAMBUESA	2027	8	135023.88260933393	Febrero
-Proyección	FRAMBUESA	2027	9	165793.32490534266	Febrero
+Proyección	FRAMBUESA	2026	42	186408.02	Octubre
+Proyección	FRAMBUESA	2026	43	274960.1800898936	Octubre
+Proyección	FRAMBUESA	2026	44	336935.80652777676	Octubre
+Proyección	FRAMBUESA	2026	45	364701.46664545755	Noviembre
+Proyección	FRAMBUESA	2026	46	384058.91941369174	Noviembre
+Proyección	FRAMBUESA	2026	47	402419.8179413982	Noviembre
+Proyección	FRAMBUESA	2026	48	401383.5417264532	Noviembre
+Proyección	FRAMBUESA	2026	49	362354.36527474225	Diciembre
+Proyección	FRAMBUESA	2026	50	359669.62712147995	Diciembre
+Proyección	FRAMBUESA	2026	51	329709.9120639269	Diciembre
+Proyección	FRAMBUESA	2026	52	268324.2737754769	Diciembre
+Proyección	FRAMBUESA	2027	1	179351.72425422393	Enero
+Proyección	FRAMBUESA	2027	2	135504.50596436957	Enero
+Proyección	FRAMBUESA	2027	3	111779.97259696471	Enero
+Proyección	FRAMBUESA	2027	4	107633.69944381951	Enero
+Proyección	FRAMBUESA	2027	5	88129.04171156835	Enero
+Proyección	FRAMBUESA	2027	6	83045.79727952134	Febrero
+Proyección	FRAMBUESA	2027	7	99110.99934458188	Febrero
+Proyección	FRAMBUESA	2027	8	129368.62921026458	Febrero
+Proyección	FRAMBUESA	2027	9	158849.34398807984	Febrero
 Proyección	FRAMBUESA	2027	10	0	Marzo
 Proyección	FRAMBUESA	2027	11	0	Marzo
 Proyección	FRAMBUESA	2027	12	0	Marzo
@@ -4349,26 +4630,26 @@ Proyección	ZARZAMORA	2026	38	0	Septiembre
 Proyección	ZARZAMORA	2026	39	0	Septiembre
 Proyección	ZARZAMORA	2026	40	1938.56	Octubre
 Proyección	ZARZAMORA	2026	41	7775.1	Octubre
-Proyección	ZARZAMORA	2026	42	9699.759999999998	Octubre
-Proyección	ZARZAMORA	2026	43	34783.44217290535	Octubre
-Proyección	ZARZAMORA	2026	44	52892.974389689356	Octubre
-Proyección	ZARZAMORA	2026	45	64054.77747871961	Noviembre
-Proyección	ZARZAMORA	2026	46	78397.13449144678	Noviembre
-Proyección	ZARZAMORA	2026	47	85604.043566705	Noviembre
-Proyección	ZARZAMORA	2026	48	76381.29045530084	Noviembre
-Proyección	ZARZAMORA	2026	49	72826.36549631969	Diciembre
-Proyección	ZARZAMORA	2026	50	69635.14573116168	Diciembre
-Proyección	ZARZAMORA	2026	51	56841.468898584724	Diciembre
-Proyección	ZARZAMORA	2026	52	40461.93616678945	Diciembre
-Proyección	ZARZAMORA	2027	1	48210.326653585646	Enero
-Proyección	ZARZAMORA	2027	2	43532.62247735508	Enero
-Proyección	ZARZAMORA	2027	3	49781.6719399699	Enero
-Proyección	ZARZAMORA	2027	4	55057.032300270315	Enero
-Proyección	ZARZAMORA	2027	5	86026.15882313583	Enero
-Proyección	ZARZAMORA	2027	6	82811.72627219175	Febrero
-Proyección	ZARZAMORA	2027	7	117661.29666215586	Febrero
-Proyección	ZARZAMORA	2027	8	161834.9456574045	Febrero
-Proyección	ZARZAMORA	2027	9	183906.83797698328	Febrero
+Proyección	ZARZAMORA	2026	42	8279.38	Octubre
+Proyección	ZARZAMORA	2026	43	215105.50125937487	Octubre
+Proyección	ZARZAMORA	2026	44	327097.292804908	Octubre
+Proyección	ZARZAMORA	2026	45	396123.3896612602	Noviembre
+Proyección	ZARZAMORA	2026	46	484818.46127400437	Noviembre
+Proyección	ZARZAMORA	2026	47	529386.9597411207	Noviembre
+Proyección	ZARZAMORA	2026	48	472352.20966784045	Noviembre
+Proyección	ZARZAMORA	2026	49	450368.07389887515	Diciembre
+Proyección	ZARZAMORA	2026	50	430633.1401392759	Diciembre
+Proyección	ZARZAMORA	2026	51	351515.3157922196	Diciembre
+Proyección	ZARZAMORA	2026	52	250222.074566897	Diciembre
+Proyección	ZARZAMORA	2027	1	175048.59861163222	Enero
+Proyección	ZARZAMORA	2027	2	158064.15528577392	Enero
+Proyección	ZARZAMORA	2027	3	180754.05238905645	Enero
+Proyección	ZARZAMORA	2027	4	199908.54692043216	Enero
+Proyección	ZARZAMORA	2027	5	312355.45558809506	Enero
+Proyección	ZARZAMORA	2027	6	512118.89270147134	Febrero
+Proyección	ZARZAMORA	2027	7	727633.339780731	Febrero
+Proyección	ZARZAMORA	2027	8	1000809.1474637394	Febrero
+Proyección	ZARZAMORA	2027	9	1137304.7087007535	Febrero
 Proyección	ZARZAMORA	2027	10	0	Marzo
 Proyección	ZARZAMORA	2027	11	0	Marzo
 Proyección	ZARZAMORA	2027	12	0	Marzo
@@ -4396,11 +4677,11 @@ Proyección	AGUACATE	2026	23	0
 Proyección	AGUACATE	2026	24	0	
 Proyección	AGUACATE	2026	25	0	
 Proyección	AGUACATE	2026	26	0	Junio
-Proyección	AGUACATE	2026	27	984449.8099999998	Julio
+Proyección	AGUACATE	2026	27	984449.8099999999	Julio
 Proyección	AGUACATE	2026	28	182394.99	Julio
 Proyección	AGUACATE	2026	29	248825.01	Julio
 Proyección	AGUACATE	2026	30	246345.01	Julio
-Proyección	AGUACATE	2026	31	248244.96	Agosto
+Proyección	AGUACATE	2026	31	248244.95999999996	Agosto
 Proyección	AGUACATE	2026	32	66690.01000000001	Agosto
 Proyección	AGUACATE	2026	33	134060.02000000002	Agosto
 Proyección	AGUACATE	2026	34	287000.01	Agosto
@@ -4409,24 +4690,24 @@ Proyección	AGUACATE	2026	36	259520.01	Septiembre
 Proyección	AGUACATE	2026	37	392150.01	Septiembre
 Proyección	AGUACATE	2026	38	314720	Septiembre
 Proyección	AGUACATE	2026	39	431365	Septiembre
-Proyección	AGUACATE	2026	40	314742.28	Octubre
+Proyección	AGUACATE	2026	40	327672.28	Octubre
 Proyección	AGUACATE	2026	41	253105	Octubre
-Proyección	AGUACATE	2026	42	313190	Octubre
-Proyección	AGUACATE	2026	43	322643.38578139	Octubre
-Proyección	AGUACATE	2026	44	280899.51744007494	Octubre
-Proyección	AGUACATE	2026	45	130328.69954680697	Noviembre
-Proyección	AGUACATE	2026	46	100262.86840219288	Noviembre
-Proyección	AGUACATE	2026	47	202199.17454319383	Noviembre
-Proyección	AGUACATE	2026	48	109248.04258568438	Noviembre
-Proyección	AGUACATE	2026	49	313633.0951322017	Diciembre
-Proyección	AGUACATE	2026	50	218162.70784019254	Diciembre
-Proyección	AGUACATE	2026	51	211286.982359209	Diciembre
-Proyección	AGUACATE	2026	52	211286.982359209	Diciembre
-Proyección	AGUACATE	2027	1	213045.58417606866	Enero
-Proyección	AGUACATE	2027	2	314865.42662058887	Enero
-Proyección	AGUACATE	2027	3	296494.00639885024	Enero
-Proyección	AGUACATE	2027	4	251462.59025645704	Enero
-Proyección	AGUACATE	2027	5	30641.59854409089	Enero
+Proyección	AGUACATE	2026	42	242395	Octubre
+Proyección	AGUACATE	2026	43	320084.9032587383	Octubre
+Proyección	AGUACATE	2026	44	508378.9745859145	Octubre
+Proyección	AGUACATE	2026	45	235872.14117893996	Noviembre
+Proyección	AGUACATE	2026	46	181458.24774591575	Noviembre
+Proyección	AGUACATE	2026	47	365945.12497984804	Noviembre
+Proyección	AGUACATE	2026	48	197719.84078640118	Noviembre
+Proyección	AGUACATE	2026	49	567621.0224659072	Diciembre
+Proyección	AGUACATE	2026	50	394836.3269379561	Diciembre
+Proyección	AGUACATE	2026	51	382392.46693630144	Diciembre
+Proyección	AGUACATE	2026	52	382392.46693630144	Diciembre
+Proyección	AGUACATE	2027	1	385575.22850352543	Enero
+Proyección	AGUACATE	2027	2	569851.326825721	Enero
+Proyección	AGUACATE	2027	3	536602.2708674569	Enero
+Proyección	AGUACATE	2027	4	455103.2872762684	Enero
+Proyección	AGUACATE	2027	5	55455.93167792243	Enero
 Proyección	AGUACATE	2027	6	0	Febrero
 Proyección	AGUACATE	2027	7	0	Febrero
 Proyección	AGUACATE	2027	8	0	Febrero
@@ -4468,23 +4749,23 @@ Proyección	PAPA	2026	41	0	Octubre
 Proyección	PAPA	2026	42	0	Octubre
 Proyección	PAPA	2026	43	0	Octubre
 Proyección	PAPA	2026	44	0	Octubre
-Proyección	PAPA	2026	45	40000	Noviembre
-Proyección	PAPA	2026	46	301473	Noviembre
-Proyección	PAPA	2026	47	241473	Noviembre
-Proyección	PAPA	2026	48	241473	Noviembre
-Proyección	PAPA	2026	49	241473	Diciembre
-Proyección	PAPA	2026	50	241473	Diciembre
-Proyección	PAPA	2026	51	241473	Diciembre
-Proyección	PAPA	2026	52	241473	Diciembre
-Proyección	PAPA	2027	1	241473	Enero
-Proyección	PAPA	2027	2	241473	Enero
-Proyección	PAPA	2027	3	241473	Enero
+Proyección	PAPA	2026	45	20000	Noviembre
+Proyección	PAPA	2026	46	150736.5	Noviembre
+Proyección	PAPA	2026	47	120736.5	Noviembre
+Proyección	PAPA	2026	48	120736.5	Noviembre
+Proyección	PAPA	2026	49	120736.5	Diciembre
+Proyección	PAPA	2026	50	120736.5	Diciembre
+Proyección	PAPA	2026	51	120736.5	Diciembre
+Proyección	PAPA	2026	52	120736.5	Diciembre
+Proyección	PAPA	2027	1	120736.5	Enero
+Proyección	PAPA	2027	2	120736.5	Enero
+Proyección	PAPA	2027	3	120736.5	Enero
 Proyección	PAPA	2027	4	0	Enero
 Proyección	PAPA	2027	5	0	Enero
 Proyección	PAPA	2027	6	0	Febrero
 Proyección	PAPA	2027	7	0	Febrero
-Proyección	PAPA	2027	8	766652	Febrero
-Proyección	PAPA	2027	9	766652	Febrero
+Proyección	PAPA	2027	8	383326	Febrero
+Proyección	PAPA	2027	9	383326	Febrero
 Proyección	PAPA	2027	10	0	Marzo
 Proyección	PAPA	2027	11	0	Marzo
 Proyección	PAPA	2027	12	0	Marzo
@@ -4520,22 +4801,22 @@ Proyección	ESPARRAGO	2026	41	202500.72	Octubre
 Proyección	ESPARRAGO	2026	42	117030.68999999999	Octubre
 Proyección	ESPARRAGO	2026	43	236863.93301234144	Octubre
 Proyección	ESPARRAGO	2026	44	236863.93301234144	Octubre
-Proyección	ESPARRAGO	2026	45	353704.43301234144	Noviembre
-Proyección	ESPARRAGO	2026	46	413618.99514870386	Noviembre
-Proyección	ESPARRAGO	2026	47	337332.5044891209	Noviembre
-Proyección	ESPARRAGO	2026	48	267635.2594602594	Noviembre
-Proyección	ESPARRAGO	2026	49	191737.61799612184	Diciembre
-Proyección	ESPARRAGO	2026	50	191737.61799612184	Diciembre
-Proyección	ESPARRAGO	2026	51	191737.61799612184	Diciembre
-Proyección	ESPARRAGO	2026	52	191737.61799612184	Diciembre
-Proyección	ESPARRAGO	2027	1	191737.61799612184	Enero
-Proyección	ESPARRAGO	2027	2	191737.61799612184	Enero
-Proyección	ESPARRAGO	2027	3	191737.61799612184	Enero
-Proyección	ESPARRAGO	2027	4	191737.61799612184	Enero
-Proyección	ESPARRAGO	2027	5	191737.61799612184	Enero
-Proyección	ESPARRAGO	2027	6	191737.61799612184	Febrero
-Proyección	ESPARRAGO	2027	7	181164.52229762214	Febrero
-Proyección	ESPARRAGO	2027	8	181164.52229762214	Febrero
+Proyección	ESPARRAGO	2026	45	236863.93301234144	Noviembre
+Proyección	ESPARRAGO	2026	46	276986.6951487039	Noviembre
+Proyección	ESPARRAGO	2026	47	225900.20448912092	Noviembre
+Proyección	ESPARRAGO	2026	48	179226.30946025945	Noviembre
+Proyección	ESPARRAGO	2026	49	128400.21799612184	Diciembre
+Proyección	ESPARRAGO	2026	50	128400.21799612184	Diciembre
+Proyección	ESPARRAGO	2026	51	128400.21799612184	Diciembre
+Proyección	ESPARRAGO	2026	52	128400.21799612184	Diciembre
+Proyección	ESPARRAGO	2027	1	128400.21799612184	Enero
+Proyección	ESPARRAGO	2027	2	128400.21799612184	Enero
+Proyección	ESPARRAGO	2027	3	128400.21799612184	Enero
+Proyección	ESPARRAGO	2027	4	128400.21799612184	Enero
+Proyección	ESPARRAGO	2027	5	128400.21799612184	Enero
+Proyección	ESPARRAGO	2027	6	128400.21799612184	Febrero
+Proyección	ESPARRAGO	2027	7	121319.77229762214	Febrero
+Proyección	ESPARRAGO	2027	8	121319.77229762214	Febrero
 Proyección	ESPARRAGO	2027	9	0	Febrero
 Proyección	ESPARRAGO	2027	10	0	Marzo
 Proyección	ESPARRAGO	2027	11	0	Marzo
@@ -4709,6 +4990,7 @@ function processAllSlots(){
   const varRecs = parsed['egreso|variacion']||[];
   state.factorScale = varRecs.length ? normalizeFactorScale(varRecs) : null;
   if(state.factorScale==='enteros') notes.push('[Variación Egreso] Los % vienen como enteros (p. ej. 12 = 12%) — se dividieron entre 100.');
+  if(varRecs._mezcla) notes.push(`[Variación Egreso] ⚠️ La hoja mezcla formatos: hay % como entero (p. ej. 12) y ${varRecs._mezcla} valor(es) que parecen decimal (p. ej. 0.12). Todos se dividieron entre 100 — usa un solo formato en la hoja.`);
   state.factor = weekMap(varRecs, 'Variación Egreso', false);
 
   // ---- Factor Producción (método "Variación estacional" de Producción) ----
@@ -4717,6 +4999,7 @@ function processAllSlots(){
   const prodVarRecs = parsed['produccion|variacion']||[];
   state.factorScaleProd = prodVarRecs.length ? normalizeFactorScale(prodVarRecs) : null;
   if(state.factorScaleProd==='enteros') notes.push('[Factor Producción] Los % vienen como enteros (p. ej. 10 = 10%) — se dividieron entre 100.');
+  if(prodVarRecs._mezcla) notes.push(`[Factor Producción] ⚠️ La hoja mezcla formatos: hay % como entero (p. ej. 3.95) y ${prodVarRecs._mezcla} valor(es) que parecen decimal (p. ej. 0.0395). Todos se dividieron entre 100 — usa un solo formato en la hoja.`);
   state.factorProd = weekMap(prodVarRecs, 'Factor Producción', false);
 
   state.variacion = {};
@@ -4880,6 +5163,7 @@ function buildFilterUI(){
   focal.value = state.filters.focalCrop;
   focal.addEventListener('change', ()=>{ state.filters.focalCrop = focal.value; renderAll(); });
   document.getElementById('tableCropSelect').addEventListener('change', e=>{ state.filters.focalCrop = e.target.value; renderAll(); });
+  document.getElementById('kghaCropSelect').addEventListener('change', e=>{ state.filters.focalCrop = e.target.value; renderAll(); });
   document.getElementById('tableVariableSeg').querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.filters.tablaVariable = btn.dataset.var; renderAll(); });
   });
@@ -4980,6 +5264,8 @@ function init(){
   document.getElementById('badgeToday').textContent = fmtDateHuman(NOW_UTC);
   document.getElementById('badgeForecastRange').textContent = monthLabel(FORECAST_MONTHS[0])+' – '+monthLabel(FORECAST_MONTHS[2]);
   loadCierre();
+  loadHectareas();
+  buildHectareasBox();
   buildFilterUI();
   buildTabs();
   buildLoaderGrid();
@@ -4995,7 +5281,7 @@ function init(){
 
 // Solo para pruebas automáticas (Node); en el navegador no hace nada.
 if(typeof window!=='undefined' && window.__FORECAST_TEST__){
-  window.__FORECAST_TEST__.api = { realWeeklyFor: (typeof realWeeklyFor!=='undefined'?realWeeklyFor:null), state, parseSlot, parsePercent, processAllSlots, projectedWeeks, monthlyParts, kindSeries, scenarioForecastConsolidated, ebitdaSet, fmtM, renderAll, BAKED_DATA, estacionalSourceFor, horizonWeeks, renderCierreRows, horizonFor, layoutFromHeader,
+  window.__FORECAST_TEST__.api = { realWeeklyFor: (typeof realWeeklyFor!=='undefined'?realWeeklyFor:null), state, parseSlot, parsePercent, processAllSlots, projectedWeeks, monthlyParts, kindSeries, scenarioForecastConsolidated, ebitdaSet, fmtM, renderAll, BAKED_DATA, estacionalSourceFor, horizonWeeks, renderCierreRows, renderKgHa, renderKgHaTable, kgHaContext, hectareasDe, horizonFor, layoutFromHeader,
     get DISPLAY_MONTHS(){ return DISPLAY_MONTHS; }, get FORECAST_MONTHS(){ return FORECAST_MONTHS; },
     get CURRENT_MONTH_KEY(){ return CURRENT_MONTH_KEY; }, get HORIZON_MK(){ return HORIZON_MK; } };
 }
