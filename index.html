@@ -285,7 +285,7 @@
         <select id="metodoProyeccion">
           <option value="polinomial">📈 Regresión polinomial (grado 1)</option>
           <option value="movil">🔄 Promedio móvil (12 semanas)</option>
-          <option value="estacional">📐 Variación estacional (método Excel)</option>
+          <option value="estacional" selected>📐 Variación estacional (método Excel)</option>
         </select>
         <div class="field indented" id="castigoField" hidden>
           <label for="castigoMovil">Castigo (%)</label>
@@ -718,7 +718,7 @@ const state = {
   cierre: {},                                       // cultivo → 'AAAA-MM' desde el que la proyección es $0
   hectareas: {},                                    // cultivo → hectáreas (recuadro de Kg por hectárea, se guarda en el navegador)
   monthly: null,
-  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat([OTHER_LABEL])), mes: 'TOTAL3', escenario:'base', metodo:'polinomial', castigoMovil:'', tablaVariable:'egreso', vista:'mensual' },
+  filters: { focalCrop:'CONSOLIDADO', included: new Set(CROPS.concat([OTHER_LABEL])), mes: 'TOTAL3', escenario:'base', metodo:'estacional', castigoMovil:'', tablaVariable:'egreso', vista:'mensual' },
   scenarios: {
     base:      { ingreso:0, egreso:0, produccion:0, tc:0 },
     optimista: { ingreso:8, egreso:-5, produccion:5, tc:5 },
@@ -893,16 +893,18 @@ function parsePercent(v){
 // Normaliza la hoja de variación: si algún valor capturado SIN "%" es mayor a 1 en valor absoluto
 // (p. ej. 12), la hoja viene en puntos porcentuales y esos valores se dividen entre 100 (12 → 0.12).
 // Si todos están entre -1 y 1 (p. ej. 0.12), la hoja ya viene en decimal y se usan tal cual.
+// Escala de la hoja de variación / factor (valores SIN "%"):
+//  · DECIMAL (lo normal: es lo que manda el Apps Script desde Google Sheets, 3.95% → 0.0395):
+//    se usa tal cual. Un decimal mayor a 1 es válido (4.449 = +444.9% en semanas de arranque) y
+//    NO se divide entre 100.
+//  · ENTEROS (3.95 = 3.95%): solo si NINGÚN valor distinto de 0 está entre -1 y 1. Una hoja capturada
+//    en enteros no trae valores tipo 0.0395; en cuanto aparece uno, la hoja es decimal.
+// Los valores escritos con "%" ya se convirtieron en parsePercent ("3.95%" → 0.0395) y no se tocan.
 function normalizeFactorScale(records){
-  const plain = records.filter(r=>!r.pctSign);
-  const enteros = plain.some(r=>Math.abs(r.importe)>1);
-  // Aviso: hoja mezclada (unos valores como entero 3.95 y otros como decimal 0.0395). La escala se decide
-  // para toda la hoja; los decimales chicos quedarían divididos entre 100 → revisar la hoja.
-  if(enteros){
-    const chicos = plain.filter(r=> r.importe!==0 && Math.abs(r.importe)<0.2 && !Number.isInteger(r.importe));
-    records._mezcla = chicos.length;
-  }
-  if(enteros) plain.forEach(r=>{ r.importe = r.importe/100; });
+  const plain = records.filter(r=>!r.pctSign && r.importe!==0);
+  const hayDecimales = plain.some(r=> Math.abs(r.importe)<1);
+  const enteros = plain.length>0 && !hayDecimales;
+  if(enteros) records.forEach(r=>{ if(!r.pctSign) r.importe = r.importe/100; });
   return enteros ? 'enteros' : 'decimal';
 }
 function decumulate(records){
@@ -5361,7 +5363,6 @@ function processAllSlots(){
   const varRecs = parsed['egreso|variacion']||[];
   state.factorScale = varRecs.length ? normalizeFactorScale(varRecs) : null;
   if(state.factorScale==='enteros') notes.push('[Variación Egreso] Los % vienen como enteros (p. ej. 12 = 12%) — se dividieron entre 100.');
-  if(varRecs._mezcla) notes.push(`[Variación Egreso] ⚠️ La hoja mezcla formatos: hay % como entero (p. ej. 12) y ${varRecs._mezcla} valor(es) que parecen decimal (p. ej. 0.12). Todos se dividieron entre 100 — usa un solo formato en la hoja.`);
   state.factor = weekMap(varRecs, 'Variación Egreso', false);
 
   // ---- Factor Producción (método "Variación estacional" de Producción) ----
@@ -5370,7 +5371,6 @@ function processAllSlots(){
   const prodVarRecs = parsed['produccion|variacion']||[];
   state.factorScaleProd = prodVarRecs.length ? normalizeFactorScale(prodVarRecs) : null;
   if(state.factorScaleProd==='enteros') notes.push('[Factor Producción] Los % vienen como enteros (p. ej. 10 = 10%) — se dividieron entre 100.');
-  if(prodVarRecs._mezcla) notes.push(`[Factor Producción] ⚠️ La hoja mezcla formatos: hay % como entero (p. ej. 3.95) y ${prodVarRecs._mezcla} valor(es) que parecen decimal (p. ej. 0.0395). Todos se dividieron entre 100 — usa un solo formato en la hoja.`);
   state.factorProd = weekMap(prodVarRecs, 'Factor Producción', false);
 
   state.variacion = {};
