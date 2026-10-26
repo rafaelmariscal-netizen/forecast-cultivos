@@ -285,7 +285,7 @@
         <select id="metodoProyeccion">
           <option value="polinomial">📈 Regresión polinomial (grado 1)</option>
           <option value="movil">🔄 Promedio móvil (12 semanas)</option>
-          <option value="estacional" selected>📐 Variación estacional (método Excel)</option>
+          <option value="estacional" selected>📐 Forecast estacional (método Excel)</option>
         </select>
         <div class="field indented" id="castigoField" hidden>
           <label for="castigoMovil">Castigo (%)</label>
@@ -455,7 +455,7 @@
           <h4>Cargar información desde tu Google Sheet</h4>
           <p class="dataintro">
             Pega o sube cada hoja en su casilla: Real, Presupuesto y Proyección para Egreso, Ingreso y Producción, más la hoja
-            <b>Variación Egreso</b> y <b>Factor Producción</b> (casillas verdes de Egreso y Producción), que son las que usa el método "Variación estacional".
+            <b>Variación Egreso</b> y <b>Factor Producción</b> (casillas verdes de Egreso y Producción), que son las que usa el método "Forecast estacional".
             Factor Producción acepta las columnas <code>cultivo, ejercicio, semana, mes, %_variacion</code> (con encabezado) y el % como <code>10%</code>, <code>10</code> o <code>0.10</code>.
             Formato de columnas: <code>Tipo, Cultivo, ejercicio, semana, Importe, Mes</code> (la columna Mes es opcional pero recomendada).
             En la hoja de Variación la columna de importe es el <b>%</b>: acepta <code>5%</code>, <code>-88%</code>, <code>1647%</code> o el decimal <code>0.05</code>.
@@ -512,7 +512,7 @@ const VARIABLES = ['egreso','ingreso','produccion'];
 const TIPOS = ['real','presupuesto','proyeccion'];
 const MES_ABR = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const DAY_MS = 86400000;
-const METODO_LABEL = { polinomial:'Regresión polinomial', promedio:'Promedio histórico', movil:'Promedio móvil', estacional:'Variación estacional' };
+const METODO_LABEL = { polinomial:'Regresión polinomial', promedio:'Promedio histórico', movil:'Promedio móvil', estacional:'Forecast estacional' };
 
 const CROP_PROFILES = {
   FRESA:      { weeklyKg: 9000, priceUsd: 2.9,  priceMxn:null, weeklyEgreso: 343000, growth: 0.05 },
@@ -1098,7 +1098,7 @@ function horizonWeeks(variable){
   return out;
 }
 
-// De dónde sale el método "Variación estacional" para cada variable/cultivo (para el aviso del panel).
+// De dónde sale el método "Forecast estacional" para cada variable/cultivo (para el aviso del panel).
 //  · Egreso: 'variacion' si el cultivo trae % en la hoja Variación Egreso; si no, 'ppto' (factor 0).
 //  · Producción: 'variacion' si el cultivo trae % en la hoja Factor Producción; si no, 'ppto' (factor 0).
 //  · Ingreso: 'proyeccion' (hoja Proyección de ingreso, tal cual).
@@ -1472,7 +1472,7 @@ const TABLE_VAR_META = {
 const TABLE_METHODS = [
   { key:'polinomial', label:'Regresión polinomial (grado 1)' },
   { key:'movil',      label:'Promedio móvil' },
-  { key:'estacional', label:'Variación estacional' }
+  { key:'estacional', label:'Forecast estacional' }
 ];
 function hasTipo(variable, tipo){ return state.raw[variable].some(r=>r.tipo===tipo); }
 
@@ -5273,7 +5273,7 @@ function loadBakedDefaults(){
 //    (semanas ya transcurridas, importe ≠ 0). Si viene vacía, se conserva el comportamiento anterior:
 //    las semanas ya transcurridas de Proyección (importe > 0) hacen de real.
 //  · Proyección: siempre se conserva con origTipo:'proyeccion'.
-//  · Variación Egreso: % semanal por cultivo que usa el método "Variación estacional".
+//  · Variación Egreso: % semanal por cultivo que usa el método "Forecast estacional".
 function processAllSlots(){
   const parsed = {};
   const errors = [], notes = [];
@@ -5365,7 +5365,7 @@ function processAllSlots(){
   if(state.factorScale==='enteros') notes.push('[Variación Egreso] Los % vienen como enteros (p. ej. 12 = 12%) — se dividieron entre 100.');
   state.factor = weekMap(varRecs, 'Variación Egreso', false);
 
-  // ---- Factor Producción (método "Variación estacional" de Producción) ----
+  // ---- Factor Producción (método "Forecast estacional" de Producción) ----
   // Misma normalización que egreso: si la hoja trae enteros (10 = 10%) se dividen entre 100.
   // weekMap toma UNA vez cada [cultivo, ejercicio, semana] → el cruce con PPTO Producción no duplica.
   const prodVarRecs = parsed['produccion|variacion']||[];
