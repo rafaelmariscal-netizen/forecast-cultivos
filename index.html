@@ -105,6 +105,23 @@
   .seg-accent button.on{ background:var(--accent); color:#fff; }
   .tablevar-seg{ margin:10px 0 12px; max-width:640px; }
   .hint{ font-size:11.5px; color:var(--text-muted); line-height:1.5; margin:0; }
+  /* Ícono ⓘ con recuadro de información: aparece al pasar el mouse (o al tocar/enfocar) y se quita al salir. */
+  .title-row{ display:flex; align-items:center; gap:6px; position:relative; }
+  .info-tip{ flex:none; width:17px; height:17px; border-radius:50%; border:1.5px solid var(--text-muted); background:transparent; color:var(--text-muted); font:700 10.5px/1 'Public Sans',sans-serif; font-style:normal; display:inline-flex; align-items:center; justify-content:center; padding:0; cursor:help; }
+  .info-tip:hover, .info-tip:focus-visible{ border-color:var(--accent); color:var(--accent); outline:none; }
+  .info-pop{ position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:30; background:var(--surface-raised); border:1px solid var(--border-strong); border-radius:8px; box-shadow:var(--shadow-2); padding:9px 11px; font-size:11.5px; line-height:1.5; color:var(--text-secondary); opacity:0; visibility:hidden; transform:translateY(-3px); transition:opacity .12s ease, transform .12s ease, visibility .12s; pointer-events:none; }
+  .info-tip:hover + .info-pop, .info-tip:focus + .info-pop{ opacity:1; visibility:visible; transform:none; }
+  /* Variante para notas de ancho completo (p. ej. "Cómo leer las gráficas"): recuadro de ancho fijo. */
+  .info-row{ margin:2px 0 4px; }
+  .info-row .info-label{ font-size:11.5px; color:var(--text-muted); }
+  .info-pop.wide{ right:auto; width:min(460px, calc(100vw - 48px)); }
+  .info-row:has(.info-pop:empty){ display:none; }   /* sin texto que mostrar (p. ej. Empaque) → sin ícono */
+  .kgha-box .title-row h5{ flex:1; }
+  .info-pop.up{ top:auto; bottom:calc(100% + 6px); transform:translateY(3px); }   /* abre hacia arriba (notas al final del panel) */
+  /* Método de proyección: si el texto trae un aviso ⚠️ (clase .warn que pone el código), la ⓘ se pinta de color de aviso. */
+  .info-pop.warn{ border-color:var(--warning); }
+  .title-row:has(.info-pop.warn) .info-tip{ border-color:var(--warning); color:var(--warning); }
+  .info-pop .chartband-swatch{ display:inline-block; vertical-align:-1px; margin:0 3px 0 0; }
   .hint.warn{ color:var(--warning); font-weight:600; }
   .cierre-box{ border:1px solid var(--border); border-radius:8px; background:var(--surface); }
   .cierre-box > summary{ cursor:pointer; list-style:none; padding:8px 10px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); display:flex; justify-content:space-between; align-items:center; gap:6px; }
@@ -254,19 +271,26 @@
         <select id="focalCrop"></select>
       </div>
       <div class="field indented" id="includedField">
-        <h3 id="includedFieldTitle">¿Cuáles cultivos entran al consolidado?</h3>
+        <div class="title-row">
+          <h3 id="includedFieldTitle">¿Cuáles cultivos entran al consolidado?</h3>
+          <button type="button" class="info-tip" aria-label="Información sobre Empaque" aria-describedby="empaqueInfo">i</button>
+          <div class="info-pop" id="empaqueInfo" role="tooltip">📦 Empaque no es un cultivo (no tiene tipo de cambio ni aparece en "Comparativo de cultivos"), pero su egreso sí existe en la base de datos — al incluirlo aquí se suma al Ingreso/Egreso/EBITDA consolidado.</div>
+        </div>
         <div class="chip-quickrow">
           <button type="button" id="btnIncludedAll">Todos</button><span class="dotsep">·</span><button type="button" id="btnIncludedNone">Ninguno</button>
         </div>
         <div class="chipgrid" id="includedChips"></div>
-        <p class="hint">📦 Empaque no es un cultivo (no tiene tipo de cambio ni aparece en "Comparativo de cultivos"), pero su egreso sí existe en la base de datos — al incluirlo aquí se suma al Ingreso/Egreso/EBITDA consolidado.</p>
       </div>
       <div class="field" id="mesField">
         <h3>Mes de referencia</h3>
         <select id="mesFiltro"></select>
       </div>
       <div class="field" id="escenarioField">
-        <h3>Escenario</h3>
+        <div class="title-row">
+          <h3>Escenario</h3>
+          <button type="button" class="info-tip" aria-label="Información sobre los escenarios" aria-describedby="escenarioInfo">i</button>
+          <div class="info-pop" id="escenarioInfo" role="tooltip">% que aplica cada escenario a cada variable — el de Base siempre es 0.</div>
+        </div>
         <div class="segmented" id="escenarioSeg">
           <button data-sc="pesimista">Pesimista</button>
           <button data-sc="base" class="on base">Base</button>
@@ -277,11 +301,14 @@
             <thead><tr><th></th><th>Ing.</th><th>Egr.</th><th>Prod.</th><th>TC</th></tr></thead>
             <tbody id="scenarioMiniBody"></tbody>
           </table>
-          <p class="hint">% que aplica cada escenario a cada variable — el de Base siempre es 0.</p>
         </div>
       </div>
       <div class="field">
-        <h3>Método de proyección</h3>
+        <div class="title-row">
+          <h3>Método de proyección</h3>
+          <button type="button" class="info-tip" aria-label="Cómo se calcula el método" aria-describedby="metodoHint">i</button>
+          <div class="info-pop" id="metodoHint" role="tooltip"></div>
+        </div>
         <select id="metodoProyeccion">
           <option value="polinomial">📈 Regresión polinomial (grado 1)</option>
           <option value="movil">🔄 Promedio móvil (12 semanas)</option>
@@ -292,15 +319,17 @@
           <input type="number" id="castigoMovil" class="textinput" min="0" max="100" step="any" placeholder="Sin castigo" inputmode="decimal">
           <p class="hint">Solo aplica al Promedio móvil. Ej.: 20 = la proyección queda al 80% del promedio. Vacío = sin castigo.</p>
         </div>
-        <p class="hint" id="metodoHint"></p>
       </div>
       <div class="field" id="vistaField">
-        <h3>Vista</h3>
+        <div class="title-row">
+          <h3>Vista</h3>
+          <button type="button" class="info-tip" aria-label="Información sobre la vista" aria-describedby="vistaInfo">i</button>
+          <div class="info-pop" id="vistaInfo" role="tooltip">Acumulado suma mes a mes desde el inicio de la temporada (gráficas y tabla).</div>
+        </div>
         <div class="segmented seg-accent" id="vistaSeg">
           <button type="button" data-vista="mensual" class="on">Mensual</button>
           <button type="button" data-vista="acumulado">Acumulado</button>
         </div>
-        <p class="hint">Acumulado suma mes a mes desde el inicio de la temporada (gráficas y tabla).</p>
       </div>
       <div class="field" id="cierreField">
         <details class="cierre-box" id="cierreBox">
@@ -311,7 +340,11 @@
           </div>
         </details>
       </div>
-      <p class="hint">El forecast corre semana a semana desde la primera semana sin egreso <b>Real</b> (total de todos los cultivos = 0), cubre el resto de ese mes + los 3 meses siguientes, y se agrupa por la columna <b>Mes</b> de tus hojas. El tipo de cambio solo afecta a los cultivos de exportación — papa se vende en mercado nacional.</p>
+      <div class="title-row info-row">
+        <button type="button" class="info-tip" aria-label="Cómo funciona el forecast" aria-describedby="forecastInfo">i</button>
+        <div class="info-pop up" id="forecastInfo" role="tooltip">El forecast corre semana a semana desde la primera semana sin egreso <b>Real</b> (total de todos los cultivos = 0), cubre el resto de ese mes + los 3 meses siguientes, y se agrupa por la columna <b>Mes</b> de tus hojas. El tipo de cambio solo afecta a los cultivos de exportación — papa se vende en mercado nacional.</div>
+        <span class="info-label">Cómo funciona el forecast</span>
+      </div>
     </aside>
 
     <main>
@@ -328,7 +361,11 @@
           <div class="kpi"><span class="label">Margen EBITDA</span><span class="value" id="kpiMargen">—</span><span class="delta" id="kpiMargenPill"></span></div>
         </div>
 
-        <p class="hint chartband-hint"><span class="chartband-swatch"></span><span>Cada gráfica tiene 3 líneas: <b>Presupuesto</b> (punteada gris), <b>Real</b> (sólida oscura) y <b>Proyección</b> del método seleccionado en "Método de proyección" (sólida de color: verde bosque = Base, verde fuerte = Optimista, rojo = Pesimista). El área verde es el rango entre el escenario Pesimista y el Optimista.</span></p>
+        <div class="title-row info-row">
+          <button type="button" class="info-tip" aria-label="Cómo leer las gráficas" aria-describedby="chartsInfo">i</button>
+          <div class="info-pop wide" id="chartsInfo" role="tooltip">Cada gráfica tiene 3 líneas: <b>Presupuesto</b> (punteada gris), <b>Real</b> (sólida oscura) y <b>Proyección</b> del método seleccionado en "Método de proyección" (sólida de color: verde bosque = Base, verde fuerte = Optimista, rojo = Pesimista). <span class="chartband-swatch"></span>El área verde es el rango entre el escenario Pesimista y el Optimista.</div>
+          <span class="info-label">Cómo leer las gráficas</span>
+        </div>
 
         <div class="cardgrid">
           <div class="card">
@@ -370,7 +407,11 @@
             <button type="button" data-var="produccion">🌾 Producción</button>
             <button type="button" data-var="ebitda">📊 EBITDA</button>
           </div>
-          <p class="cardsub" id="tablaSub"></p>
+          <div class="title-row info-row">
+            <button type="button" class="info-tip" aria-label="Cómo leer la tabla" aria-describedby="tablaSub">i</button>
+            <div class="info-pop wide" id="tablaSub" role="tooltip"></div>
+            <span class="info-label">Cómo leer la tabla</span>
+          </div>
           <div class="tablewrap">
             <table id="tablaHistorico"><thead></thead><tbody></tbody></table>
           </div>
@@ -384,14 +425,21 @@
               <div class="legend-inline" id="legendKgHa"></div>
             </div>
             <div class="kgha-box">
-              <h5>Hectáreas por cultivo</h5>
+              <div class="title-row">
+                <h5>Hectáreas por cultivo</h5>
+                <button type="button" class="info-tip" aria-label="Información sobre las hectáreas" aria-describedby="kghaBoxInfo">i</button>
+                <div class="info-pop" id="kghaBoxInfo" role="tooltip">Escribe las hectáreas de cada cultivo. Se guardan en este navegador y no se borran al recargar la página ni al actualizar los datos. Mientras un cultivo no tenga hectáreas, la gráfica y la tabla muestran sus kg.</div>
+              </div>
               <div id="kghaInputs"></div>
               <p class="hint" id="kghaEmpaqueMsg" hidden>📦 Empaque no lleva hectáreas.</p>
               <div class="kgha-total" id="kghaTotalRow"><span>Total</span><b id="kghaTotal">0 ha</b></div>
-              <p class="hint">Escribe las hectáreas de cada cultivo. Se guardan en este navegador y no se borran al recargar la página ni al actualizar los datos. Mientras un cultivo no tenga hectáreas, la gráfica y la tabla muestran sus kg.</p>
             </div>
           </div>
-          <p class="cardsub" id="kghaSub"></p>
+          <div class="title-row info-row">
+            <button type="button" class="info-tip" aria-label="Cómo leer la tabla de kg por hectárea" aria-describedby="kghaSub">i</button>
+            <div class="info-pop wide" id="kghaSub" role="tooltip"></div>
+            <span class="info-label">Cómo leer la tabla</span>
+          </div>
           <div class="tablewrap">
             <table id="tablaKgHa"><thead></thead><tbody></tbody></table>
           </div>
@@ -1946,14 +1994,14 @@ Real	AGUACATE	2026	32	3948465	Agosto
 Real	AGUACATE	2026	33	6635842	Agosto
 Real	AGUACATE	2026	34	5828517	Agosto
 Real	AGUACATE	2026	35	11231801	Agosto
-Real	AGUACATE	2026	36	5390602	Septiembre
+Real	AGUACATE	2026	36	4554976	Septiembre
 Real	AGUACATE	2026	37	7966337	Septiembre
 Real	AGUACATE	2026	38	3606482	Septiembre
 Real	AGUACATE	2026	39	5306276	Septiembre
 Real	AGUACATE	2026	40	956431	Octubre
 Real	AGUACATE	2026	41	6990407	Octubre
-Real	AGUACATE	2026	42	2073636	Octubre
-Real	AGUACATE	2026	43	2374265	Octubre
+Real	AGUACATE	2026	42	2071363	Octubre
+Real	AGUACATE	2026	43	0	Octubre
 Real	AGUACATE	2026	44	0	Octubre
 Real	AGUACATE	2026	45	0	Noviembre
 Real	AGUACATE	2026	46	0	Noviembre
@@ -2005,8 +2053,8 @@ Real	ARANDANO	2026	38	3246087	Septiembre
 Real	ARANDANO	2026	39	3290480	Septiembre
 Real	ARANDANO	2026	40	9114278	Octubre
 Real	ARANDANO	2026	41	7828474	Octubre
-Real	ARANDANO	2026	42	4359139	Octubre
-Real	ARANDANO	2026	43	1720018	Octubre
+Real	ARANDANO	2026	42	4323425	Octubre
+Real	ARANDANO	2026	43	0	Octubre
 Real	ARANDANO	2026	44	0	Octubre
 Real	ARANDANO	2026	45	0	Noviembre
 Real	ARANDANO	2026	46	0	Noviembre
@@ -2058,10 +2106,10 @@ Real	ESPARRAGO	2026	36	7840678	Septiembre
 Real	ESPARRAGO	2026	37	8732258	Septiembre
 Real	ESPARRAGO	2026	38	6552101	Septiembre
 Real	ESPARRAGO	2026	39	8409064	Septiembre
-Real	ESPARRAGO	2026	40	8370582	Octubre
-Real	ESPARRAGO	2026	41	11481626	Octubre
-Real	ESPARRAGO	2026	42	6222647	Octubre
-Real	ESPARRAGO	2026	43	3839676	Octubre
+Real	ESPARRAGO	2026	40	8352732	Octubre
+Real	ESPARRAGO	2026	41	11418020	Octubre
+Real	ESPARRAGO	2026	42	6131539	Octubre
+Real	ESPARRAGO	2026	43	0	Octubre
 Real	ESPARRAGO	2026	44	0	Octubre
 Real	ESPARRAGO	2026	45	0	Noviembre
 Real	ESPARRAGO	2026	46	0	Noviembre
@@ -2100,7 +2148,7 @@ Real	ESPARRAGO	2027	26	0	Junio
 Real	ESPARRAGO	2027	27	0	Julio
 Real	ESPARRAGO	2027	28	0	Julio
 Real	FRAMBUESA	2026	26	0	Junio
-Real	FRAMBUESA	2026	27	37744110	Julio
+Real	FRAMBUESA	2026	27	37741655	Julio
 Real	FRAMBUESA	2026	28	6705242	Julio
 Real	FRAMBUESA	2026	29	6427179	Julio
 Real	FRAMBUESA	2026	30	12829249	Julio
@@ -2114,9 +2162,9 @@ Real	FRAMBUESA	2026	37	10945569	Septiembre
 Real	FRAMBUESA	2026	38	6435596	Septiembre
 Real	FRAMBUESA	2026	39	9061548	Septiembre
 Real	FRAMBUESA	2026	40	14659073	Octubre
-Real	FRAMBUESA	2026	41	11125771	Octubre
+Real	FRAMBUESA	2026	41	11123616	Octubre
 Real	FRAMBUESA	2026	42	11866763	Octubre
-Real	FRAMBUESA	2026	43	6473381	Octubre
+Real	FRAMBUESA	2026	43	0	Octubre
 Real	FRAMBUESA	2026	44	0	Octubre
 Real	FRAMBUESA	2026	45	0	Noviembre
 Real	FRAMBUESA	2026	46	0	Noviembre
@@ -2167,10 +2215,10 @@ Real	FRESA	2026	36	16593656	Septiembre
 Real	FRESA	2026	37	21746898	Septiembre
 Real	FRESA	2026	38	11791479	Septiembre
 Real	FRESA	2026	39	12606607	Septiembre
-Real	FRESA	2026	40	23089900	Octubre
+Real	FRESA	2026	40	22769026	Octubre
 Real	FRESA	2026	41	20094392	Octubre
-Real	FRESA	2026	42	12990186	Octubre
-Real	FRESA	2026	43	10215973	Octubre
+Real	FRESA	2026	42	12983386	Octubre
+Real	FRESA	2026	43	0	Octubre
 Real	FRESA	2026	44	0	Octubre
 Real	FRESA	2026	45	0	Noviembre
 Real	FRESA	2026	46	0	Noviembre
@@ -2223,9 +2271,9 @@ Real	PAPA	2026	37	1864761	Septiembre
 Real	PAPA	2026	38	827522	Septiembre
 Real	PAPA	2026	39	816057	Septiembre
 Real	PAPA	2026	40	2469264	Octubre
-Real	PAPA	2026	41	2825970	Octubre
-Real	PAPA	2026	42	2645146	Octubre
-Real	PAPA	2026	43	4780622	Octubre
+Real	PAPA	2026	41	2825674	Octubre
+Real	PAPA	2026	42	1775003	Octubre
+Real	PAPA	2026	43	0	Octubre
 Real	PAPA	2026	44	0	Octubre
 Real	PAPA	2026	45	0	Noviembre
 Real	PAPA	2026	46	0	Noviembre
@@ -2276,10 +2324,10 @@ Real	ZARZAMORA	2026	36	2567906	Septiembre
 Real	ZARZAMORA	2026	37	4823982	Septiembre
 Real	ZARZAMORA	2026	38	2988028	Septiembre
 Real	ZARZAMORA	2026	39	3044631	Septiembre
-Real	ZARZAMORA	2026	40	5944313	Octubre
-Real	ZARZAMORA	2026	41	5217970	Octubre
-Real	ZARZAMORA	2026	42	6675962	Octubre
-Real	ZARZAMORA	2026	43	980844	Octubre
+Real	ZARZAMORA	2026	40	5934744	Octubre
+Real	ZARZAMORA	2026	41	5217583	Octubre
+Real	ZARZAMORA	2026	42	6542208	Octubre
+Real	ZARZAMORA	2026	43	0	Octubre
 Real	ZARZAMORA	2026	44	0	Octubre
 Real	ZARZAMORA	2026	45	0	Noviembre
 Real	ZARZAMORA	2026	46	0	Noviembre
@@ -2328,13 +2376,13 @@ Real	EMPAQUE	2026	33	434087	Agosto
 Real	EMPAQUE	2026	34	3987079	Agosto
 Real	EMPAQUE	2026	35	1435542	Agosto
 Real	EMPAQUE	2026	36	2115701	Septiembre
-Real	EMPAQUE	2026	37	1633665	Septiembre
+Real	EMPAQUE	2026	37	1670493	Septiembre
 Real	EMPAQUE	2026	38	1996799	Septiembre
 Real	EMPAQUE	2026	39	2591927	Septiembre
 Real	EMPAQUE	2026	40	33784432	Octubre
-Real	EMPAQUE	2026	41	9556357	Octubre
-Real	EMPAQUE	2026	42	1617669	Octubre
-Real	EMPAQUE	2026	43	2384232	Octubre
+Real	EMPAQUE	2026	41	9549621	Octubre
+Real	EMPAQUE	2026	42	1527679	Octubre
+Real	EMPAQUE	2026	43	0	Octubre
 Real	EMPAQUE	2026	44	0	Octubre
 Real	EMPAQUE	2026	45	0	Noviembre
 Real	EMPAQUE	2026	46	0	Noviembre
@@ -2813,7 +2861,7 @@ Presupuesto	EMPAQUE	2027	25	3815630	Junio
 Presupuesto	EMPAQUE	2027	26	2187861	Junio
 Presupuesto	EMPAQUE	2027	27	1486771	Julio
 Presupuesto	EMPAQUE	2027	28	219680	Julio`,
-  proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe	Mes	2430288254.715196
+  proyeccion: `Egreso	Cultivo	ejercicio	semana	Importe	Mes	2442493307.4030795
 Proyección	AGUACATE	2026	26	0	Junio	
 Proyección	AGUACATE	2026	27	195285625	Julio	
 Proyección	AGUACATE	2026	28	3101945	Julio	
@@ -2824,28 +2872,28 @@ Proyección	AGUACATE	2026	32	3948465	Agosto
 Proyección	AGUACATE	2026	33	6635842	Agosto	
 Proyección	AGUACATE	2026	34	5828517	Agosto	
 Proyección	AGUACATE	2026	35	11231801	Agosto	
-Proyección	AGUACATE	2026	36	4707439.260325097	Septiembre	
-Proyección	AGUACATE	2026	37	6028393.91303784	Septiembre	
-Proyección	AGUACATE	2026	38	6317883.4452834185	Septiembre	
-Proyección	AGUACATE	2026	39	15775967.992588047	Septiembre	
-Proyección	AGUACATE	2026	40	4308069.055343487	Octubre	
-Proyección	AGUACATE	2026	41	6299713.726722424	Octubre	
-Proyección	AGUACATE	2026	42	13398972.897759084	Octubre	
-Proyección	AGUACATE	2026	43	6545085.170229571	Octubre	
-Proyección	AGUACATE	2026	44	6169106.998407564	Octubre	
-Proyección	AGUACATE	2026	45	5095105.126696039	Noviembre	
-Proyección	AGUACATE	2026	46	8524276.102706252	Noviembre	
-Proyección	AGUACATE	2026	47	5027727.936459599	Noviembre	
-Proyección	AGUACATE	2026	48	8262832.726538124	Noviembre	
-Proyección	AGUACATE	2026	49	4604966.31171965	Diciembre	
-Proyección	AGUACATE	2026	50	7032044.648325614	Diciembre	
-Proyección	AGUACATE	2026	51	10411023.546210922	Diciembre	
-Proyección	AGUACATE	2026	52	2856191.91954892	Diciembre	
-Proyección	AGUACATE	2027	1	4770174.786920862	Enero	
-Proyección	AGUACATE	2027	2	2812516.8104729573	Enero	
-Proyección	AGUACATE	2027	3	6024763.760928332	Enero	
-Proyección	AGUACATE	2027	4	4945166.870301243	Enero	
-Proyección	AGUACATE	2027	5	1417685.8859999785	Enero	
+Proyección	AGUACATE	2026	36	4692278.9302993575	Septiembre	
+Proyección	AGUACATE	2026	37	6009557.755439124	Septiembre	
+Proyección	AGUACATE	2026	38	6298405.424577519	Septiembre	
+Proyección	AGUACATE	2026	39	15728264.617758699	Septiembre	
+Proyección	AGUACATE	2026	40	4295087.244707633	Octubre	
+Proyección	AGUACATE	2026	41	6281197.123297937	Octubre	
+Proyección	AGUACATE	2026	42	13359768.432560619	Octubre	
+Proyección	AGUACATE	2026	43	6636211.891756626	Octubre	
+Proyección	AGUACATE	2026	44	6254999.004530194	Octubre	
+Proyección	AGUACATE	2026	45	5166043.886690084	Noviembre	
+Proyección	AGUACATE	2026	46	8642958.948601715	Noviembre	
+Proyección	AGUACATE	2026	47	5097728.608973916	Noviembre	
+Proyección	AGUACATE	2026	48	8377875.516251654	Noviembre	
+Proyección	AGUACATE	2026	49	4669080.9063834855	Diciembre	
+Proyección	AGUACATE	2026	50	7129951.269518033	Diciembre	
+Proyección	AGUACATE	2026	51	10555975.432829978	Diciembre	
+Proyección	AGUACATE	2026	52	2895958.4617574806	Diciembre	
+Proyección	AGUACATE	2027	1	4836589.566581838	Enero	
+Proyección	AGUACATE	2027	2	2851675.2674696506	Enero	
+Proyección	AGUACATE	2027	3	6108646.0871669	Enero	
+Proyección	AGUACATE	2027	4	5014018.051389686	Enero	
+Proyección	AGUACATE	2027	5	1437424.218441239	Enero	
 Proyección	AGUACATE	2027	6		Febrero	
 Proyección	AGUACATE	2027	7		Febrero	
 Proyección	AGUACATE	2027	8		Febrero	
@@ -2883,22 +2931,22 @@ Proyección	ARANDANO	2026	38	4511565.574732247	Septiembre
 Proyección	ARANDANO	2026	39	12777065.223516664	Septiembre	
 Proyección	ARANDANO	2026	40	3881761.7981069665	Octubre	
 Proyección	ARANDANO	2026	41	4477411.954471412	Octubre	
-Proyección	ARANDANO	2026	42	3566114.924595949	Octubre	
-Proyección	ARANDANO	2026	43	5050087.440898214	Octubre	
-Proyección	ARANDANO	2026	44	9707394.840473345	Octubre	
-Proyección	ARANDANO	2026	45	3545983.9932768773	Noviembre	
-Proyección	ARANDANO	2026	46	4597838.05942133	Noviembre	
-Proyección	ARANDANO	2026	47	5326390.870565312	Noviembre	
-Proyección	ARANDANO	2026	48	10346712.000343712	Noviembre	
-Proyección	ARANDANO	2026	49	6104767.447687778	Diciembre	
-Proyección	ARANDANO	2026	50	6224743.360933351	Diciembre	
-Proyección	ARANDANO	2026	51	5925743.415672173	Diciembre	
-Proyección	ARANDANO	2026	52	8072425.028149033	Diciembre	
-Proyección	ARANDANO	2027	1	6861833.782408761	Enero	
-Proyección	ARANDANO	2027	2	5603862.052472395	Enero	
-Proyección	ARANDANO	2027	3	7412520.425951214	Enero	
-Proyección	ARANDANO	2027	4	9107690.288764084	Enero	
-Proyección	ARANDANO	2027	5	11852367.836632937	Enero	
+Proyección	ARANDANO	2026	42	3222104.509410426	Octubre	
+Proyección	ARANDANO	2026	43	4801903.9261319	Octubre	
+Proyección	ARANDANO	2026	44	9230330.750211861	Octubre	
+Proyección	ARANDANO	2026	45	3371718.7392479265	Noviembre	
+Proyección	ARANDANO	2026	46	4371880.068937397	Noviembre	
+Proyección	ARANDANO	2026	47	5064628.589664888	Noviembre	
+Proyección	ARANDANO	2026	48	9838229.052162647	Noviembre	
+Proyección	ARANDANO	2026	49	5804752.317310421	Diciembre	
+Proyección	ARANDANO	2026	50	5918832.086343631	Diciembre	
+Proyección	ARANDANO	2026	51	5634526.31384645	Diciembre	
+Proyección	ARANDANO	2026	52	7675710.547534565	Diciembre	
+Proyección	ARANDANO	2027	1	6524613.081620749	Enero	
+Proyección	ARANDANO	2027	2	5328463.616955247	Enero	
+Proyección	ARANDANO	2027	3	7048236.5607469985	Enero	
+Proyección	ARANDANO	2027	4	8660098.318580998	Enero	
+Proyección	ARANDANO	2027	5	11269890.336505616	Enero	
 Proyección	ARANDANO	2027	6		Febrero	
 Proyección	ARANDANO	2027	7		Febrero	
 Proyección	ARANDANO	2027	8		Febrero	
@@ -2936,24 +2984,24 @@ Proyección	ESPARRAGO	2026	36	7344643.081515182	Septiembre
 Proyección	ESPARRAGO	2026	37	8367688.790414392	Septiembre	
 Proyección	ESPARRAGO	2026	38	13604315.950246567	Septiembre	
 Proyección	ESPARRAGO	2026	39	21004889.48127594	Septiembre	
-Proyección	ESPARRAGO	2026	40	6227764.119722878	Octubre	
-Proyección	ESPARRAGO	2026	41	11842326.065567942	Octubre	
-Proyección	ESPARRAGO	2026	42	14065089.335792188	Octubre	
-Proyección	ESPARRAGO	2026	43	7816390.368829697	Octubre	
-Proyección	ESPARRAGO	2026	44	6200466.100000001	Octubre	
-Proyección	ESPARRAGO	2026	45	6284393.59	Noviembre	
-Proyección	ESPARRAGO	2026	46	12655934.450000001	Noviembre	
-Proyección	ESPARRAGO	2026	47	3528414.35	Noviembre	
-Proyección	ESPARRAGO	2026	48	4345894.45	Noviembre	
-Proyección	ESPARRAGO	2026	49	3194362.69	Diciembre	
-Proyección	ESPARRAGO	2026	50	4353957.29	Diciembre	
-Proyección	ESPARRAGO	2026	51	3207845.39	Diciembre	
-Proyección	ESPARRAGO	2026	52	2508377.54	Diciembre	
-Proyección	ESPARRAGO	2027	1	3517820.8000000003	Enero	
-Proyección	ESPARRAGO	2027	2	2882252.09	Enero	
-Proyección	ESPARRAGO	2027	3	3543871.56	Enero	
-Proyección	ESPARRAGO	2027	4	5194848.26	Enero	
-Proyección	ESPARRAGO	2027	5	3598052.65	Enero	
+Proyección	ESPARRAGO	2026	40	6227247.207126481	Octubre	
+Proyección	ESPARRAGO	2026	41	11838067.943187982	Octubre	
+Proyección	ESPARRAGO	2026	42	10786452.036083138	Octubre	
+Proyección	ESPARRAGO	2026	43	6091693.48718206	Octubre	
+Proyección	ESPARRAGO	2026	44	4967018.948099628	Octubre	
+Proyección	ESPARRAGO	2026	45	5034250.8991131885	Noviembre	
+Proyección	ESPARRAGO	2026	46	10138313.024412286	Noviembre	
+Proyección	ESPARRAGO	2026	47	2826513.4669789798	Noviembre	
+Proyección	ESPARRAGO	2026	48	3481373.7760119373	Noviembre	
+Proyección	ESPARRAGO	2026	49	2558914.0803999393	Diciembre	
+Proyección	ESPARRAGO	2026	50	3487832.6902950904	Diciembre	
+Proyección	ESPARRAGO	2026	51	2569714.6920461417	Diciembre	
+Proyección	ESPARRAGO	2026	52	2009390.6763182743	Diciembre	
+Proyección	ESPARRAGO	2027	1	2818027.2721141065	Enero	
+Proyección	ESPARRAGO	2027	2	2308891.05969465	Enero	
+Proyección	ESPARRAGO	2027	3	2838895.803035096	Enero	
+Proyección	ESPARRAGO	2027	4	4161446.7886409997	Enero	
+Proyección	ESPARRAGO	2027	5	2882298.749897218	Enero	
 Proyección	ESPARRAGO	2027	6		Febrero	
 Proyección	ESPARRAGO	2027	7		Febrero	
 Proyección	ESPARRAGO	2027	8		Febrero	
@@ -2978,7 +3026,7 @@ Proyección	ESPARRAGO	2027	26		Junio
 Proyección	ESPARRAGO	2027	27		Julio	
 Proyección	ESPARRAGO	2027	28	0	Julio	
 Proyección	FRAMBUESA	2026	26	0	Junio	
-Proyección	FRAMBUESA	2026	27	37744110	Julio	
+Proyección	FRAMBUESA	2026	27	37741655	Julio	
 Proyección	FRAMBUESA	2026	28	6705242	Julio	
 Proyección	FRAMBUESA	2026	29	6427179	Julio	
 Proyección	FRAMBUESA	2026	30	12829249	Julio	
@@ -2987,28 +3035,28 @@ Proyección	FRAMBUESA	2026	32	5150746	Agosto
 Proyección	FRAMBUESA	2026	33	11685085	Agosto	
 Proyección	FRAMBUESA	2026	34	8875672	Agosto	
 Proyección	FRAMBUESA	2026	35	11143179	Agosto	
-Proyección	FRAMBUESA	2026	36	11776793.285673697	Septiembre	
-Proyección	FRAMBUESA	2026	37	9010602.957613144	Septiembre	
-Proyección	FRAMBUESA	2026	38	22021576.456588246	Septiembre	
-Proyección	FRAMBUESA	2026	39	21511479.635593396	Septiembre	
-Proyección	FRAMBUESA	2026	40	23039748.01658014	Octubre	
-Proyección	FRAMBUESA	2026	41	22861507.293788407	Octubre	
-Proyección	FRAMBUESA	2026	42	22662923.641416073	Octubre	
-Proyección	FRAMBUESA	2026	43	22100070.908902448	Octubre	
-Proyección	FRAMBUESA	2026	44	21851259.1	Octubre	
-Proyección	FRAMBUESA	2026	45	14279251.73	Noviembre	
-Proyección	FRAMBUESA	2026	46	15069459.57	Noviembre	
-Proyección	FRAMBUESA	2026	47	15059928.2	Noviembre	
-Proyección	FRAMBUESA	2026	48	21239001.14	Noviembre	
-Proyección	FRAMBUESA	2026	49	14086346.78	Diciembre	
-Proyección	FRAMBUESA	2026	50	13228296.23	Diciembre	
-Proyección	FRAMBUESA	2026	51	13886596.05	Diciembre	
-Proyección	FRAMBUESA	2026	52	9852058.13	Diciembre	
-Proyección	FRAMBUESA	2027	1	17447041.99	Enero	
-Proyección	FRAMBUESA	2027	2	10027228.49	Enero	
-Proyección	FRAMBUESA	2027	3	11046428.58	Enero	
-Proyección	FRAMBUESA	2027	4	12288383.16	Enero	
-Proyección	FRAMBUESA	2027	5	17459179.16	Enero	
+Proyección	FRAMBUESA	2026	36	11776553.17309	Septiembre	
+Proyección	FRAMBUESA	2026	37	9010434.552265637	Septiembre	
+Proyección	FRAMBUESA	2026	38	22021184.103031527	Septiembre	
+Proyección	FRAMBUESA	2026	39	21511120.019658353	Septiembre	
+Proyección	FRAMBUESA	2026	40	23039397.810079608	Octubre	
+Proyección	FRAMBUESA	2026	41	22860896.816154547	Octubre	
+Proyección	FRAMBUESA	2026	42	16096974.38958083	Octubre	
+Proyección	FRAMBUESA	2026	43	16026875.1136098	Octubre	
+Proyección	FRAMBUESA	2026	44	26522184.02116725	Octubre	
+Proyección	FRAMBUESA	2026	45	17331584.43339454	Noviembre	
+Proyección	FRAMBUESA	2026	46	18290707.093170658	Noviembre	
+Proyección	FRAMBUESA	2026	47	18279138.297617186	Noviembre	
+Proyección	FRAMBUESA	2026	48	25779049.805915345	Noviembre	
+Proyección	FRAMBUESA	2026	49	17097444.12326046	Diciembre	
+Proyección	FRAMBUESA	2026	50	16055976.69649036	Diciembre	
+Proyección	FRAMBUESA	2026	51	16854994.679263778	Diciembre	
+Proyección	FRAMBUESA	2026	52	11958033.974852134	Diciembre	
+Proyección	FRAMBUESA	2027	1	21176521.506891657	Enero	
+Proyección	FRAMBUESA	2027	2	12170648.74920965	Enero	
+Proyección	FRAMBUESA	2027	3	13407713.039997827	Enero	
+Proyección	FRAMBUESA	2027	4	14915147.818284424	Enero	
+Proyección	FRAMBUESA	2027	5	21191253.11822641	Enero	
 Proyección	FRAMBUESA	2027	6		Febrero	
 Proyección	FRAMBUESA	2027	7		Febrero	
 Proyección	FRAMBUESA	2027	8		Febrero	
@@ -3045,24 +3093,24 @@ Proyección	FRESA	2026	36	8258623.501274882	Septiembre
 Proyección	FRESA	2026	37	14059596.555372996	Septiembre	
 Proyección	FRESA	2026	38	14263352.384421755	Septiembre	
 Proyección	FRESA	2026	39	23232269.01892776	Septiembre	
-Proyección	FRESA	2026	40	14486372.31370764	Octubre	
-Proyección	FRESA	2026	41	20404272.03459582	Octubre	
-Proyección	FRESA	2026	42	17212160.692975607	Octubre	
-Proyección	FRESA	2026	43	27239300.865533095	Octubre	
-Proyección	FRESA	2026	44	21176861.9	Octubre	
-Proyección	FRESA	2026	45	16755688.91	Noviembre	
-Proyección	FRESA	2026	46	24793160.84	Noviembre	
-Proyección	FRESA	2026	47	18699791.45	Noviembre	
-Proyección	FRESA	2026	48	29569489.22	Noviembre	
-Proyección	FRESA	2026	49	22167228.51	Diciembre	
-Proyección	FRESA	2026	50	24542131.4	Diciembre	
-Proyección	FRESA	2026	51	27355589.42	Diciembre	
-Proyección	FRESA	2026	52	20824829.43	Diciembre	
-Proyección	FRESA	2027	1	26671033.64	Enero	
-Proyección	FRESA	2027	2	22974917.43	Enero	
-Proyección	FRESA	2027	3	25875399.07	Enero	
-Proyección	FRESA	2027	4	35835263.59	Enero	
-Proyección	FRESA	2027	5	24433122.1	Enero	
+Proyección	FRESA	2026	40	14469543.367550265	Octubre	
+Proyección	FRESA	2026	41	20382175.73516475	Octubre	
+Proyección	FRESA	2026	42	14887095.141819974	Octubre	
+Proyección	FRESA	2026	43	24506513.783285573	Octubre	
+Proyección	FRESA	2026	44	20296715.713613313	Octubre	
+Proyección	FRESA	2026	45	16059294.148393786	Noviembre	
+Proyección	FRESA	2026	46	23762715.155231297	Noviembre	
+Proyección	FRESA	2026	47	17922596.499744225	Noviembre	
+Proyección	FRESA	2026	48	28340531.251945946	Noviembre	
+Proyección	FRESA	2026	49	21245921.01279057	Diciembre	
+Proyección	FRESA	2026	50	23522118.92319809	Diciembre	
+Proyección	FRESA	2026	51	26218644.87089412	Diciembre	
+Proyección	FRESA	2026	52	19959314.308282755	Diciembre	
+Proyección	FRESA	2027	1	25562540.386557333	Enero	
+Proyección	FRESA	2027	2	22020041.01563553	Enero	
+Proyección	FRESA	2027	3	24799973.734544884	Enero	
+Proyección	FRESA	2027	4	34345889.444962	Enero	
+Proyección	FRESA	2027	5	23417640.234018937	Enero	
 Proyección	FRESA	2027	6		Febrero	
 Proyección	FRESA	2027	7		Febrero	
 Proyección	FRESA	2027	8		Febrero	
@@ -3101,23 +3149,23 @@ Proyección	PAPA	2026	37	577972.854867289	Septiembre
 Proyección	PAPA	2026	38	3520598.635760939	Septiembre	
 Proyección	PAPA	2026	39	1720800.799004593	Septiembre	
 Proyección	PAPA	2026	40	1822797.7889050466	Octubre	
-Proyección	PAPA	2026	41	1848868.6680599025	Octubre	
-Proyección	PAPA	2026	42	4932666.772655075	Octubre	
-Proyección	PAPA	2026	43	2981069.8155160197	Octubre	
-Proyección	PAPA	2026	44	6312208.616808227	Octubre	
-Proyección	PAPA	2026	45	2149170.1748731295	Noviembre	
-Proyección	PAPA	2026	46	1746018.8959972002	Noviembre	
-Proyección	PAPA	2026	47	3258923.4847066617	Noviembre	
-Proyección	PAPA	2026	48	3959354.856435363	Noviembre	
-Proyección	PAPA	2026	49	2448338.3950435794	Diciembre	
-Proyección	PAPA	2026	50	3740381.1418728624	Diciembre	
-Proyección	PAPA	2026	51	4527088.825388171	Diciembre	
-Proyección	PAPA	2026	52	1879796.4186651183	Diciembre	
-Proyección	PAPA	2027	1	4632769.347574347	Enero	
-Proyección	PAPA	2027	2	7038720.20988866	Enero	
-Proyección	PAPA	2027	3	5805587.96092354	Enero	
-Proyección	PAPA	2027	4	3817308.446779143	Enero	
-Proyección	PAPA	2027	5	2374070.202776362	Enero	
+Proyección	PAPA	2026	41	1848854.260972982	Octubre	
+Proyección	PAPA	2026	42	6184267.052800436	Octubre	
+Proyección	PAPA	2026	43	3668867.8832630753	Octubre	
+Proyección	PAPA	2026	44	7768573.330999096	Octubre	
+Proyección	PAPA	2026	45	2645030.7836530907	Noviembre	
+Proyección	PAPA	2026	46	2148863.6789895925	Noviembre	
+Proyección	PAPA	2026	47	4010828.476683089	Noviembre	
+Proyección	PAPA	2026	48	4872864.699649073	Noviembre	
+Proyección	PAPA	2026	49	3013223.661580153	Diciembre	
+Proyección	PAPA	2026	50	4603368.955384489	Diciembre	
+Proyección	PAPA	2026	51	5571587.324019371	Diciembre	
+Proyección	PAPA	2026	52	2313506.604782279	Diciembre	
+Proyección	PAPA	2027	1	5701650.656222215	Enero	
+Proyección	PAPA	2027	2	8662707.053328473	Enero	
+Proyección	PAPA	2027	3	7145064.198908789	Enero	
+Proyección	PAPA	2027	4	4698045.073618166	Enero	
+Proyección	PAPA	2027	5	2921820.171484422	Enero	
 Proyección	PAPA	2027	6		Febrero	
 Proyección	PAPA	2027	7		Febrero	
 Proyección	PAPA	2027	8		Febrero	
@@ -3154,24 +3202,24 @@ Proyección	ZARZAMORA	2026	36	2732729.440382933	Septiembre
 Proyección	ZARZAMORA	2026	37	3619531.0108495187	Septiembre	
 Proyección	ZARZAMORA	2026	38	6608183.97773215	Septiembre	
 Proyección	ZARZAMORA	2026	39	7997648.536175887	Septiembre	
-Proyección	ZARZAMORA	2026	40	6403824.108405327	Octubre	
-Proyección	ZARZAMORA	2026	41	5230639.205443661	Octubre	
-Proyección	ZARZAMORA	2026	42	5665414.21614701	Octubre	
-Proyección	ZARZAMORA	2026	43	5909193.934570973	Octubre	
-Proyección	ZARZAMORA	2026	44	5860140.72	Octubre	
-Proyección	ZARZAMORA	2026	45	3691221.9	Noviembre	
-Proyección	ZARZAMORA	2026	46	3384022.38	Noviembre	
-Proyección	ZARZAMORA	2026	47	4757059.68	Noviembre	
-Proyección	ZARZAMORA	2026	48	6763474.14	Noviembre	
-Proyección	ZARZAMORA	2026	49	4349811.42	Diciembre	
-Proyección	ZARZAMORA	2026	50	4371165.12	Diciembre	
-Proyección	ZARZAMORA	2026	51	3398316.66	Diciembre	
-Proyección	ZARZAMORA	2026	52	3725843.7600000002	Diciembre	
-Proyección	ZARZAMORA	2027	1	5553147.24	Enero	
-Proyección	ZARZAMORA	2027	2	3589903.2600000002	Enero	
-Proyección	ZARZAMORA	2027	3	3141345	Enero	
-Proyección	ZARZAMORA	2027	4	4198450.5600000005	Enero	
-Proyección	ZARZAMORA	2027	5	5914512.84	Enero	
+Proyección	ZARZAMORA	2026	40	6402831.171977521	Octubre	
+Proyección	ZARZAMORA	2026	41	5229861.159399983	Octubre	
+Proyección	ZARZAMORA	2026	42	3949896.242378714	Octubre	
+Proyección	ZARZAMORA	2026	43	4319186.67657594	Octubre	
+Proyección	ZARZAMORA	2026	44	6656984.038898873	Octubre	
+Proyección	ZARZAMORA	2026	45	4193142.527869872	Noviembre	
+Proyección	ZARZAMORA	2026	46	3844170.9930365933	Noviembre	
+Proyección	ZARZAMORA	2026	47	5403909.543293251	Noviembre	
+Proyección	ZARZAMORA	2026	48	7683149.867685307	Noviembre	
+Proyección	ZARZAMORA	2026	49	4941284.958624687	Diciembre	
+Proyección	ZARZAMORA	2026	50	4965542.266915303	Diciembre	
+Proyección	ZARZAMORA	2026	51	3860408.9638216277	Diciembre	
+Proyección	ZARZAMORA	2026	52	4232472.158407651	Diciembre	
+Proyección	ZARZAMORA	2027	1	6308246.560730256	Enero	
+Proyección	ZARZAMORA	2027	2	4078046.901066743	Enero	
+Proyección	ZARZAMORA	2027	3	3568495.1138297548	Enero	
+Proyección	ZARZAMORA	2027	4	4769342.5297176195	Enero	
+Proyección	ZARZAMORA	2027	5	6718749.507049797	Enero	
 Proyección	ZARZAMORA	2027	6		Febrero	
 Proyección	ZARZAMORA	2027	7		Febrero	
 Proyección	ZARZAMORA	2027	8		Febrero	
@@ -3206,27 +3254,27 @@ Proyección	EMPAQUE	2026	33	434087	Agosto
 Proyección	EMPAQUE	2026	34	3987079	Agosto	
 Proyección	EMPAQUE	2026	35	1435542	Agosto	
 Proyección	EMPAQUE	2026	36	2115701	Septiembre	
-Proyección	EMPAQUE	2026	37	1633665	Septiembre	
+Proyección	EMPAQUE	2026	37	1670493	Septiembre	
 Proyección	EMPAQUE	2026	38	1996799	Septiembre	
 Proyección	EMPAQUE	2026	39	2591927	Septiembre	
 Proyección	EMPAQUE	2026	40	33784432	Octubre	
-Proyección	EMPAQUE	2026	41	9556357	Octubre	
-Proyección	EMPAQUE	2026	42	1617669	Octubre	
-Proyección	EMPAQUE	2026	43	2384232	Octubre	
-Proyección	EMPAQUE	2026	44	2976815.7600000002	Octubre	
-Proyección	EMPAQUE	2026	45	3553262.0700000003	Noviembre	
-Proyección	EMPAQUE	2026	46	3514221.1500000004	Noviembre	
-Proyección	EMPAQUE	2026	47	3708960.66	Noviembre	
-Proyección	EMPAQUE	2026	48	1375641.87	Noviembre	
-Proyección	EMPAQUE	2026	49	3213970.5900000003	Diciembre	
-Proyección	EMPAQUE	2026	50	2105351.43	Diciembre	
-Proyección	EMPAQUE	2026	51	2075254.8900000001	Diciembre	
-Proyección	EMPAQUE	2026	52	2789033.7300000004	Diciembre	
-Proyección	EMPAQUE	2027	1	3044325.9600000004	Enero	
-Proyección	EMPAQUE	2027	2	3112059.2700000005	Enero	
-Proyección	EMPAQUE	2027	3	3866989.14	Enero	
-Proyección	EMPAQUE	2027	4	4691174.130000001	Enero	
-Proyección	EMPAQUE	2027	5	3857694.0000000005	Enero	
+Proyección	EMPAQUE	2026	41	9549621	Octubre	
+Proyección	EMPAQUE	2026	42	1527679	Octubre	
+Proyección	EMPAQUE	2026	43	3134468.939689323	Octubre	
+Proyección	EMPAQUE	2026	44	3124590.037137883	Octubre	
+Proyección	EMPAQUE	2026	45	3729652.137847433	Noviembre	
+Proyección	EMPAQUE	2026	46	3688673.1591306925	Noviembre	
+Proyección	EMPAQUE	2026	47	3893079.8748432947	Noviembre	
+Proyección	EMPAQUE	2026	48	1443931.1090155365	Noviembre	
+Proyección	EMPAQUE	2026	49	3373517.6426129118	Diciembre	
+Proyección	EMPAQUE	2026	50	2209864.7122360016	Diciembre	
+Proyección	EMPAQUE	2026	51	2178274.127994966	Diciembre	
+Proyección	EMPAQUE	2026	52	2927486.1827523746	Diciembre	
+Proyección	EMPAQUE	2027	1	3195451.560097969	Enero	
+Proyección	EMPAQUE	2027	2	3266547.268623905	Enero	
+Proyección	EMPAQUE	2027	3	4058953.161603925	Enero	
+Proyección	EMPAQUE	2027	4	4924052.118387393	Enero	
+Proyección	EMPAQUE	2027	5	4049196.5947958394	Enero	
 Proyección	EMPAQUE	2027	6		Febrero	
 Proyección	EMPAQUE	2027	7		Febrero	
 Proyección	EMPAQUE	2027	8		Febrero	
@@ -3264,46 +3312,46 @@ Variación Egreso	FRESA	2026	36	0.06173071169089406	agosto
 Variación Egreso	FRESA	2026	37	0.0961602226323971	septiembre
 Variación Egreso	FRESA	2026	38	0.09720458474657556	septiembre
 Variación Egreso	FRESA	2026	39	0.06172129658505354	septiembre
-Variación Egreso	FRESA	2026	40	0.10976937474596016	septiembre
-Variación Egreso	FRESA	2026	41	0.12704389478043354	octubre
-Variación Egreso	FRESA	2026	42	0.11920841342540822	octubre
-Variación Egreso	FRESA	2026	43	0.0759694990973947	octubre
-Variación Egreso	FRESA	2026	44	0.01	octubre
-Variación Egreso	FRESA	2026	45	0.01	octubre
-Variación Egreso	FRESA	2026	46	0.01	noviembre
-Variación Egreso	FRESA	2026	47	0.01	noviembre
-Variación Egreso	FRESA	2026	48	0.01	noviembre
-Variación Egreso	FRESA	2026	49	0.01	noviembre
-Variación Egreso	FRESA	2026	50	0.01	diciembre
-Variación Egreso	FRESA	2026	51	0.01	diciembre
-Variación Egreso	FRESA	2026	52	0.01	diciembre
-Variación Egreso	FRESA	2027	1	0.01	diciembre
-Variación Egreso	FRESA	2027	2	0.01	enero
-Variación Egreso	FRESA	2027	3	0.01	enero
-Variación Egreso	FRESA	2027	4	0.01	enero
-Variación Egreso	FRESA	2027	5	0.01	enero
-Variación Egreso	FRESA	2027	6	0.01	enero
-Variación Egreso	FRESA	2027	7	0.01	febrero
-Variación Egreso	FRESA	2027	8	0.01	febrero
-Variación Egreso	FRESA	2027	9	0.01	febrero
-Variación Egreso	FRESA	2027	10	0.01	febrero
-Variación Egreso	FRESA	2027	11	0.01	marzo
-Variación Egreso	FRESA	2027	12	0.01	marzo
-Variación Egreso	FRESA	2027	13	0.01	marzo
-Variación Egreso	FRESA	2027	14	0.01	marzo
-Variación Egreso	FRESA	2027	15	0.01	abril
-Variación Egreso	FRESA	2027	16	0.01	abril
-Variación Egreso	FRESA	2027	17	0.01	abril
-Variación Egreso	FRESA	2027	18	0.01	abril
-Variación Egreso	FRESA	2027	19	0.01	mayo
-Variación Egreso	FRESA	2027	20	0.01	mayo
-Variación Egreso	FRESA	2027	21	0.01	mayo
-Variación Egreso	FRESA	2027	22	0.01	mayo
-Variación Egreso	FRESA	2027	23	0.01	mayo
-Variación Egreso	FRESA	2027	24	0.01	junio
-Variación Egreso	FRESA	2027	25	0.01	junio
-Variación Egreso	FRESA	2027	26	0.01	junio
-Variación Egreso	FRESA	2027	27	0.01	julio
+Variación Egreso	FRESA	2026	40	0.10848014590037591	septiembre
+Variación Egreso	FRESA	2026	41	0.12582339059734848	octubre
+Variación Egreso	FRESA	2026	42	-0.031977307707264896	octubre
+Variación Egreso	FRESA	2026	43	-0.031977307707264896	octubre
+Variación Egreso	FRESA	2026	44	-0.031977307707264896	octubre
+Variación Egreso	FRESA	2026	45	-0.031977307707264896	octubre
+Variación Egreso	FRESA	2026	46	-0.031977307707264896	noviembre
+Variación Egreso	FRESA	2026	47	-0.031977307707264896	noviembre
+Variación Egreso	FRESA	2026	48	-0.031977307707264896	noviembre
+Variación Egreso	FRESA	2026	49	-0.031977307707264896	noviembre
+Variación Egreso	FRESA	2026	50	-0.031977307707264896	diciembre
+Variación Egreso	FRESA	2026	51	-0.031977307707264896	diciembre
+Variación Egreso	FRESA	2026	52	-0.031977307707264896	diciembre
+Variación Egreso	FRESA	2027	1	-0.031977307707264896	diciembre
+Variación Egreso	FRESA	2027	2	-0.031977307707264896	enero
+Variación Egreso	FRESA	2027	3	-0.031977307707264896	enero
+Variación Egreso	FRESA	2027	4	-0.031977307707264896	enero
+Variación Egreso	FRESA	2027	5	-0.031977307707264896	enero
+Variación Egreso	FRESA	2027	6	-0.031977307707264896	enero
+Variación Egreso	FRESA	2027	7	-0.031977307707264896	febrero
+Variación Egreso	FRESA	2027	8	-0.031977307707264896	febrero
+Variación Egreso	FRESA	2027	9	-0.031977307707264896	febrero
+Variación Egreso	FRESA	2027	10	-0.031977307707264896	febrero
+Variación Egreso	FRESA	2027	11	-0.031977307707264896	marzo
+Variación Egreso	FRESA	2027	12	-0.031977307707264896	marzo
+Variación Egreso	FRESA	2027	13	-0.031977307707264896	marzo
+Variación Egreso	FRESA	2027	14	-0.031977307707264896	marzo
+Variación Egreso	FRESA	2027	15	-0.031977307707264896	abril
+Variación Egreso	FRESA	2027	16	-0.031977307707264896	abril
+Variación Egreso	FRESA	2027	17	-0.031977307707264896	abril
+Variación Egreso	FRESA	2027	18	-0.031977307707264896	abril
+Variación Egreso	FRESA	2027	19	-0.031977307707264896	mayo
+Variación Egreso	FRESA	2027	20	-0.031977307707264896	mayo
+Variación Egreso	FRESA	2027	21	-0.031977307707264896	mayo
+Variación Egreso	FRESA	2027	22	-0.031977307707264896	mayo
+Variación Egreso	FRESA	2027	23	-0.031977307707264896	mayo
+Variación Egreso	FRESA	2027	24	-0.031977307707264896	junio
+Variación Egreso	FRESA	2027	25	-0.031977307707264896	junio
+Variación Egreso	FRESA	2027	26	-0.031977307707264896	junio
+Variación Egreso	FRESA	2027	27	-0.031977307707264896	julio
 Variación Egreso	ARANDANO	2026	27	0	junio
 Variación Egreso	ARANDANO	2026	28	-0.509370082017974	julio
 Variación Egreso	ARANDANO	2026	29	-0.41142778383187717	julio
@@ -3319,97 +3367,97 @@ Variación Egreso	ARANDANO	2026	38	0.00612083995367807	septiembre
 Variación Egreso	ARANDANO	2026	39	-0.08138694524170553	septiembre
 Variación Egreso	ARANDANO	2026	40	-0.014054071833955073	septiembre
 Variación Egreso	ARANDANO	2026	41	0.031498459684241864	octubre
-Variación Egreso	ARANDANO	2026	42	0.04056950073997351	octubre
-Variación Egreso	ARANDANO	2026	43	-0.01121740898840401	octubre
-Variación Egreso	ARANDANO	2026	44	-0.01121740898840401	octubre
-Variación Egreso	ARANDANO	2026	45	-0.01121740898840401	octubre
-Variación Egreso	ARANDANO	2026	46	-0.01121740898840401	noviembre
-Variación Egreso	ARANDANO	2026	47	-0.01121740898840401	noviembre
-Variación Egreso	ARANDANO	2026	48	-0.01121740898840401	noviembre
-Variación Egreso	ARANDANO	2026	49	-0.01121740898840401	noviembre
-Variación Egreso	ARANDANO	2026	50	-0.01121740898840401	diciembre
-Variación Egreso	ARANDANO	2026	51	-0.01121740898840401	diciembre
-Variación Egreso	ARANDANO	2026	52	-0.01121740898840401	diciembre
-Variación Egreso	ARANDANO	2027	1	-0.01121740898840401	diciembre
-Variación Egreso	ARANDANO	2027	2	-0.01121740898840401	enero
-Variación Egreso	ARANDANO	2027	3	-0.01121740898840401	enero
-Variación Egreso	ARANDANO	2027	4	-0.01121740898840401	enero
-Variación Egreso	ARANDANO	2027	5	-0.01121740898840401	enero
-Variación Egreso	ARANDANO	2027	6	-0.01121740898840401	enero
-Variación Egreso	ARANDANO	2027	7	-0.01121740898840401	febrero
-Variación Egreso	ARANDANO	2027	8	-0.01121740898840401	febrero
-Variación Egreso	ARANDANO	2027	9	-0.01121740898840401	febrero
-Variación Egreso	ARANDANO	2027	10	-0.01121740898840401	febrero
-Variación Egreso	ARANDANO	2027	11	-0.01121740898840401	marzo
-Variación Egreso	ARANDANO	2027	12	-0.01121740898840401	marzo
-Variación Egreso	ARANDANO	2027	13	-0.01121740898840401	marzo
-Variación Egreso	ARANDANO	2027	14	-0.01121740898840401	marzo
-Variación Egreso	ARANDANO	2027	15	-0.01121740898840401	abril
-Variación Egreso	ARANDANO	2027	16	-0.01121740898840401	abril
-Variación Egreso	ARANDANO	2027	17	-0.01121740898840401	abril
-Variación Egreso	ARANDANO	2027	18	-0.01121740898840401	abril
-Variación Egreso	ARANDANO	2027	19	-0.01121740898840401	mayo
-Variación Egreso	ARANDANO	2027	20	-0.01121740898840401	mayo
-Variación Egreso	ARANDANO	2027	21	-0.01121740898840401	mayo
-Variación Egreso	ARANDANO	2027	22	-0.01121740898840401	mayo
-Variación Egreso	ARANDANO	2027	23	-0.01121740898840401	mayo
-Variación Egreso	ARANDANO	2027	24	-0.01121740898840401	junio
-Variación Egreso	ARANDANO	2027	25	-0.01121740898840401	junio
-Variación Egreso	ARANDANO	2027	26	-0.01121740898840401	junio
-Variación Egreso	ARANDANO	2027	27	-0.01121740898840401	junio
+Variación Egreso	ARANDANO	2026	42	-0.05981053567164288	octubre
+Variación Egreso	ARANDANO	2026	43	-0.05981053567164288	octubre
+Variación Egreso	ARANDANO	2026	44	-0.05981053567164288	octubre
+Variación Egreso	ARANDANO	2026	45	-0.05981053567164288	octubre
+Variación Egreso	ARANDANO	2026	46	-0.05981053567164288	noviembre
+Variación Egreso	ARANDANO	2026	47	-0.05981053567164288	noviembre
+Variación Egreso	ARANDANO	2026	48	-0.05981053567164288	noviembre
+Variación Egreso	ARANDANO	2026	49	-0.05981053567164288	noviembre
+Variación Egreso	ARANDANO	2026	50	-0.05981053567164288	diciembre
+Variación Egreso	ARANDANO	2026	51	-0.05981053567164288	diciembre
+Variación Egreso	ARANDANO	2026	52	-0.05981053567164288	diciembre
+Variación Egreso	ARANDANO	2027	1	-0.05981053567164288	diciembre
+Variación Egreso	ARANDANO	2027	2	-0.05981053567164288	enero
+Variación Egreso	ARANDANO	2027	3	-0.05981053567164288	enero
+Variación Egreso	ARANDANO	2027	4	-0.05981053567164288	enero
+Variación Egreso	ARANDANO	2027	5	-0.05981053567164288	enero
+Variación Egreso	ARANDANO	2027	6	-0.05981053567164288	enero
+Variación Egreso	ARANDANO	2027	7	-0.05981053567164288	febrero
+Variación Egreso	ARANDANO	2027	8	-0.05981053567164288	febrero
+Variación Egreso	ARANDANO	2027	9	-0.05981053567164288	febrero
+Variación Egreso	ARANDANO	2027	10	-0.05981053567164288	febrero
+Variación Egreso	ARANDANO	2027	11	-0.05981053567164288	marzo
+Variación Egreso	ARANDANO	2027	12	-0.05981053567164288	marzo
+Variación Egreso	ARANDANO	2027	13	-0.05981053567164288	marzo
+Variación Egreso	ARANDANO	2027	14	-0.05981053567164288	marzo
+Variación Egreso	ARANDANO	2027	15	-0.05981053567164288	abril
+Variación Egreso	ARANDANO	2027	16	-0.05981053567164288	abril
+Variación Egreso	ARANDANO	2027	17	-0.05981053567164288	abril
+Variación Egreso	ARANDANO	2027	18	-0.05981053567164288	abril
+Variación Egreso	ARANDANO	2027	19	-0.05981053567164288	mayo
+Variación Egreso	ARANDANO	2027	20	-0.05981053567164288	mayo
+Variación Egreso	ARANDANO	2027	21	-0.05981053567164288	mayo
+Variación Egreso	ARANDANO	2027	22	-0.05981053567164288	mayo
+Variación Egreso	ARANDANO	2027	23	-0.05981053567164288	mayo
+Variación Egreso	ARANDANO	2027	24	-0.05981053567164288	junio
+Variación Egreso	ARANDANO	2027	25	-0.05981053567164288	junio
+Variación Egreso	ARANDANO	2027	26	-0.05981053567164288	junio
+Variación Egreso	ARANDANO	2027	27	-0.05981053567164288	junio
 Variación Egreso	FRAMBUESA	2026	27	0	junio
-Variación Egreso	FRAMBUESA	2026	28	0.4097718746556954	julio
-Variación Egreso	FRAMBUESA	2026	29	0.43673666040038217	julio
-Variación Egreso	FRAMBUESA	2026	30	0.6372273503109022	julio
-Variación Egreso	FRAMBUESA	2026	31	0.6184361401550971	julio
-Variación Egreso	FRAMBUESA	2026	32	0.588351015349291	agosto
-Variación Egreso	FRAMBUESA	2026	33	0.675390234299625	agosto
-Variación Egreso	FRAMBUESA	2026	34	0.7236722122896498	agosto
-Variación Egreso	FRAMBUESA	2026	35	0.6677209713272295	agosto
-Variación Egreso	FRAMBUESA	2026	36	0.6758765293582657	agosto
-Variación Egreso	FRAMBUESA	2026	37	0.7396514476876143	septiembre
-Variación Egreso	FRAMBUESA	2026	38	0.7103884646819383	septiembre
-Variación Egreso	FRAMBUESA	2026	39	0.6935473933597824	septiembre
-Variación Egreso	FRAMBUESA	2026	40	0.7076818444662936	septiembre
-Variación Egreso	FRAMBUESA	2026	41	0.7068077724206565	octubre
-Variación Egreso	FRAMBUESA	2026	42	0.7259407136960687	octubre
-Variación Egreso	FRAMBUESA	2026	43	0.6904370606332927	octubre
-Variación Egreso	FRAMBUESA	2026	44	0.01	octubre
-Variación Egreso	FRAMBUESA	2026	45	0.01	octubre
-Variación Egreso	FRAMBUESA	2026	46	0.01	noviembre
-Variación Egreso	FRAMBUESA	2026	47	0.01	noviembre
-Variación Egreso	FRAMBUESA	2026	48	0.01	noviembre
-Variación Egreso	FRAMBUESA	2026	49	0.01	noviembre
-Variación Egreso	FRAMBUESA	2026	50	0.01	diciembre
-Variación Egreso	FRAMBUESA	2026	51	0.01	diciembre
-Variación Egreso	FRAMBUESA	2026	52	0.01	diciembre
-Variación Egreso	FRAMBUESA	2027	1	0.01	diciembre
-Variación Egreso	FRAMBUESA	2027	2	0.01	enero
-Variación Egreso	FRAMBUESA	2027	3	0.01	enero
-Variación Egreso	FRAMBUESA	2027	4	0.01	enero
-Variación Egreso	FRAMBUESA	2027	5	0.01	enero
-Variación Egreso	FRAMBUESA	2027	6	0.01	enero
-Variación Egreso	FRAMBUESA	2027	7	0.01	febrero
-Variación Egreso	FRAMBUESA	2027	8	0.01	febrero
-Variación Egreso	FRAMBUESA	2027	9	0.01	febrero
-Variación Egreso	FRAMBUESA	2027	10	0.01	febrero
-Variación Egreso	FRAMBUESA	2027	11	0.01	marzo
-Variación Egreso	FRAMBUESA	2027	12	0.01	marzo
-Variación Egreso	FRAMBUESA	2027	13	0.01	marzo
-Variación Egreso	FRAMBUESA	2027	14	0.01	marzo
-Variación Egreso	FRAMBUESA	2027	15	0.01	abril
-Variación Egreso	FRAMBUESA	2027	16	0.01	abril
-Variación Egreso	FRAMBUESA	2027	17	0.01	abril
-Variación Egreso	FRAMBUESA	2027	18	0.01	abril
-Variación Egreso	FRAMBUESA	2027	19	0.01	mayo
-Variación Egreso	FRAMBUESA	2027	20	0.01	mayo
-Variación Egreso	FRAMBUESA	2027	21	0.01	mayo
-Variación Egreso	FRAMBUESA	2027	22	0.01	mayo
-Variación Egreso	FRAMBUESA	2027	23	0.01	mayo
-Variación Egreso	FRAMBUESA	2027	24	0.01	junio
-Variación Egreso	FRAMBUESA	2027	25	0.01	junio
-Variación Egreso	FRAMBUESA	2027	26	0.01	junio
-Variación Egreso	FRAMBUESA	2027	27	0.01	junio
+Variación Egreso	FRAMBUESA	2026	28	0.4096940109794762	julio
+Variación Egreso	FRAMBUESA	2026	29	0.43666733200019536	julio
+Variación Egreso	FRAMBUESA	2026	30	0.6371642572423453	julio
+Variación Egreso	FRAMBUESA	2026	31	0.6183841990965508	julio
+Variación Egreso	FRAMBUESA	2026	32	0.5883032556697734	agosto
+Variación Egreso	FRAMBUESA	2026	33	0.6753461646391103	agosto
+Variación Egreso	FRAMBUESA	2026	34	0.7236308099162018	agosto
+Variación Egreso	FRAMBUESA	2026	35	0.667684850939134	agosto
+Variación Egreso	FRAMBUESA	2026	36	0.6758423605456138	agosto
+Variación Egreso	FRAMBUESA	2026	37	0.7396189341468481	septiembre
+Variación Egreso	FRAMBUESA	2026	38	0.7103579910689882	septiembre
+Variación Egreso	FRAMBUESA	2026	39	0.6935190816564629	septiembre
+Variación Egreso	FRAMBUESA	2026	40	0.7076558875295103	septiembre
+Variación Egreso	FRAMBUESA	2026	41	0.7067621950246883	octubre
+Variación Egreso	FRAMBUESA	2026	42	0.2258975896441099	octubre
+Variación Egreso	FRAMBUESA	2026	43	0.2258975896441099	octubre
+Variación Egreso	FRAMBUESA	2026	44	0.2258975896441099	octubre
+Variación Egreso	FRAMBUESA	2026	45	0.2258975896441099	octubre
+Variación Egreso	FRAMBUESA	2026	46	0.2258975896441099	noviembre
+Variación Egreso	FRAMBUESA	2026	47	0.2258975896441099	noviembre
+Variación Egreso	FRAMBUESA	2026	48	0.2258975896441099	noviembre
+Variación Egreso	FRAMBUESA	2026	49	0.2258975896441099	noviembre
+Variación Egreso	FRAMBUESA	2026	50	0.2258975896441099	diciembre
+Variación Egreso	FRAMBUESA	2026	51	0.2258975896441099	diciembre
+Variación Egreso	FRAMBUESA	2026	52	0.2258975896441099	diciembre
+Variación Egreso	FRAMBUESA	2027	1	0.2258975896441099	diciembre
+Variación Egreso	FRAMBUESA	2027	2	0.2258975896441099	enero
+Variación Egreso	FRAMBUESA	2027	3	0.2258975896441099	enero
+Variación Egreso	FRAMBUESA	2027	4	0.2258975896441099	enero
+Variación Egreso	FRAMBUESA	2027	5	0.2258975896441099	enero
+Variación Egreso	FRAMBUESA	2027	6	0.2258975896441099	enero
+Variación Egreso	FRAMBUESA	2027	7	0.2258975896441099	febrero
+Variación Egreso	FRAMBUESA	2027	8	0.2258975896441099	febrero
+Variación Egreso	FRAMBUESA	2027	9	0.2258975896441099	febrero
+Variación Egreso	FRAMBUESA	2027	10	0.2258975896441099	febrero
+Variación Egreso	FRAMBUESA	2027	11	0.2258975896441099	marzo
+Variación Egreso	FRAMBUESA	2027	12	0.2258975896441099	marzo
+Variación Egreso	FRAMBUESA	2027	13	0.2258975896441099	marzo
+Variación Egreso	FRAMBUESA	2027	14	0.2258975896441099	marzo
+Variación Egreso	FRAMBUESA	2027	15	0.2258975896441099	abril
+Variación Egreso	FRAMBUESA	2027	16	0.2258975896441099	abril
+Variación Egreso	FRAMBUESA	2027	17	0.2258975896441099	abril
+Variación Egreso	FRAMBUESA	2027	18	0.2258975896441099	abril
+Variación Egreso	FRAMBUESA	2027	19	0.2258975896441099	mayo
+Variación Egreso	FRAMBUESA	2027	20	0.2258975896441099	mayo
+Variación Egreso	FRAMBUESA	2027	21	0.2258975896441099	mayo
+Variación Egreso	FRAMBUESA	2027	22	0.2258975896441099	mayo
+Variación Egreso	FRAMBUESA	2027	23	0.2258975896441099	mayo
+Variación Egreso	FRAMBUESA	2027	24	0.2258975896441099	junio
+Variación Egreso	FRAMBUESA	2027	25	0.2258975896441099	junio
+Variación Egreso	FRAMBUESA	2027	26	0.2258975896441099	junio
+Variación Egreso	FRAMBUESA	2027	27	0.2258975896441099	junio
 Variación Egreso	ZARZAMORA	2026	27	0	junio
 Variación Egreso	ZARZAMORA	2026	28	0.4852454294065137	julio
 Variación Egreso	ZARZAMORA	2026	29	0.5742853903024489	julio
@@ -3423,46 +3471,46 @@ Variación Egreso	ZARZAMORA	2026	36	0.5718485517389156	agosto
 Variación Egreso	ZARZAMORA	2026	37	0.624188198182701	septiembre
 Variación Egreso	ZARZAMORA	2026	38	0.6053620655663673	septiembre
 Variación Egreso	ZARZAMORA	2026	39	0.5361119402276548	septiembre
-Variación Egreso	ZARZAMORA	2026	40	0.5595720041842993	septiembre
-Variación Egreso	ZARZAMORA	2026	41	0.5836298735532708	octubre
-Variación Egreso	ZARZAMORA	2026	42	0.6619410803989219	octubre
-Variación Egreso	ZARZAMORA	2026	43	0.5852432445129884	octubre
-Variación Egreso	ZARZAMORA	2026	44	0.02	octubre
-Variación Egreso	ZARZAMORA	2026	45	0.02	octubre
-Variación Egreso	ZARZAMORA	2026	46	0.02	noviembre
-Variación Egreso	ZARZAMORA	2026	47	0.02	noviembre
-Variación Egreso	ZARZAMORA	2026	48	0.02	noviembre
-Variación Egreso	ZARZAMORA	2026	49	0.02	noviembre
-Variación Egreso	ZARZAMORA	2026	50	0.02	diciembre
-Variación Egreso	ZARZAMORA	2026	51	0.02	diciembre
-Variación Egreso	ZARZAMORA	2026	52	0.02	diciembre
-Variación Egreso	ZARZAMORA	2027	1	0.02	diciembre
-Variación Egreso	ZARZAMORA	2027	2	0.02	enero
-Variación Egreso	ZARZAMORA	2027	3	0.02	enero
-Variación Egreso	ZARZAMORA	2027	4	0.02	enero
-Variación Egreso	ZARZAMORA	2027	5	0.02	enero
-Variación Egreso	ZARZAMORA	2027	6	0.02	enero
-Variación Egreso	ZARZAMORA	2027	7	0.02	febrero
-Variación Egreso	ZARZAMORA	2027	8	0.02	febrero
-Variación Egreso	ZARZAMORA	2027	9	0.02	febrero
-Variación Egreso	ZARZAMORA	2027	10	0.02	febrero
-Variación Egreso	ZARZAMORA	2027	11	0.02	marzo
-Variación Egreso	ZARZAMORA	2027	12	0.02	marzo
-Variación Egreso	ZARZAMORA	2027	13	0.02	marzo
-Variación Egreso	ZARZAMORA	2027	14	0.02	marzo
-Variación Egreso	ZARZAMORA	2027	15	0.02	abril
-Variación Egreso	ZARZAMORA	2027	16	0.02	abril
-Variación Egreso	ZARZAMORA	2027	17	0.02	abril
-Variación Egreso	ZARZAMORA	2027	18	0.02	abril
-Variación Egreso	ZARZAMORA	2027	19	0.02	mayo
-Variación Egreso	ZARZAMORA	2027	20	0.02	mayo
-Variación Egreso	ZARZAMORA	2027	21	0.02	mayo
-Variación Egreso	ZARZAMORA	2027	22	0.02	mayo
-Variación Egreso	ZARZAMORA	2027	23	0.02	mayo
-Variación Egreso	ZARZAMORA	2027	24	0.02	junio
-Variación Egreso	ZARZAMORA	2027	25	0.02	junio
-Variación Egreso	ZARZAMORA	2027	26	0.02	junio
-Variación Egreso	ZARZAMORA	2027	27	0.02	junio
+Variación Egreso	ZARZAMORA	2026	40	0.559330186821966	septiembre
+Variación Egreso	ZARZAMORA	2026	41	0.5833943121028677	octubre
+Variación Egreso	ZARZAMORA	2026	42	0.15869635971418294	octubre
+Variación Egreso	ZARZAMORA	2026	43	0.15869635971418294	octubre
+Variación Egreso	ZARZAMORA	2026	44	0.15869635971418294	octubre
+Variación Egreso	ZARZAMORA	2026	45	0.15869635971418294	octubre
+Variación Egreso	ZARZAMORA	2026	46	0.15869635971418294	noviembre
+Variación Egreso	ZARZAMORA	2026	47	0.15869635971418294	noviembre
+Variación Egreso	ZARZAMORA	2026	48	0.15869635971418294	noviembre
+Variación Egreso	ZARZAMORA	2026	49	0.15869635971418294	noviembre
+Variación Egreso	ZARZAMORA	2026	50	0.15869635971418294	diciembre
+Variación Egreso	ZARZAMORA	2026	51	0.15869635971418294	diciembre
+Variación Egreso	ZARZAMORA	2026	52	0.15869635971418294	diciembre
+Variación Egreso	ZARZAMORA	2027	1	0.15869635971418294	diciembre
+Variación Egreso	ZARZAMORA	2027	2	0.15869635971418294	enero
+Variación Egreso	ZARZAMORA	2027	3	0.15869635971418294	enero
+Variación Egreso	ZARZAMORA	2027	4	0.15869635971418294	enero
+Variación Egreso	ZARZAMORA	2027	5	0.15869635971418294	enero
+Variación Egreso	ZARZAMORA	2027	6	0.15869635971418294	enero
+Variación Egreso	ZARZAMORA	2027	7	0.15869635971418294	febrero
+Variación Egreso	ZARZAMORA	2027	8	0.15869635971418294	febrero
+Variación Egreso	ZARZAMORA	2027	9	0.15869635971418294	febrero
+Variación Egreso	ZARZAMORA	2027	10	0.15869635971418294	febrero
+Variación Egreso	ZARZAMORA	2027	11	0.15869635971418294	marzo
+Variación Egreso	ZARZAMORA	2027	12	0.15869635971418294	marzo
+Variación Egreso	ZARZAMORA	2027	13	0.15869635971418294	marzo
+Variación Egreso	ZARZAMORA	2027	14	0.15869635971418294	marzo
+Variación Egreso	ZARZAMORA	2027	15	0.15869635971418294	abril
+Variación Egreso	ZARZAMORA	2027	16	0.15869635971418294	abril
+Variación Egreso	ZARZAMORA	2027	17	0.15869635971418294	abril
+Variación Egreso	ZARZAMORA	2027	18	0.15869635971418294	abril
+Variación Egreso	ZARZAMORA	2027	19	0.15869635971418294	mayo
+Variación Egreso	ZARZAMORA	2027	20	0.15869635971418294	mayo
+Variación Egreso	ZARZAMORA	2027	21	0.15869635971418294	mayo
+Variación Egreso	ZARZAMORA	2027	22	0.15869635971418294	mayo
+Variación Egreso	ZARZAMORA	2027	23	0.15869635971418294	mayo
+Variación Egreso	ZARZAMORA	2027	24	0.15869635971418294	junio
+Variación Egreso	ZARZAMORA	2027	25	0.15869635971418294	junio
+Variación Egreso	ZARZAMORA	2027	26	0.15869635971418294	junio
+Variación Egreso	ZARZAMORA	2027	27	0.15869635971418294	junio
 Variación Egreso	AGUACATE	2026	27	0	junio
 Variación Egreso	AGUACATE	2026	28	-0.014353392081401184	julio
 Variación Egreso	AGUACATE	2026	29	-0.016808911057559217	julio
@@ -3472,50 +3520,50 @@ Variación Egreso	AGUACATE	2026	32	0.013267245690368634	agosto
 Variación Egreso	AGUACATE	2026	33	0.02446710708956057	agosto
 Variación Egreso	AGUACATE	2026	34	0.0030967559127451083	agosto
 Variación Egreso	AGUACATE	2026	35	0.02399937615263248	agosto
-Variación Egreso	AGUACATE	2026	36	0.030618863212199976	agosto
-Variación Egreso	AGUACATE	2026	37	0.03896554076412406	septiembre
-Variación Egreso	AGUACATE	2026	38	0.022340186863449962	septiembre
-Variación Egreso	AGUACATE	2026	39	0.007176787119197003	septiembre
-Variación Egreso	AGUACATE	2026	40	-0.010965059171605396	septiembre
-Variación Egreso	AGUACATE	2026	41	-0.004875741761035557	octubre
-Variación Egreso	AGUACATE	2026	42	-0.024422974928436425	octubre
-Variación Egreso	AGUACATE	2026	43	-0.04063461667298596	octubre
-Variación Egreso	AGUACATE	2026	44	-0.04063461667298596	octubre
-Variación Egreso	AGUACATE	2026	45	-0.04063461667298596	octubre
-Variación Egreso	AGUACATE	2026	46	-0.04063461667298596	noviembre
-Variación Egreso	AGUACATE	2026	47	-0.04063461667298596	noviembre
-Variación Egreso	AGUACATE	2026	48	-0.04063461667298596	noviembre
-Variación Egreso	AGUACATE	2026	49	-0.04063461667298596	noviembre
-Variación Egreso	AGUACATE	2026	50	-0.04063461667298596	diciembre
-Variación Egreso	AGUACATE	2026	51	-0.04063461667298596	diciembre
-Variación Egreso	AGUACATE	2026	52	-0.04063461667298596	diciembre
-Variación Egreso	AGUACATE	2027	1	-0.04063461667298596	diciembre
-Variación Egreso	AGUACATE	2027	2	-0.04063461667298596	enero
-Variación Egreso	AGUACATE	2027	3	-0.04063461667298596	enero
-Variación Egreso	AGUACATE	2027	4	-0.04063461667298596	enero
-Variación Egreso	AGUACATE	2027	5	-0.04063461667298596	enero
-Variación Egreso	AGUACATE	2027	6	-0.04063461667298596	enero
-Variación Egreso	AGUACATE	2027	7	-0.04063461667298596	febrero
-Variación Egreso	AGUACATE	2027	8	-0.04063461667298596	febrero
-Variación Egreso	AGUACATE	2027	9	-0.04063461667298596	febrero
-Variación Egreso	AGUACATE	2027	10	-0.04063461667298596	febrero
-Variación Egreso	AGUACATE	2027	11	-0.04063461667298596	marzo
-Variación Egreso	AGUACATE	2027	12	-0.04063461667298596	marzo
-Variación Egreso	AGUACATE	2027	13	-0.04063461667298596	marzo
-Variación Egreso	AGUACATE	2027	14	-0.04063461667298596	marzo
-Variación Egreso	AGUACATE	2027	15	-0.04063461667298596	abril
-Variación Egreso	AGUACATE	2027	16	-0.04063461667298596	abril
-Variación Egreso	AGUACATE	2027	17	-0.04063461667298596	abril
-Variación Egreso	AGUACATE	2027	18	-0.04063461667298596	abril
-Variación Egreso	AGUACATE	2027	19	-0.04063461667298596	mayo
-Variación Egreso	AGUACATE	2027	20	-0.04063461667298596	mayo
-Variación Egreso	AGUACATE	2027	21	-0.04063461667298596	mayo
-Variación Egreso	AGUACATE	2027	22	-0.04063461667298596	mayo
-Variación Egreso	AGUACATE	2027	23	-0.04063461667298596	mayo
-Variación Egreso	AGUACATE	2027	24	-0.04063461667298596	junio
-Variación Egreso	AGUACATE	2027	25	-0.04063461667298596	junio
-Variación Egreso	AGUACATE	2027	26	-0.04063461667298596	junio
-Variación Egreso	AGUACATE	2027	27	-0.04063461667298596	junio
+Variación Egreso	AGUACATE	2026	36	0.02729975037122634	agosto
+Variación Egreso	AGUACATE	2026	37	0.03571921695918112	septiembre
+Variación Egreso	AGUACATE	2026	38	0.01918831432565138	septiembre
+Variación Egreso	AGUACATE	2026	39	0.004131285770694049	septiembre
+Variación Egreso	AGUACATE	2026	40	-0.013945388444218165	septiembre
+Variación Egreso	AGUACATE	2026	41	-0.0078006875676577825	octubre
+Variación Egreso	AGUACATE	2026	42	-0.027277445627025276	octubre
+Variación Egreso	AGUACATE	2026	43	-0.027277445627025276	octubre
+Variación Egreso	AGUACATE	2026	44	-0.027277445627025276	octubre
+Variación Egreso	AGUACATE	2026	45	-0.027277445627025276	octubre
+Variación Egreso	AGUACATE	2026	46	-0.027277445627025276	noviembre
+Variación Egreso	AGUACATE	2026	47	-0.027277445627025276	noviembre
+Variación Egreso	AGUACATE	2026	48	-0.027277445627025276	noviembre
+Variación Egreso	AGUACATE	2026	49	-0.027277445627025276	noviembre
+Variación Egreso	AGUACATE	2026	50	-0.027277445627025276	diciembre
+Variación Egreso	AGUACATE	2026	51	-0.027277445627025276	diciembre
+Variación Egreso	AGUACATE	2026	52	-0.027277445627025276	diciembre
+Variación Egreso	AGUACATE	2027	1	-0.027277445627025276	diciembre
+Variación Egreso	AGUACATE	2027	2	-0.027277445627025276	enero
+Variación Egreso	AGUACATE	2027	3	-0.027277445627025276	enero
+Variación Egreso	AGUACATE	2027	4	-0.027277445627025276	enero
+Variación Egreso	AGUACATE	2027	5	-0.027277445627025276	enero
+Variación Egreso	AGUACATE	2027	6	-0.027277445627025276	enero
+Variación Egreso	AGUACATE	2027	7	-0.027277445627025276	febrero
+Variación Egreso	AGUACATE	2027	8	-0.027277445627025276	febrero
+Variación Egreso	AGUACATE	2027	9	-0.027277445627025276	febrero
+Variación Egreso	AGUACATE	2027	10	-0.027277445627025276	febrero
+Variación Egreso	AGUACATE	2027	11	-0.027277445627025276	marzo
+Variación Egreso	AGUACATE	2027	12	-0.027277445627025276	marzo
+Variación Egreso	AGUACATE	2027	13	-0.027277445627025276	marzo
+Variación Egreso	AGUACATE	2027	14	-0.027277445627025276	marzo
+Variación Egreso	AGUACATE	2027	15	-0.027277445627025276	abril
+Variación Egreso	AGUACATE	2027	16	-0.027277445627025276	abril
+Variación Egreso	AGUACATE	2027	17	-0.027277445627025276	abril
+Variación Egreso	AGUACATE	2027	18	-0.027277445627025276	abril
+Variación Egreso	AGUACATE	2027	19	-0.027277445627025276	mayo
+Variación Egreso	AGUACATE	2027	20	-0.027277445627025276	mayo
+Variación Egreso	AGUACATE	2027	21	-0.027277445627025276	mayo
+Variación Egreso	AGUACATE	2027	22	-0.027277445627025276	mayo
+Variación Egreso	AGUACATE	2027	23	-0.027277445627025276	mayo
+Variación Egreso	AGUACATE	2027	24	-0.027277445627025276	junio
+Variación Egreso	AGUACATE	2027	25	-0.027277445627025276	junio
+Variación Egreso	AGUACATE	2027	26	-0.027277445627025276	junio
+Variación Egreso	AGUACATE	2027	27	-0.027277445627025276	junio
 Variación Egreso	PAPA	2026	27	0	junio
 Variación Egreso	PAPA	2026	28	0.233003977827012	julio
 Variación Egreso	PAPA	2026	29	0.16540289644189293	julio
@@ -3530,44 +3578,44 @@ Variación Egreso	PAPA	2026	37	0.08612523512011638	septiembre
 Variación Egreso	PAPA	2026	38	-0.03151160949679649	septiembre
 Variación Egreso	PAPA	2026	39	-0.06500067972995832	septiembre
 Variación Egreso	PAPA	2026	40	-0.053494261189247105	septiembre
-Variación Egreso	PAPA	2026	41	-0.03787239269880999	octubre
-Variación Egreso	PAPA	2026	42	-0.09143798398423253	octubre
-Variación Egreso	PAPA	2026	43	-0.07444739329506406	octubre
-Variación Egreso	PAPA	2026	44	-0.07444739329506406	octubre
-Variación Egreso	PAPA	2026	45	-0.07444739329506406	octubre
-Variación Egreso	PAPA	2026	46	-0.07444739329506406	noviembre
-Variación Egreso	PAPA	2026	47	-0.07444739329506406	noviembre
-Variación Egreso	PAPA	2026	48	-0.07444739329506406	noviembre
-Variación Egreso	PAPA	2026	49	-0.07444739329506406	noviembre
-Variación Egreso	PAPA	2026	50	-0.07444739329506406	diciembre
-Variación Egreso	PAPA	2026	51	-0.07444739329506406	diciembre
-Variación Egreso	PAPA	2026	52	-0.07444739329506406	diciembre
-Variación Egreso	PAPA	2027	1	-0.07444739329506406	diciembre
-Variación Egreso	PAPA	2027	2	-0.07444739329506406	enero
-Variación Egreso	PAPA	2027	3	-0.07444739329506406	enero
-Variación Egreso	PAPA	2027	4	-0.07444739329506406	enero
-Variación Egreso	PAPA	2027	5	-0.07444739329506406	enero
-Variación Egreso	PAPA	2027	6	-0.07444739329506406	enero
-Variación Egreso	PAPA	2027	7	-0.07444739329506406	febrero
-Variación Egreso	PAPA	2027	8	-0.07444739329506406	febrero
-Variación Egreso	PAPA	2027	9	-0.07444739329506406	febrero
-Variación Egreso	PAPA	2027	10	-0.07444739329506406	febrero
-Variación Egreso	PAPA	2027	11	-0.07444739329506406	marzo
-Variación Egreso	PAPA	2027	12	-0.07444739329506406	marzo
-Variación Egreso	PAPA	2027	13	-0.07444739329506406	marzo
-Variación Egreso	PAPA	2027	14	-0.07444739329506406	marzo
-Variación Egreso	PAPA	2027	15	-0.07444739329506406	abril
-Variación Egreso	PAPA	2027	16	-0.07444739329506406	abril
-Variación Egreso	PAPA	2027	17	-0.07444739329506406	abril
-Variación Egreso	PAPA	2027	18	-0.07444739329506406	abril
-Variación Egreso	PAPA	2027	19	-0.07444739329506406	mayo
-Variación Egreso	PAPA	2027	20	-0.07444739329506406	mayo
-Variación Egreso	PAPA	2027	21	-0.07444739329506406	mayo
-Variación Egreso	PAPA	2027	22	-0.07444739329506406	mayo
-Variación Egreso	PAPA	2027	23	-0.07444739329506406	mayo
-Variación Egreso	PAPA	2027	24	-0.07444739329506406	junio
-Variación Egreso	PAPA	2027	25	-0.07444739329506406	junio
-Variación Egreso	PAPA	2027	26	-0.07444739329506406	junio
+Variación Egreso	PAPA	2026	41	-0.03787988996257269	octubre
+Variación Egreso	PAPA	2026	42	0.13909785518470424	octubre
+Variación Egreso	PAPA	2026	43	0.13909785518470424	octubre
+Variación Egreso	PAPA	2026	44	0.13909785518470424	octubre
+Variación Egreso	PAPA	2026	45	0.13909785518470424	octubre
+Variación Egreso	PAPA	2026	46	0.13909785518470424	noviembre
+Variación Egreso	PAPA	2026	47	0.13909785518470424	noviembre
+Variación Egreso	PAPA	2026	48	0.13909785518470424	noviembre
+Variación Egreso	PAPA	2026	49	0.13909785518470424	noviembre
+Variación Egreso	PAPA	2026	50	0.13909785518470424	diciembre
+Variación Egreso	PAPA	2026	51	0.13909785518470424	diciembre
+Variación Egreso	PAPA	2026	52	0.13909785518470424	diciembre
+Variación Egreso	PAPA	2027	1	0.13909785518470424	diciembre
+Variación Egreso	PAPA	2027	2	0.13909785518470424	enero
+Variación Egreso	PAPA	2027	3	0.13909785518470424	enero
+Variación Egreso	PAPA	2027	4	0.13909785518470424	enero
+Variación Egreso	PAPA	2027	5	0.13909785518470424	enero
+Variación Egreso	PAPA	2027	6	0.13909785518470424	enero
+Variación Egreso	PAPA	2027	7	0.13909785518470424	febrero
+Variación Egreso	PAPA	2027	8	0.13909785518470424	febrero
+Variación Egreso	PAPA	2027	9	0.13909785518470424	febrero
+Variación Egreso	PAPA	2027	10	0.13909785518470424	febrero
+Variación Egreso	PAPA	2027	11	0.13909785518470424	marzo
+Variación Egreso	PAPA	2027	12	0.13909785518470424	marzo
+Variación Egreso	PAPA	2027	13	0.13909785518470424	marzo
+Variación Egreso	PAPA	2027	14	0.13909785518470424	marzo
+Variación Egreso	PAPA	2027	15	0.13909785518470424	abril
+Variación Egreso	PAPA	2027	16	0.13909785518470424	abril
+Variación Egreso	PAPA	2027	17	0.13909785518470424	abril
+Variación Egreso	PAPA	2027	18	0.13909785518470424	abril
+Variación Egreso	PAPA	2027	19	0.13909785518470424	mayo
+Variación Egreso	PAPA	2027	20	0.13909785518470424	mayo
+Variación Egreso	PAPA	2027	21	0.13909785518470424	mayo
+Variación Egreso	PAPA	2027	22	0.13909785518470424	mayo
+Variación Egreso	PAPA	2027	23	0.13909785518470424	mayo
+Variación Egreso	PAPA	2027	24	0.13909785518470424	junio
+Variación Egreso	PAPA	2027	25	0.13909785518470424	junio
+Variación Egreso	PAPA	2027	26	0.13909785518470424	junio
 Variación Egreso	ESPARRAGO	2026	27	0	junio
 Variación Egreso	ESPARRAGO	2026	28	0.0481784840426992	junio
 Variación Egreso	ESPARRAGO	2026	29	0.04700723126976014	julio
@@ -3581,46 +3629,46 @@ Variación Egreso	ESPARRAGO	2026	36	0.10934137739546024	agosto
 Variación Egreso	ESPARRAGO	2026	37	0.12509009128444837	agosto
 Variación Egreso	ESPARRAGO	2026	38	0.09313056437834788	septiembre
 Variación Egreso	ESPARRAGO	2026	39	0.07118359608582409	septiembre
-Variación Egreso	ESPARRAGO	2026	40	0.08011374571773267	septiembre
-Variación Egreso	ESPARRAGO	2026	41	0.09800098907934879	septiembre
-Variación Egreso	ESPARRAGO	2026	42	0.0759016718397732	octubre
-Variación Egreso	ESPARRAGO	2026	43	0.05870972388096041	octubre
-Variación Egreso	ESPARRAGO	2026	44	0.03	octubre
-Variación Egreso	ESPARRAGO	2026	45	0.03	octubre
-Variación Egreso	ESPARRAGO	2026	46	0.03	octubre
-Variación Egreso	ESPARRAGO	2026	47	0.03	noviembre
-Variación Egreso	ESPARRAGO	2026	48	0.03	noviembre
-Variación Egreso	ESPARRAGO	2026	49	0.03	noviembre
-Variación Egreso	ESPARRAGO	2026	50	0.03	noviembre
-Variación Egreso	ESPARRAGO	2026	51	0.03	diciembre
-Variación Egreso	ESPARRAGO	2026	52	0.03	diciembre
-Variación Egreso	ESPARRAGO	2027	1	0.03	diciembre
-Variación Egreso	ESPARRAGO	2027	2	0.03	diciembre
-Variación Egreso	ESPARRAGO	2027	3	0.03	enero
-Variación Egreso	ESPARRAGO	2027	4	0.03	enero
-Variación Egreso	ESPARRAGO	2027	5	0.03	enero
-Variación Egreso	ESPARRAGO	2027	6	0.03	enero
-Variación Egreso	ESPARRAGO	2027	7	0.03	enero
-Variación Egreso	ESPARRAGO	2027	8	0.03	febrero
-Variación Egreso	ESPARRAGO	2027	9	0.03	febrero
-Variación Egreso	ESPARRAGO	2027	10	0.03	febrero
-Variación Egreso	ESPARRAGO	2027	11	0.03	febrero
-Variación Egreso	ESPARRAGO	2027	12	0.03	marzo
-Variación Egreso	ESPARRAGO	2027	13	0.03	marzo
-Variación Egreso	ESPARRAGO	2027	14	0.03	marzo
-Variación Egreso	ESPARRAGO	2027	15	0.03	marzo
-Variación Egreso	ESPARRAGO	2027	16	0.03	abril
-Variación Egreso	ESPARRAGO	2027	17	0.03	abril
-Variación Egreso	ESPARRAGO	2027	18	0.03	abril
-Variación Egreso	ESPARRAGO	2027	19	0.03	abril
-Variación Egreso	ESPARRAGO	2027	20	0.03	mayo
-Variación Egreso	ESPARRAGO	2027	21	0.03	mayo
-Variación Egreso	ESPARRAGO	2027	22	0.03	mayo
-Variación Egreso	ESPARRAGO	2027	23	0.03	mayo
-Variación Egreso	ESPARRAGO	2027	24	0.03	mayo
-Variación Egreso	ESPARRAGO	2027	25	0.03	junio
-Variación Egreso	ESPARRAGO	2027	26	0.03	junio
-Variación Egreso	ESPARRAGO	2027	27	0.03	junio
+Variación Egreso	ESPARRAGO	2026	40	0.0800240948590989	septiembre
+Variación Egreso	ESPARRAGO	2026	41	0.09760618297800233	septiembre
+Variación Egreso	ESPARRAGO	2026	42	-0.17489597813580227	octubre
+Variación Egreso	ESPARRAGO	2026	43	-0.17489597813580227	octubre
+Variación Egreso	ESPARRAGO	2026	44	-0.17489597813580227	octubre
+Variación Egreso	ESPARRAGO	2026	45	-0.17489597813580227	octubre
+Variación Egreso	ESPARRAGO	2026	46	-0.17489597813580227	octubre
+Variación Egreso	ESPARRAGO	2026	47	-0.17489597813580227	noviembre
+Variación Egreso	ESPARRAGO	2026	48	-0.17489597813580227	noviembre
+Variación Egreso	ESPARRAGO	2026	49	-0.17489597813580227	noviembre
+Variación Egreso	ESPARRAGO	2026	50	-0.17489597813580227	noviembre
+Variación Egreso	ESPARRAGO	2026	51	-0.17489597813580227	diciembre
+Variación Egreso	ESPARRAGO	2026	52	-0.17489597813580227	diciembre
+Variación Egreso	ESPARRAGO	2027	1	-0.17489597813580227	diciembre
+Variación Egreso	ESPARRAGO	2027	2	-0.17489597813580227	diciembre
+Variación Egreso	ESPARRAGO	2027	3	-0.17489597813580227	enero
+Variación Egreso	ESPARRAGO	2027	4	-0.17489597813580227	enero
+Variación Egreso	ESPARRAGO	2027	5	-0.17489597813580227	enero
+Variación Egreso	ESPARRAGO	2027	6	-0.17489597813580227	enero
+Variación Egreso	ESPARRAGO	2027	7	-0.17489597813580227	enero
+Variación Egreso	ESPARRAGO	2027	8	-0.17489597813580227	febrero
+Variación Egreso	ESPARRAGO	2027	9	-0.17489597813580227	febrero
+Variación Egreso	ESPARRAGO	2027	10	-0.17489597813580227	febrero
+Variación Egreso	ESPARRAGO	2027	11	-0.17489597813580227	febrero
+Variación Egreso	ESPARRAGO	2027	12	-0.17489597813580227	marzo
+Variación Egreso	ESPARRAGO	2027	13	-0.17489597813580227	marzo
+Variación Egreso	ESPARRAGO	2027	14	-0.17489597813580227	marzo
+Variación Egreso	ESPARRAGO	2027	15	-0.17489597813580227	marzo
+Variación Egreso	ESPARRAGO	2027	16	-0.17489597813580227	abril
+Variación Egreso	ESPARRAGO	2027	17	-0.17489597813580227	abril
+Variación Egreso	ESPARRAGO	2027	18	-0.17489597813580227	abril
+Variación Egreso	ESPARRAGO	2027	19	-0.17489597813580227	abril
+Variación Egreso	ESPARRAGO	2027	20	-0.17489597813580227	mayo
+Variación Egreso	ESPARRAGO	2027	21	-0.17489597813580227	mayo
+Variación Egreso	ESPARRAGO	2027	22	-0.17489597813580227	mayo
+Variación Egreso	ESPARRAGO	2027	23	-0.17489597813580227	mayo
+Variación Egreso	ESPARRAGO	2027	24	-0.17489597813580227	mayo
+Variación Egreso	ESPARRAGO	2027	25	-0.17489597813580227	junio
+Variación Egreso	ESPARRAGO	2027	26	-0.17489597813580227	junio
+Variación Egreso	ESPARRAGO	2027	27	-0.17489597813580227	junio
 Variación Egreso	EMPAQUE	2026	27	0	junio
 Variación Egreso	EMPAQUE	2026	28	-0.8910437932762769	junio
 Variación Egreso	EMPAQUE	2026	29	-0.8868606791389788	julio
@@ -3631,49 +3679,49 @@ Variación Egreso	EMPAQUE	2026	33	-0.8309165401179112	agosto
 Variación Egreso	EMPAQUE	2026	34	-0.6600093591027887	agosto
 Variación Egreso	EMPAQUE	2026	35	-0.6113585402708568	agosto
 Variación Egreso	EMPAQUE	2026	36	-0.5747350161496783	agosto
-Variación Egreso	EMPAQUE	2026	37	-0.5841904286686328	agosto
-Variación Egreso	EMPAQUE	2026	38	-0.558892516653033	septiembre
-Variación Egreso	EMPAQUE	2026	39	-0.5099834467035043	septiembre
-Variación Egreso	EMPAQUE	2026	40	0.36988899136408226	septiembre
-Variación Egreso	EMPAQUE	2026	41	0.536446064633097	septiembre
-Variación Egreso	EMPAQUE	2026	42	0.41646507931004073	octubre
-Variación Egreso	EMPAQUE	2026	43	0.3965723311836977	octubre
-Variación Egreso	EMPAQUE	2026	44	0.11	octubre
-Variación Egreso	EMPAQUE	2026	45	0.11	octubre
-Variación Egreso	EMPAQUE	2026	46	0.11	octubre
-Variación Egreso	EMPAQUE	2026	47	0.11	noviembre
-Variación Egreso	EMPAQUE	2026	48	0.11	noviembre
-Variación Egreso	EMPAQUE	2026	49	0.11	noviembre
-Variación Egreso	EMPAQUE	2026	50	0.11	noviembre
-Variación Egreso	EMPAQUE	2026	51	0.11	diciembre
-Variación Egreso	EMPAQUE	2026	52	0.11	diciembre
-Variación Egreso	EMPAQUE	2027	1	0.11	diciembre
-Variación Egreso	EMPAQUE	2027	2	0.11	diciembre
-Variación Egreso	EMPAQUE	2027	3	0.11	enero
-Variación Egreso	EMPAQUE	2027	4	0.11	enero
-Variación Egreso	EMPAQUE	2027	5	0.11	enero
-Variación Egreso	EMPAQUE	2027	6	0.11	enero
-Variación Egreso	EMPAQUE	2027	7	0.11	enero
-Variación Egreso	EMPAQUE	2027	8	0.11	febrero
-Variación Egreso	EMPAQUE	2027	9	0.11	febrero
-Variación Egreso	EMPAQUE	2027	10	0.11	febrero
-Variación Egreso	EMPAQUE	2027	11	0.11	febrero
-Variación Egreso	EMPAQUE	2027	12	0.11	marzo
-Variación Egreso	EMPAQUE	2027	13	0.11	marzo
-Variación Egreso	EMPAQUE	2027	14	0.11	marzo
-Variación Egreso	EMPAQUE	2027	15	0.11	marzo
-Variación Egreso	EMPAQUE	2027	16	0.11	abril
-Variación Egreso	EMPAQUE	2027	17	0.11	abril
-Variación Egreso	EMPAQUE	2027	18	0.11	abril
-Variación Egreso	EMPAQUE	2027	19	0.11	abril
-Variación Egreso	EMPAQUE	2027	20	0.11	mayo
-Variación Egreso	EMPAQUE	2027	21	0.11	mayo
-Variación Egreso	EMPAQUE	2027	22	0.11	mayo
-Variación Egreso	EMPAQUE	2027	23	0.11	mayo
-Variación Egreso	EMPAQUE	2027	24	0.11	mayo
-Variación Egreso	EMPAQUE	2027	25	0.11	junio
-Variación Egreso	EMPAQUE	2027	26	0.11	junio
-Variación Egreso	EMPAQUE	2027	27	0.11	junio`
+Variación Egreso	EMPAQUE	2026	37	-0.5829857148893429	agosto
+Variación Egreso	EMPAQUE	2026	38	-0.5577880131982476	septiembre
+Variación Egreso	EMPAQUE	2026	39	-0.5089403056597925	septiembre
+Variación Egreso	EMPAQUE	2026	40	0.3708765775948506	septiembre
+Variación Egreso	EMPAQUE	2026	41	0.5372085009958775	septiembre
+Variación Egreso	EMPAQUE	2026	42	0.16510231766007932	octubre
+Variación Egreso	EMPAQUE	2026	43	0.16510231766007932	octubre
+Variación Egreso	EMPAQUE	2026	44	0.16510231766007932	octubre
+Variación Egreso	EMPAQUE	2026	45	0.16510231766007932	octubre
+Variación Egreso	EMPAQUE	2026	46	0.16510231766007932	octubre
+Variación Egreso	EMPAQUE	2026	47	0.16510231766007932	noviembre
+Variación Egreso	EMPAQUE	2026	48	0.16510231766007932	noviembre
+Variación Egreso	EMPAQUE	2026	49	0.16510231766007932	noviembre
+Variación Egreso	EMPAQUE	2026	50	0.16510231766007932	noviembre
+Variación Egreso	EMPAQUE	2026	51	0.16510231766007932	diciembre
+Variación Egreso	EMPAQUE	2026	52	0.16510231766007932	diciembre
+Variación Egreso	EMPAQUE	2027	1	0.16510231766007932	diciembre
+Variación Egreso	EMPAQUE	2027	2	0.16510231766007932	diciembre
+Variación Egreso	EMPAQUE	2027	3	0.16510231766007932	enero
+Variación Egreso	EMPAQUE	2027	4	0.16510231766007932	enero
+Variación Egreso	EMPAQUE	2027	5	0.16510231766007932	enero
+Variación Egreso	EMPAQUE	2027	6	0.16510231766007932	enero
+Variación Egreso	EMPAQUE	2027	7	0.16510231766007932	enero
+Variación Egreso	EMPAQUE	2027	8	0.16510231766007932	febrero
+Variación Egreso	EMPAQUE	2027	9	0.16510231766007932	febrero
+Variación Egreso	EMPAQUE	2027	10	0.16510231766007932	febrero
+Variación Egreso	EMPAQUE	2027	11	0.16510231766007932	febrero
+Variación Egreso	EMPAQUE	2027	12	0.16510231766007932	marzo
+Variación Egreso	EMPAQUE	2027	13	0.16510231766007932	marzo
+Variación Egreso	EMPAQUE	2027	14	0.16510231766007932	marzo
+Variación Egreso	EMPAQUE	2027	15	0.16510231766007932	marzo
+Variación Egreso	EMPAQUE	2027	16	0.16510231766007932	abril
+Variación Egreso	EMPAQUE	2027	17	0.16510231766007932	abril
+Variación Egreso	EMPAQUE	2027	18	0.16510231766007932	abril
+Variación Egreso	EMPAQUE	2027	19	0.16510231766007932	abril
+Variación Egreso	EMPAQUE	2027	20	0.16510231766007932	mayo
+Variación Egreso	EMPAQUE	2027	21	0.16510231766007932	mayo
+Variación Egreso	EMPAQUE	2027	22	0.16510231766007932	mayo
+Variación Egreso	EMPAQUE	2027	23	0.16510231766007932	mayo
+Variación Egreso	EMPAQUE	2027	24	0.16510231766007932	mayo
+Variación Egreso	EMPAQUE	2027	25	0.16510231766007932	junio
+Variación Egreso	EMPAQUE	2027	26	0.16510231766007932	junio
+Variación Egreso	EMPAQUE	2027	27	0.16510231766007932	junio`
  },
  ingreso: {
   real: ``,
@@ -3694,11 +3742,11 @@ Real	FRESA	2026	35	0	Agosto
 Real	FRESA	2026	36	0	Septiembre
 Real	FRESA	2026	37	980.84	Septiembre
 Real	FRESA	2026	38	0	Septiembre
-Real	FRESA	2026	39	84042.08	Septiembre
-Real	FRESA	2026	40	278310.37	Octubre
-Real	FRESA	2026	41	450659	Octubre
-Real	FRESA	2026	42	454621.32999999996	Octubre
-Real	FRESA	2026	43	526206.31	Octubre
+Real	FRESA	2026	39	85523.15	Septiembre
+Real	FRESA	2026	40	290571.08	Octubre
+Real	FRESA	2026	41	465363.67999999993	Octubre
+Real	FRESA	2026	42	477672.07000000007	Octubre
+Real	FRESA	2026	43	0	Octubre
 Real	FRESA	2026	44	0	Octubre
 Real	FRESA	2026	45	0	Noviembre
 Real	FRESA	2026	46	0	Noviembre
@@ -3748,11 +3796,11 @@ Real	ARANDANO	2026	35	0	Agosto
 Real	ARANDANO	2026	36	0	Septiembre
 Real	ARANDANO	2026	37	801.09	Septiembre
 Real	ARANDANO	2026	38	3369.06	Septiembre
-Real	ARANDANO	2026	39	5720.8099999999995	Septiembre
+Real	ARANDANO	2026	39	6915.209999999999	Septiembre
 Real	ARANDANO	2026	40	6348.85	Octubre
 Real	ARANDANO	2026	41	4376.59	Octubre
 Real	ARANDANO	2026	42	5374.61	Octubre
-Real	ARANDANO	2026	43	9430.140000000001	Octubre
+Real	ARANDANO	2026	43	0	Octubre
 Real	ARANDANO	2026	44	0	Octubre
 Real	ARANDANO	2026	45	0	Noviembre
 Real	ARANDANO	2026	46	0	Noviembre
@@ -3801,13 +3849,13 @@ Real	FRAMBUESA	2026	33	0	Agosto
 Real	FRAMBUESA	2026	34	0	Agosto
 Real	FRAMBUESA	2026	35	0	Agosto
 Real	FRAMBUESA	2026	36	0	Septiembre
-Real	FRAMBUESA	2026	37	8327.15	Septiembre
-Real	FRAMBUESA	2026	38	39992.06	Septiembre
-Real	FRAMBUESA	2026	39	107396.48	Septiembre
-Real	FRAMBUESA	2026	40	236536.46999999997	Octubre
-Real	FRAMBUESA	2026	41	229104.43	Octubre
-Real	FRAMBUESA	2026	42	213593.83999999997	Octubre
-Real	FRAMBUESA	2026	43	204479.91	Octubre
+Real	FRAMBUESA	2026	37	9258.14	Septiembre
+Real	FRAMBUESA	2026	38	44917.01	Septiembre
+Real	FRAMBUESA	2026	39	113124.09	Septiembre
+Real	FRAMBUESA	2026	40	252071.86999999997	Octubre
+Real	FRAMBUESA	2026	41	241881.40999999997	Octubre
+Real	FRAMBUESA	2026	42	235098.07	Octubre
+Real	FRAMBUESA	2026	43	0	Octubre
 Real	FRAMBUESA	2026	44	0	Octubre
 Real	FRAMBUESA	2026	45	0	Noviembre
 Real	FRAMBUESA	2026	46	0	Noviembre
@@ -3861,7 +3909,7 @@ Real	ZARZAMORA	2026	39	0	Septiembre
 Real	ZARZAMORA	2026	40	1938.56	Octubre
 Real	ZARZAMORA	2026	41	7775.1	Octubre
 Real	ZARZAMORA	2026	42	9699.759999999998	Octubre
-Real	ZARZAMORA	2026	43	11297.07	Octubre
+Real	ZARZAMORA	2026	43	0	Octubre
 Real	ZARZAMORA	2026	44	0	Octubre
 Real	ZARZAMORA	2026	45	0	Noviembre
 Real	ZARZAMORA	2026	46	0	Noviembre
@@ -3923,7 +3971,7 @@ Real	AGUACATE	2026	39	431365	Septiembre
 Real	AGUACATE	2026	40	314742.28	Octubre
 Real	AGUACATE	2026	41	253105	Octubre
 Real	AGUACATE	2026	42	313190	Octubre
-Real	AGUACATE	2026	43	182805.01	Octubre
+Real	AGUACATE	2026	43	0	Octubre
 Real	AGUACATE	2026	44	0	Octubre
 Real	AGUACATE	2026	45	0	Noviembre
 Real	AGUACATE	2026	46	0	Noviembre
@@ -4028,8 +4076,8 @@ Real	ESPARRAGO	2026	38	226035.59000000003	Septiembre
 Real	ESPARRAGO	2026	39	257511.56999999998	Septiembre
 Real	ESPARRAGO	2026	40	163578.55	Octubre
 Real	ESPARRAGO	2026	41	202500.72	Octubre
-Real	ESPARRAGO	2026	42	116989.87	Octubre
-Real	ESPARRAGO	2026	43	175941.85	Octubre
+Real	ESPARRAGO	2026	42	135633.43	Octubre
+Real	ESPARRAGO	2026	43	0	Octubre
 Real	ESPARRAGO	2026	44	0	Octubre
 Real	ESPARRAGO	2026	45	0	Noviembre
 Real	ESPARRAGO	2026	46	0	Noviembre
@@ -4466,29 +4514,29 @@ Proyección	FRESA	2026	35	0	Agosto
 Proyección	FRESA	2026	36	0	Septiembre
 Proyección	FRESA	2026	37	980.84	Septiembre
 Proyección	FRESA	2026	38	0	Septiembre
-Proyección	FRESA	2026	39	84042.08	Septiembre
-Proyección	FRESA	2026	40	278310.37	Octubre
-Proyección	FRESA	2026	41	450659	Octubre
-Proyección	FRESA	2026	42	454621.32999999996	Octubre
-Proyección	FRESA	2026	43	526206.31	Octubre
-Proyección	FRESA	2026	44	658261.8919534734	Octubre
-Proyección	FRESA	2026	45	675986.5444201352	Noviembre
-Proyección	FRESA	2026	46	715539.8861092797	Noviembre
-Proyección	FRESA	2026	47	730402.9761335889	Noviembre
-Proyección	FRESA	2026	48	788148.4593831113	Noviembre
-Proyección	FRESA	2026	49	912424.4489466652	Diciembre
-Proyección	FRESA	2026	50	977959.8559491505	Diciembre
-Proyección	FRESA	2026	51	1030870.1747751926	Diciembre
-Proyección	FRESA	2026	52	1108703.8624945132	Diciembre
-Proyección	FRESA	2027	1	1094465.585513658	Enero
-Proyección	FRESA	2027	2	1117390.5268203176	Enero
-Proyección	FRESA	2027	3	1125379.3202505095	Enero
-Proyección	FRESA	2027	4	1095966.63915119	Enero
-Proyección	FRESA	2027	5	1069821.7385371164	Enero
-Proyección	FRESA	2027	6	1133709.4110413773	Febrero
-Proyección	FRESA	2027	7	1125128.3262832437	Febrero
-Proyección	FRESA	2027	8	1083686.8470192417	Febrero
-Proyección	FRESA	2027	9	1037161.6961613343	Febrero
+Proyección	FRESA	2026	39	85523.15	Septiembre
+Proyección	FRESA	2026	40	290571.08	Octubre
+Proyección	FRESA	2026	41	465363.67999999993	Octubre
+Proyección	FRESA	2026	42	477672.07000000007	Octubre
+Proyección	FRESA	2026	43	596076.5370510163	Octubre
+Proyección	FRESA	2026	44	691157.134921468	Octubre
+Proyección	FRESA	2026	45	713715.8666475662	Noviembre
+Proyección	FRESA	2026	46	755476.8273878288	Noviembre
+Proyección	FRESA	2026	47	771169.4817244033	Noviembre
+Proyección	FRESA	2026	48	832137.9550802878	Noviembre
+Proyección	FRESA	2026	49	958020.9270428945	Diciembre
+Proyección	FRESA	2026	50	1026831.3271183582	Diciembre
+Proyección	FRESA	2026	51	1082385.7269926462	Diciembre
+Proyección	FRESA	2026	52	1164108.9882995002	Diciembre
+Proyección	FRESA	2027	1	1153482.4104684012	Enero
+Proyección	FRESA	2027	2	1177643.5324883703	Enero
+Proyección	FRESA	2027	3	1186063.1053141956	Enero
+Proyección	FRESA	2027	4	1155064.405362512	Enero
+Proyección	FRESA	2027	5	1127509.6942953528	Enero
+Proyección	FRESA	2027	6	1190364.1361396732	Febrero
+Proyección	FRESA	2027	7	1181354.2298570091	Febrero
+Proyección	FRESA	2027	8	1137841.8004954753	Febrero
+Proyección	FRESA	2027	9	1088991.6538261718	Febrero
 Proyección	FRESA	2027	10	0	Marzo
 Proyección	FRESA	2027	11	0	Marzo
 Proyección	FRESA	2027	12	0	Marzo
@@ -4520,29 +4568,29 @@ Proyección	ARANDANO	2026	35	0	Agosto
 Proyección	ARANDANO	2026	36	0	Septiembre
 Proyección	ARANDANO	2026	37	801.09	Septiembre
 Proyección	ARANDANO	2026	38	3369.06	Septiembre
-Proyección	ARANDANO	2026	39	5720.8099999999995	Septiembre
+Proyección	ARANDANO	2026	39	6915.209999999999	Septiembre
 Proyección	ARANDANO	2026	40	6348.85	Octubre
 Proyección	ARANDANO	2026	41	4376.59	Octubre
 Proyección	ARANDANO	2026	42	5374.61	Octubre
-Proyección	ARANDANO	2026	43	9430.140000000001	Octubre
-Proyección	ARANDANO	2026	44	23119.8	Octubre
-Proyección	ARANDANO	2026	45	27086.399999999998	Noviembre
-Proyección	ARANDANO	2026	46	37671.15	Noviembre
-Proyección	ARANDANO	2026	47	48796.274999999994	Noviembre
-Proyección	ARANDANO	2026	48	55689.975	Noviembre
-Proyección	ARANDANO	2026	49	77030.84999999999	Diciembre
-Proyección	ARANDANO	2026	50	72252.375	Diciembre
-Proyección	ARANDANO	2026	51	76002.22499999999	Diciembre
-Proyección	ARANDANO	2026	52	78019.5	Diciembre
-Proyección	ARANDANO	2027	1	87851.72499999999	Enero
-Proyección	ARANDANO	2027	2	87966.525	Enero
-Proyección	ARANDANO	2027	3	114420.74999999999	Enero
-Proyección	ARANDANO	2027	4	119296.67499999999	Enero
-Proyección	ARANDANO	2027	5	125203.74999999999	Enero
-Proyección	ARANDANO	2027	6	133310.47499999998	Febrero
-Proyección	ARANDANO	2027	7	177405.97499999998	Febrero
-Proyección	ARANDANO	2027	8	146036.875	Febrero
-Proyección	ARANDANO	2027	9	249366.09999999998	Febrero
+Proyección	ARANDANO	2026	43	6253.066416092138	Octubre
+Proyección	ARANDANO	2026	44	7807.000500960798	Octubre
+Proyección	ARANDANO	2026	45	25562.42593660951	Noviembre
+Proyección	ARANDANO	2026	46	35551.64148140422	Noviembre
+Proyección	ARANDANO	2026	47	46050.82866936656	Noviembre
+Proyección	ARANDANO	2026	48	52556.665387394976	Noviembre
+Proyección	ARANDANO	2026	49	89164.80174061192	Diciembre
+Proyección	ARANDANO	2026	50	83633.61811746002	Diciembre
+Proyección	ARANDANO	2026	51	87974.14703291446	Diciembre
+Proyección	ARANDANO	2026	52	90309.18455919507	Diciembre
+Proyección	ARANDANO	2027	1	105300.59131947077	Enero
+Proyección	ARANDANO	2027	2	105438.19257753913	Enero
+Proyección	ARANDANO	2027	3	137146.6824836659	Enero
+Proyección	ARANDANO	2027	4	142991.05020358707	Enero
+Proyección	ARANDANO	2027	5	150071.3720808008	Enero
+Proyección	ARANDANO	2027	6	114267.58234921712	Febrero
+Proyección	ARANDANO	2027	7	178026.05843940174	Febrero
+Proyección	ARANDANO	2027	8	146547.31467222344	Febrero
+Proyección	ARANDANO	2027	9	250237.7041776958	Febrero
 Proyección	ARANDANO	2027	10	0	Marzo
 Proyección	ARANDANO	2027	11	0	Marzo
 Proyección	ARANDANO	2027	12	0	Marzo
@@ -4573,31 +4621,31 @@ Proyección	FRAMBUESA	2026	33	0	Agosto
 Proyección	FRAMBUESA	2026	34	0	Agosto
 Proyección	FRAMBUESA	2026	35	0	Agosto
 Proyección	FRAMBUESA	2026	36	0	Septiembre
-Proyección	FRAMBUESA	2026	37	8327.15	Septiembre
-Proyección	FRAMBUESA	2026	38	39992.06	Septiembre
-Proyección	FRAMBUESA	2026	39	107396.48	Septiembre
-Proyección	FRAMBUESA	2026	40	236536.46999999997	Octubre
-Proyección	FRAMBUESA	2026	41	229104.43	Octubre
-Proyección	FRAMBUESA	2026	42	213593.83999999997	Octubre
-Proyección	FRAMBUESA	2026	43	204479.91	Octubre
-Proyección	FRAMBUESA	2026	44	314668.41520802706	Octubre
-Proyección	FRAMBUESA	2026	45	340598.6697659777	Noviembre
-Proyección	FRAMBUESA	2026	46	358675.2908531774	Noviembre
-Proyección	FRAMBUESA	2026	47	375824.4943131446	Noviembre
-Proyección	FRAMBUESA	2026	48	374856.42862381885	Noviembre
-Proyección	FRAMBUESA	2026	49	338405.8137846321	Diciembre
-Proyección	FRAMBUESA	2026	50	335896.3307932971	Diciembre
-Proyección	FRAMBUESA	2026	51	307920.83690054994	Diciembre
-Proyección	FRAMBUESA	2026	52	250591.02406141933	Diciembre
-Proyección	FRAMBUESA	2027	1	167496.7579702447	Enero
-Proyección	FRAMBUESA	2027	2	126550.25352637717	Enero
-Proyección	FRAMBUESA	2027	3	104393.8506280301	Enero
-Proyección	FRAMBUESA	2027	4	100520.51818488256	Enero
-Proyección	FRAMBUESA	2027	5	82304.8379378902	Enero
-Proyección	FRAMBUESA	2027	6	77557.5721597381	Febrero
-Proyección	FRAMBUESA	2027	7	92560.9858155203	Febrero
-Proyección	FRAMBUESA	2027	8	120817.80708538639	Febrero
-Proyección	FRAMBUESA	2027	9	148350.45103848618	Febrero
+Proyección	FRAMBUESA	2026	37	9258.14	Septiembre
+Proyección	FRAMBUESA	2026	38	44917.01	Septiembre
+Proyección	FRAMBUESA	2026	39	113124.09	Septiembre
+Proyección	FRAMBUESA	2026	40	252071.86999999997	Octubre
+Proyección	FRAMBUESA	2026	41	241881.40999999997	Octubre
+Proyección	FRAMBUESA	2026	42	235098.07	Octubre
+Proyección	FRAMBUESA	2026	43	292994.994327826	Octubre
+Proyección	FRAMBUESA	2026	44	359035.42650346685	Octubre
+Proyección	FRAMBUESA	2026	45	388621.74516338867	Noviembre
+Proyección	FRAMBUESA	2026	46	409247.0988630718	Noviembre
+Proyección	FRAMBUESA	2026	47	428814.2726907137	Noviembre
+Proyección	FRAMBUESA	2026	48	427709.71353939036	Noviembre
+Proyección	FRAMBUESA	2026	49	386119.7050968551	Diciembre
+Proyección	FRAMBUESA	2026	50	383256.39485486114	Diciembre
+Proyección	FRAMBUESA	2026	51	351336.46614264074	Diciembre
+Proyección	FRAMBUESA	2026	52	285923.37474465754	Diciembre
+Proyección	FRAMBUESA	2027	1	191113.1433259295	Enero
+Proyección	FRAMBUESA	2027	2	144393.3424933258	Enero
+Proyección	FRAMBUESA	2027	3	119112.97376254073	Enero
+Proyección	FRAMBUESA	2027	4	114693.5166498978	Enero
+Proyección	FRAMBUESA	2027	5	93909.49699477597	Enero
+Proyección	FRAMBUESA	2027	6	88492.88537756822	Febrero
+Proyección	FRAMBUESA	2027	7	105611.7214620558	Febrero
+Proyección	FRAMBUESA	2027	8	137852.64360720222	Febrero
+Proyección	FRAMBUESA	2027	9	169267.28227671783	Febrero
 Proyección	FRAMBUESA	2027	10	0	Marzo
 Proyección	FRAMBUESA	2027	11	0	Marzo
 Proyección	FRAMBUESA	2027	12	0	Marzo
@@ -4633,25 +4681,25 @@ Proyección	ZARZAMORA	2026	39	0	Septiembre
 Proyección	ZARZAMORA	2026	40	1938.56	Octubre
 Proyección	ZARZAMORA	2026	41	7775.1	Octubre
 Proyección	ZARZAMORA	2026	42	9699.759999999998	Octubre
-Proyección	ZARZAMORA	2026	43	11297.07	Octubre
-Proyección	ZARZAMORA	2026	44	62966.159999999996	Octubre
-Proyección	ZARZAMORA	2026	45	76253.4	Noviembre
-Proyección	ZARZAMORA	2026	46	93322.93499999998	Noviembre
-Proyección	ZARZAMORA	2026	47	101904.47999999998	Noviembre
-Proyección	ZARZAMORA	2026	48	90925.73999999999	Noviembre
-Proyección	ZARZAMORA	2026	49	86691.465	Diciembre
-Proyección	ZARZAMORA	2026	50	82892.15999999999	Diciembre
-Proyección	ZARZAMORA	2026	51	67664.56499999999	Diciembre
-Proyección	ZARZAMORA	2026	52	48166.244999999995	Diciembre
-Proyección	ZARZAMORA	2027	1	33698.024999999994	Enero
-Proyección	ZARZAMORA	2027	2	30427.244999999995	Enero
-Proyección	ZARZAMORA	2027	3	34793.954999999994	Enero
-Proyección	ZARZAMORA	2027	4	38483.909999999996	Enero
-Proyección	ZARZAMORA	2027	5	60126.704999999994	Enero
-Proyección	ZARZAMORA	2027	6	98580.23999999999	Febrero
-Proyección	ZARZAMORA	2027	7	140066.41499999998	Febrero
-Proyección	ZARZAMORA	2027	8	192652.83	Febrero
-Proyección	ZARZAMORA	2027	9	218922.34499999997	Febrero
+Proyección	ZARZAMORA	2026	43	36204.264626355725	Octubre
+Proyección	ZARZAMORA	2026	44	55055.89395217756	Octubre
+Proyección	ZARZAMORA	2026	45	66673.89442032	Noviembre
+Proyección	ZARZAMORA	2026	46	81599.03053744994	Noviembre
+Proyección	ZARZAMORA	2026	47	89102.4995669388	Noviembre
+Proyección	ZARZAMORA	2026	48	79502.98857296156	Noviembre
+Proyección	ZARZAMORA	2026	49	75800.65393219012	Diciembre
+Proyección	ZARZAMORA	2026	50	72478.64520286665	Diciembre
+Proyección	ZARZAMORA	2026	51	59164.05121354431	Diciembre
+Proyección	ZARZAMORA	2026	52	42115.25169701634	Diciembre
+Proyección	ZARZAMORA	2027	1	50265.884508406234	Enero
+Proyección	ZARZAMORA	2027	2	45387.00363237849	Enero
+Proyección	ZARZAMORA	2027	3	51900.635827194135	Enero
+Proyección	ZARZAMORA	2027	4	57404.781897215034	Enero
+Proyección	ZARZAMORA	2027	5	89688.40189895437	Enero
+Proyección	ZARZAMORA	2027	6	86195.87472414091	Febrero
+Proyección	ZARZAMORA	2027	7	122470.25530065184	Febrero
+Proyección	ZARZAMORA	2027	8	168450.38315925398	Febrero
+Proyección	ZARZAMORA	2027	9	191419.73101237282	Febrero
 Proyección	ZARZAMORA	2027	10	0	Marzo
 Proyección	ZARZAMORA	2027	11	0	Marzo
 Proyección	ZARZAMORA	2027	12	0	Marzo
@@ -4695,21 +4743,21 @@ Proyección	AGUACATE	2026	39	431365	Septiembre
 Proyección	AGUACATE	2026	40	314742.28	Octubre
 Proyección	AGUACATE	2026	41	253105	Octubre
 Proyección	AGUACATE	2026	42	313190	Octubre
-Proyección	AGUACATE	2026	43	182805.01	Octubre
-Proyección	AGUACATE	2026	44	169678.6027788798	Octubre
-Proyección	AGUACATE	2026	45	78725.63058357076	Noviembre
-Proyección	AGUACATE	2026	46	60564.231566243616	Noviembre
-Proyección	AGUACATE	2026	47	122139.31064104152	Noviembre
-Proyección	AGUACATE	2026	48	65991.7659923394	Noviembre
-Proyección	AGUACATE	2026	49	189451.46596273655	Diciembre
-Proyección	AGUACATE	2026	50	131782.1539251234	Diciembre
-Proyección	AGUACATE	2026	51	127628.84136931485	Diciembre
-Proyección	AGUACATE	2026	52	127628.84136931485	Diciembre
-Proyección	AGUACATE	2027	1	128691.1326179739	Enero
-Proyección	AGUACATE	2027	2	190195.86127895332	Enero
-Proyección	AGUACATE	2027	3	179098.5231891744	Enero
-Proyección	AGUACATE	2027	4	151897.09599617246	Enero
-Proyección	AGUACATE	2027	5	18509.193875642257	Enero
+Proyección	AGUACATE	2026	43	322643.38578139	Octubre
+Proyección	AGUACATE	2026	44	280899.51744007494	Octubre
+Proyección	AGUACATE	2026	45	130328.69954680697	Noviembre
+Proyección	AGUACATE	2026	46	100262.86840219288	Noviembre
+Proyección	AGUACATE	2026	47	202199.17454319383	Noviembre
+Proyección	AGUACATE	2026	48	109248.04258568438	Noviembre
+Proyección	AGUACATE	2026	49	313633.0951322017	Diciembre
+Proyección	AGUACATE	2026	50	218162.70784019254	Diciembre
+Proyección	AGUACATE	2026	51	211286.982359209	Diciembre
+Proyección	AGUACATE	2026	52	211286.982359209	Diciembre
+Proyección	AGUACATE	2027	1	213045.58417606866	Enero
+Proyección	AGUACATE	2027	2	314865.42662058887	Enero
+Proyección	AGUACATE	2027	3	296494.00639885024	Enero
+Proyección	AGUACATE	2027	4	251462.59025645704	Enero
+Proyección	AGUACATE	2027	5	30641.59854409089	Enero
 Proyección	AGUACATE	2027	6	0	Febrero
 Proyección	AGUACATE	2027	7	0	Febrero
 Proyección	AGUACATE	2027	8	0	Febrero
@@ -4800,25 +4848,25 @@ Proyección	ESPARRAGO	2026	38	226035.59000000003	Septiembre
 Proyección	ESPARRAGO	2026	39	257511.56999999998	Septiembre
 Proyección	ESPARRAGO	2026	40	163578.55	Octubre
 Proyección	ESPARRAGO	2026	41	202500.72	Octubre
-Proyección	ESPARRAGO	2026	42	116989.87	Octubre
-Proyección	ESPARRAGO	2026	43	175941.85	Octubre
-Proyección	ESPARRAGO	2026	44	237501.7872961218	Octubre
-Proyección	ESPARRAGO	2026	45	354342.28729612177	Noviembre
-Proyección	ESPARRAGO	2026	46	414364.8965943307	Noviembre
-Proyección	ESPARRAGO	2026	47	337940.8343910513	Noviembre
-Proyección	ESPARRAGO	2026	48	268117.9005605802	Noviembre
-Proyección	ESPARRAGO	2026	49	192083.3887854758	Diciembre
-Proyección	ESPARRAGO	2026	50	192083.3887854758	Diciembre
-Proyección	ESPARRAGO	2026	51	192083.3887854758	Diciembre
-Proyección	ESPARRAGO	2026	52	192083.3887854758	Diciembre
-Proyección	ESPARRAGO	2027	1	192083.3887854758	Enero
-Proyección	ESPARRAGO	2027	2	192083.3887854758	Enero
-Proyección	ESPARRAGO	2027	3	192083.3887854758	Enero
-Proyección	ESPARRAGO	2027	4	192083.3887854758	Enero
-Proyección	ESPARRAGO	2027	5	192083.3887854758	Enero
-Proyección	ESPARRAGO	2027	6	192083.3887854758	Febrero
-Proyección	ESPARRAGO	2027	7	181491.22605316294	Febrero
-Proyección	ESPARRAGO	2027	8	181491.22605316294	Febrero
+Proyección	ESPARRAGO	2026	42	135633.43	Octubre
+Proyección	ESPARRAGO	2026	43	239961.7703677316	Octubre
+Proyección	ESPARRAGO	2026	44	239961.7703677316	Octubre
+Proyección	ESPARRAGO	2026	45	356802.2703677316	Noviembre
+Proyección	ESPARRAGO	2026	46	417241.5801504188	Noviembre
+Proyección	ESPARRAGO	2026	47	340286.9521467143	Noviembre
+Proyección	ESPARRAGO	2026	48	269979.28013682977	Noviembre
+Proyección	ESPARRAGO	2026	49	193416.90697308863	Diciembre
+Proyección	ESPARRAGO	2026	50	193416.90697308863	Diciembre
+Proyección	ESPARRAGO	2026	51	193416.90697308863	Diciembre
+Proyección	ESPARRAGO	2026	52	193416.90697308863	Diciembre
+Proyección	ESPARRAGO	2027	1	193416.90697308863	Enero
+Proyección	ESPARRAGO	2027	2	193416.90697308863	Enero
+Proyección	ESPARRAGO	2027	3	193416.90697308863	Enero
+Proyección	ESPARRAGO	2027	4	193416.90697308863	Enero
+Proyección	ESPARRAGO	2027	5	193416.90697308863	Enero
+Proyección	ESPARRAGO	2027	6	193416.90697308863	Febrero
+Proyección	ESPARRAGO	2027	7	182751.20929463074	Febrero
+Proyección	ESPARRAGO	2027	8	182751.20929463074	Febrero
 Proyección	ESPARRAGO	2027	9	0	Febrero
 Proyección	ESPARRAGO	2027	10	0	Marzo
 Proyección	ESPARRAGO	2027	11	0	Marzo
@@ -4852,47 +4900,47 @@ Factor Producción	FRESA	2026	35	0	agosto
 Factor Producción	FRESA	2026	36	0	agosto
 Factor Producción	FRESA	2026	37	0	septiembre
 Factor Producción	FRESA	2026	38	0	septiembre
-Factor Producción	FRESA	2026	39	4.339598447977364	septiembre
-Factor Producción	FRESA	2026	40	2.1616778490306556	septiembre
-Factor Producción	FRESA	2026	41	1.4068172138605324	octubre
-Factor Producción	FRESA	2026	42	0.42518089548833604	octubre
-Factor Producción	FRESA	2026	43	-0.04442263272454254	octubre
-Factor Producción	FRESA	2026	44	-0.04442263272454254	octubre
-Factor Producción	FRESA	2026	45	-0.14442263272454253	octubre
-Factor Producción	FRESA	2026	46	-0.14442263272454253	noviembre
-Factor Producción	FRESA	2026	47	-0.14442263272454253	noviembre
-Factor Producción	FRESA	2026	48	-0.14442263272454253	noviembre
-Factor Producción	FRESA	2026	49	-0.04442263272454254	noviembre
-Factor Producción	FRESA	2026	50	-0.04442263272454254	diciembre
-Factor Producción	FRESA	2026	51	-0.04442263272454254	diciembre
-Factor Producción	FRESA	2026	52	-0.04442263272454254	diciembre
-Factor Producción	FRESA	2027	1	-0.11442263272454249	diciembre
-Factor Producción	FRESA	2027	2	-0.11442263272454249	enero
-Factor Producción	FRESA	2027	3	-0.11442263272454249	enero
-Factor Producción	FRESA	2027	4	-0.11442263272454249	enero
-Factor Producción	FRESA	2027	5	-0.11442263272454249	enero
-Factor Producción	FRESA	2027	6	-0.04442263272454254	enero
-Factor Producción	FRESA	2027	7	-0.04442263272454254	febrero
-Factor Producción	FRESA	2027	8	-0.04442263272454254	febrero
-Factor Producción	FRESA	2027	9	-0.04442263272454254	febrero
-Factor Producción	FRESA	2027	10	-0.04442263272454254	febrero
-Factor Producción	FRESA	2027	11	-0.04442263272454254	marzo
-Factor Producción	FRESA	2027	12	-0.04442263272454254	marzo
-Factor Producción	FRESA	2027	13	-0.04442263272454254	marzo
-Factor Producción	FRESA	2027	14	-0.04442263272454254	marzo
-Factor Producción	FRESA	2027	15	-0.04442263272454254	abril
-Factor Producción	FRESA	2027	16	-0.04442263272454254	abril
-Factor Producción	FRESA	2027	17	-0.04442263272454254	abril
-Factor Producción	FRESA	2027	18	-0.04442263272454254	abril
-Factor Producción	FRESA	2027	19	-0.04442263272454254	mayo
-Factor Producción	FRESA	2027	20	-0.04442263272454254	mayo
-Factor Producción	FRESA	2027	21	-0.04442263272454254	mayo
-Factor Producción	FRESA	2027	22	-0.04442263272454254	mayo
-Factor Producción	FRESA	2027	23	-0.04442263272454254	mayo
-Factor Producción	FRESA	2027	24	-0.04442263272454254	junio
-Factor Producción	FRESA	2027	25	-0.04442263272454254	junio
-Factor Producción	FRESA	2027	26	-0.04442263272454254	junio
-Factor Producción	FRESA	2027	27	-0.04442263272454254	julio
+Factor Producción	FRESA	2026	39	4.432612414956454	septiembre
+Factor Producción	FRESA	2026	40	2.2812569865004226	septiembre
+Factor Producción	FRESA	2026	41	1.4909278749103991	octubre
+Factor Producción	FRESA	2026	42	0.5033303210093562	octubre
+Factor Producción	FRESA	2026	43	0.003330321009356152	octubre
+Factor Producción	FRESA	2026	44	0.003330321009356152	octubre
+Factor Producción	FRESA	2026	45	-0.09666967899064383	octubre
+Factor Producción	FRESA	2026	46	-0.09666967899064383	noviembre
+Factor Producción	FRESA	2026	47	-0.09666967899064383	noviembre
+Factor Producción	FRESA	2026	48	-0.09666967899064383	noviembre
+Factor Producción	FRESA	2026	49	0.003330321009356152	noviembre
+Factor Producción	FRESA	2026	50	0.003330321009356152	diciembre
+Factor Producción	FRESA	2026	51	0.003330321009356152	diciembre
+Factor Producción	FRESA	2026	52	0.003330321009356152	diciembre
+Factor Producción	FRESA	2027	1	-0.0666696789906438	diciembre
+Factor Producción	FRESA	2027	2	-0.0666696789906438	enero
+Factor Producción	FRESA	2027	3	-0.0666696789906438	enero
+Factor Producción	FRESA	2027	4	-0.0666696789906438	enero
+Factor Producción	FRESA	2027	5	-0.0666696789906438	enero
+Factor Producción	FRESA	2027	6	0.003330321009356152	enero
+Factor Producción	FRESA	2027	7	0.003330321009356152	febrero
+Factor Producción	FRESA	2027	8	0.003330321009356152	febrero
+Factor Producción	FRESA	2027	9	0.003330321009356152	febrero
+Factor Producción	FRESA	2027	10	0.003330321009356152	febrero
+Factor Producción	FRESA	2027	11	0.003330321009356152	marzo
+Factor Producción	FRESA	2027	12	0.003330321009356152	marzo
+Factor Producción	FRESA	2027	13	0.003330321009356152	marzo
+Factor Producción	FRESA	2027	14	0.003330321009356152	marzo
+Factor Producción	FRESA	2027	15	0.003330321009356152	abril
+Factor Producción	FRESA	2027	16	0.003330321009356152	abril
+Factor Producción	FRESA	2027	17	0.003330321009356152	abril
+Factor Producción	FRESA	2027	18	0.003330321009356152	abril
+Factor Producción	FRESA	2027	19	0.003330321009356152	mayo
+Factor Producción	FRESA	2027	20	0.003330321009356152	mayo
+Factor Producción	FRESA	2027	21	0.003330321009356152	mayo
+Factor Producción	FRESA	2027	22	0.003330321009356152	mayo
+Factor Producción	FRESA	2027	23	0.003330321009356152	mayo
+Factor Producción	FRESA	2027	24	0.003330321009356152	junio
+Factor Producción	FRESA	2027	25	0.003330321009356152	junio
+Factor Producción	FRESA	2027	26	0.003330321009356152	junio
+Factor Producción	FRESA	2027	27	0.003330321009356152	julio
 Factor Producción	ARANDANO	2026	27	0	junio
 Factor Producción	ARANDANO	2026	28	0	julio
 Factor Producción	ARANDANO	2026	29	0	julio
@@ -4905,47 +4953,47 @@ Factor Producción	ARANDANO	2026	35	-0.5	agosto
 Factor Producción	ARANDANO	2026	36	-1	agosto
 Factor Producción	ARANDANO	2026	37	-0.9677338362712217	septiembre
 Factor Producción	ARANDANO	2026	38	-0.8922343739344475	septiembre
-Factor Producción	ARANDANO	2026	39	-0.8149380525305732	septiembre
-Factor Producción	ARANDANO	2026	40	-0.7614901663321108	septiembre
-Factor Producción	ARANDANO	2026	41	-0.7489748023594744	octubre
-Factor Producción	ARANDANO	2026	42	-0.7336569602476297	octubre
-Factor Producción	ARANDANO	2026	43	-0.7098996867866342	octubre
-Factor Producción	ARANDANO	2026	44	-0.175	octubre
-Factor Producción	ARANDANO	2026	45	-0.175	octubre
-Factor Producción	ARANDANO	2026	46	-0.175	noviembre
-Factor Producción	ARANDANO	2026	47	-0.175	noviembre
-Factor Producción	ARANDANO	2026	48	-0.175	noviembre
-Factor Producción	ARANDANO	2026	49	-0.025	noviembre
-Factor Producción	ARANDANO	2026	50	-0.025	diciembre
-Factor Producción	ARANDANO	2026	51	-0.025	diciembre
-Factor Producción	ARANDANO	2026	52	-0.025	diciembre
-Factor Producción	ARANDANO	2027	1	0.025	diciembre
-Factor Producción	ARANDANO	2027	2	0.025	enero
-Factor Producción	ARANDANO	2027	3	0.025	enero
-Factor Producción	ARANDANO	2027	4	0.025	enero
-Factor Producción	ARANDANO	2027	5	0.025	enero
-Factor Producción	ARANDANO	2027	6	0.025	enero
-Factor Producción	ARANDANO	2027	7	0.025	febrero
-Factor Producción	ARANDANO	2027	8	0.025	febrero
-Factor Producción	ARANDANO	2027	9	0.025	febrero
-Factor Producción	ARANDANO	2027	10	0.025	febrero
-Factor Producción	ARANDANO	2027	11	0.025	marzo
-Factor Producción	ARANDANO	2027	12	0.025	marzo
-Factor Producción	ARANDANO	2027	13	0.025	marzo
-Factor Producción	ARANDANO	2027	14	0.025	marzo
-Factor Producción	ARANDANO	2027	15	0.025	abril
-Factor Producción	ARANDANO	2027	16	0.025	abril
-Factor Producción	ARANDANO	2027	17	0.025	abril
-Factor Producción	ARANDANO	2027	18	0.025	abril
-Factor Producción	ARANDANO	2027	19	0.025	mayo
-Factor Producción	ARANDANO	2027	20	0.025	mayo
-Factor Producción	ARANDANO	2027	21	0.025	mayo
-Factor Producción	ARANDANO	2027	22	0.025	mayo
-Factor Producción	ARANDANO	2027	23	0.025	mayo
-Factor Producción	ARANDANO	2027	24	0.025	junio
-Factor Producción	ARANDANO	2027	25	0.025	junio
-Factor Producción	ARANDANO	2027	26	0.025	junio
-Factor Producción	ARANDANO	2027	27	0.025	junio
+Factor Producción	ARANDANO	2026	39	-0.7925905766477991	septiembre
+Factor Producción	ARANDANO	2026	40	-0.7439483265363911	septiembre
+Factor Producción	ARANDANO	2026	41	-0.7344317931017068	octubre
+Factor Producción	ARANDANO	2026	42	-0.7214173386753926	octubre
+Factor Producción	ARANDANO	2026	43	-0.7214173386753926	octubre
+Factor Producción	ARANDANO	2026	44	-0.7214173386753926	octubre
+Factor Producción	ARANDANO	2026	45	-0.2214173386753926	octubre
+Factor Producción	ARANDANO	2026	46	-0.2214173386753926	noviembre
+Factor Producción	ARANDANO	2026	47	-0.2214173386753926	noviembre
+Factor Producción	ARANDANO	2026	48	-0.2214173386753926	noviembre
+Factor Producción	ARANDANO	2026	49	0.12858266132460738	noviembre
+Factor Producción	ARANDANO	2026	50	0.12858266132460738	diciembre
+Factor Producción	ARANDANO	2026	51	0.12858266132460738	diciembre
+Factor Producción	ARANDANO	2026	52	0.12858266132460738	diciembre
+Factor Producción	ARANDANO	2027	1	0.22858266132460736	diciembre
+Factor Producción	ARANDANO	2027	2	0.22858266132460736	enero
+Factor Producción	ARANDANO	2027	3	0.22858266132460736	enero
+Factor Producción	ARANDANO	2027	4	0.22858266132460736	enero
+Factor Producción	ARANDANO	2027	5	0.22858266132460736	enero
+Factor Producción	ARANDANO	2027	6	-0.12141733867539262	enero
+Factor Producción	ARANDANO	2027	7	0.028582661324607406	febrero
+Factor Producción	ARANDANO	2027	8	0.028582661324607406	febrero
+Factor Producción	ARANDANO	2027	9	0.028582661324607406	febrero
+Factor Producción	ARANDANO	2027	10	0.028582661324607406	febrero
+Factor Producción	ARANDANO	2027	11	0.028582661324607406	marzo
+Factor Producción	ARANDANO	2027	12	0.028582661324607406	marzo
+Factor Producción	ARANDANO	2027	13	0.028582661324607406	marzo
+Factor Producción	ARANDANO	2027	14	0.028582661324607406	marzo
+Factor Producción	ARANDANO	2027	15	0.028582661324607406	abril
+Factor Producción	ARANDANO	2027	16	0.028582661324607406	abril
+Factor Producción	ARANDANO	2027	17	0.028582661324607406	abril
+Factor Producción	ARANDANO	2027	18	0.028582661324607406	abril
+Factor Producción	ARANDANO	2027	19	0.028582661324607406	mayo
+Factor Producción	ARANDANO	2027	20	0.028582661324607406	mayo
+Factor Producción	ARANDANO	2027	21	0.028582661324607406	mayo
+Factor Producción	ARANDANO	2027	22	0.028582661324607406	mayo
+Factor Producción	ARANDANO	2027	23	0.028582661324607406	mayo
+Factor Producción	ARANDANO	2027	24	0.028582661324607406	junio
+Factor Producción	ARANDANO	2027	25	0.028582661324607406	junio
+Factor Producción	ARANDANO	2027	26	0.028582661324607406	junio
+Factor Producción	ARANDANO	2027	27	0.028582661324607406	junio
 Factor Producción	FRAMBUESA	2026	27	0	junio
 Factor Producción	FRAMBUESA	2026	28	0	julio
 Factor Producción	FRAMBUESA	2026	29	0	julio
@@ -4956,49 +5004,49 @@ Factor Producción	FRAMBUESA	2026	33	0	agosto
 Factor Producción	FRAMBUESA	2026	34	0	agosto
 Factor Producción	FRAMBUESA	2026	35	0	agosto
 Factor Producción	FRAMBUESA	2026	36	-1	agosto
-Factor Producción	FRAMBUESA	2026	37	-0.7910778382885195	septiembre
-Factor Producción	FRAMBUESA	2026	38	-0.5700480463729285	septiembre
-Factor Producción	FRAMBUESA	2026	39	-0.29251433261530396	septiembre
-Factor Producción	FRAMBUESA	2026	40	0.09312028588119242	septiembre
-Factor Producción	FRAMBUESA	2026	41	0.16734968645676268	octubre
-Factor Producción	FRAMBUESA	2026	42	0.13690239921304787	octubre
-Factor Producción	FRAMBUESA	2026	43	0.06968584455883209	octubre
-Factor Producción	FRAMBUESA	2026	44	0.06968584455883209	octubre
-Factor Producción	FRAMBUESA	2026	45	0.06968584455883209	octubre
-Factor Producción	FRAMBUESA	2026	46	0.06968584455883209	noviembre
-Factor Producción	FRAMBUESA	2026	47	0.06968584455883209	noviembre
-Factor Producción	FRAMBUESA	2026	48	0.06968584455883209	noviembre
-Factor Producción	FRAMBUESA	2026	49	0.06968584455883209	noviembre
-Factor Producción	FRAMBUESA	2026	50	0.06968584455883209	diciembre
-Factor Producción	FRAMBUESA	2026	51	0.06968584455883209	diciembre
-Factor Producción	FRAMBUESA	2026	52	0.06968584455883209	diciembre
-Factor Producción	FRAMBUESA	2027	1	0.06968584455883209	diciembre
-Factor Producción	FRAMBUESA	2027	2	0.06968584455883209	enero
-Factor Producción	FRAMBUESA	2027	3	0.06968584455883209	enero
-Factor Producción	FRAMBUESA	2027	4	0.06968584455883209	enero
-Factor Producción	FRAMBUESA	2027	5	0.06968584455883209	enero
-Factor Producción	FRAMBUESA	2027	6	0.06968584455883209	enero
-Factor Producción	FRAMBUESA	2027	7	0.06968584455883209	febrero
-Factor Producción	FRAMBUESA	2027	8	0.06968584455883209	febrero
-Factor Producción	FRAMBUESA	2027	9	0.06968584455883209	febrero
-Factor Producción	FRAMBUESA	2027	10	0.06968584455883209	febrero
-Factor Producción	FRAMBUESA	2027	11	0.06968584455883209	marzo
-Factor Producción	FRAMBUESA	2027	12	0.06968584455883209	marzo
-Factor Producción	FRAMBUESA	2027	13	0.06968584455883209	marzo
-Factor Producción	FRAMBUESA	2027	14	0.06968584455883209	marzo
-Factor Producción	FRAMBUESA	2027	15	0.06968584455883209	abril
-Factor Producción	FRAMBUESA	2027	16	0.06968584455883209	abril
-Factor Producción	FRAMBUESA	2027	17	0.06968584455883209	abril
-Factor Producción	FRAMBUESA	2027	18	0.06968584455883209	abril
-Factor Producción	FRAMBUESA	2027	19	0.06968584455883209	mayo
-Factor Producción	FRAMBUESA	2027	20	0.06968584455883209	mayo
-Factor Producción	FRAMBUESA	2027	21	0.06968584455883209	mayo
-Factor Producción	FRAMBUESA	2027	22	0.06968584455883209	mayo
-Factor Producción	FRAMBUESA	2027	23	0.06968584455883209	mayo
-Factor Producción	FRAMBUESA	2027	24	0.06968584455883209	junio
-Factor Producción	FRAMBUESA	2027	25	0.06968584455883209	junio
-Factor Producción	FRAMBUESA	2027	26	0.06968584455883209	junio
-Factor Producción	FRAMBUESA	2027	27	0.06968584455883209	junio
+Factor Producción	FRAMBUESA	2026	37	-0.7677199735530733	septiembre
+Factor Producción	FRAMBUESA	2026	38	-0.5179409683945653	septiembre
+Factor Producción	FRAMBUESA	2026	39	-0.2398851107145823	septiembre
+Factor Producción	FRAMBUESA	2026	40	0.16869482032556044	septiembre
+Factor Producción	FRAMBUESA	2026	41	0.24230262350761295	octubre
+Factor Producción	FRAMBUESA	2026	42	0.2205073495285596	octubre
+Factor Producción	FRAMBUESA	2026	43	0.2205073495285596	octubre
+Factor Producción	FRAMBUESA	2026	44	0.2205073495285596	octubre
+Factor Producción	FRAMBUESA	2026	45	0.2205073495285596	octubre
+Factor Producción	FRAMBUESA	2026	46	0.2205073495285596	noviembre
+Factor Producción	FRAMBUESA	2026	47	0.2205073495285596	noviembre
+Factor Producción	FRAMBUESA	2026	48	0.2205073495285596	noviembre
+Factor Producción	FRAMBUESA	2026	49	0.2205073495285596	noviembre
+Factor Producción	FRAMBUESA	2026	50	0.2205073495285596	diciembre
+Factor Producción	FRAMBUESA	2026	51	0.2205073495285596	diciembre
+Factor Producción	FRAMBUESA	2026	52	0.2205073495285596	diciembre
+Factor Producción	FRAMBUESA	2027	1	0.2205073495285596	diciembre
+Factor Producción	FRAMBUESA	2027	2	0.2205073495285596	enero
+Factor Producción	FRAMBUESA	2027	3	0.2205073495285596	enero
+Factor Producción	FRAMBUESA	2027	4	0.2205073495285596	enero
+Factor Producción	FRAMBUESA	2027	5	0.2205073495285596	enero
+Factor Producción	FRAMBUESA	2027	6	0.2205073495285596	enero
+Factor Producción	FRAMBUESA	2027	7	0.2205073495285596	febrero
+Factor Producción	FRAMBUESA	2027	8	0.2205073495285596	febrero
+Factor Producción	FRAMBUESA	2027	9	0.2205073495285596	febrero
+Factor Producción	FRAMBUESA	2027	10	0.2205073495285596	febrero
+Factor Producción	FRAMBUESA	2027	11	0.2205073495285596	marzo
+Factor Producción	FRAMBUESA	2027	12	0.2205073495285596	marzo
+Factor Producción	FRAMBUESA	2027	13	0.2205073495285596	marzo
+Factor Producción	FRAMBUESA	2027	14	0.2205073495285596	marzo
+Factor Producción	FRAMBUESA	2027	15	0.2205073495285596	abril
+Factor Producción	FRAMBUESA	2027	16	0.2205073495285596	abril
+Factor Producción	FRAMBUESA	2027	17	0.2205073495285596	abril
+Factor Producción	FRAMBUESA	2027	18	0.2205073495285596	abril
+Factor Producción	FRAMBUESA	2027	19	0.2205073495285596	mayo
+Factor Producción	FRAMBUESA	2027	20	0.2205073495285596	mayo
+Factor Producción	FRAMBUESA	2027	21	0.2205073495285596	mayo
+Factor Producción	FRAMBUESA	2027	22	0.2205073495285596	mayo
+Factor Producción	FRAMBUESA	2027	23	0.2205073495285596	mayo
+Factor Producción	FRAMBUESA	2027	24	0.2205073495285596	junio
+Factor Producción	FRAMBUESA	2027	25	0.2205073495285596	junio
+Factor Producción	FRAMBUESA	2027	26	0.2205073495285596	junio
+Factor Producción	FRAMBUESA	2027	27	0.2205073495285596	junio
 Factor Producción	ZARZAMORA	2026	27	0	junio
 Factor Producción	ZARZAMORA	2026	28	0	julio
 Factor Producción	ZARZAMORA	2026	29	0	julio
@@ -5014,44 +5062,44 @@ Factor Producción	ZARZAMORA	2026	38	-0.5	septiembre
 Factor Producción	ZARZAMORA	2026	39	-0.5	septiembre
 Factor Producción	ZARZAMORA	2026	40	-0.48436115458461737	septiembre
 Factor Producción	ZARZAMORA	2026	41	13.557782255483616	octubre
-Factor Producción	ZARZAMORA	2026	42	6.112362881139579	octubre
-Factor Producción	ZARZAMORA	2026	43	0.08659983865341003	octubre
-Factor Producción	ZARZAMORA	2026	44	0.21499999999999997	octubre
-Factor Producción	ZARZAMORA	2026	45	0.21499999999999997	octubre
-Factor Producción	ZARZAMORA	2026	46	0.21499999999999997	noviembre
-Factor Producción	ZARZAMORA	2026	47	0.21499999999999997	noviembre
-Factor Producción	ZARZAMORA	2026	48	0.21499999999999997	noviembre
-Factor Producción	ZARZAMORA	2026	49	0.21499999999999997	noviembre
-Factor Producción	ZARZAMORA	2026	50	0.21499999999999997	diciembre
-Factor Producción	ZARZAMORA	2026	51	0.21499999999999997	diciembre
-Factor Producción	ZARZAMORA	2026	52	0.21499999999999997	diciembre
-Factor Producción	ZARZAMORA	2027	1	0.21499999999999997	diciembre
-Factor Producción	ZARZAMORA	2027	2	0.21499999999999997	enero
-Factor Producción	ZARZAMORA	2027	3	0.21499999999999997	enero
-Factor Producción	ZARZAMORA	2027	4	0.21499999999999997	enero
-Factor Producción	ZARZAMORA	2027	5	0.21499999999999997	enero
-Factor Producción	ZARZAMORA	2027	6	0.21499999999999997	enero
-Factor Producción	ZARZAMORA	2027	7	0.21499999999999997	febrero
-Factor Producción	ZARZAMORA	2027	8	0.21499999999999997	febrero
-Factor Producción	ZARZAMORA	2027	9	0.21499999999999997	febrero
-Factor Producción	ZARZAMORA	2027	10	0.21499999999999997	febrero
-Factor Producción	ZARZAMORA	2027	11	0.21499999999999997	marzo
-Factor Producción	ZARZAMORA	2027	12	0.21499999999999997	marzo
-Factor Producción	ZARZAMORA	2027	13	0.21499999999999997	marzo
-Factor Producción	ZARZAMORA	2027	14	0.21499999999999997	marzo
-Factor Producción	ZARZAMORA	2027	15	0.21499999999999997	abril
-Factor Producción	ZARZAMORA	2027	16	0.21499999999999997	abril
-Factor Producción	ZARZAMORA	2027	17	0.21499999999999997	abril
-Factor Producción	ZARZAMORA	2027	18	0.21499999999999997	abril
-Factor Producción	ZARZAMORA	2027	19	0.21499999999999997	mayo
-Factor Producción	ZARZAMORA	2027	20	0.21499999999999997	mayo
-Factor Producción	ZARZAMORA	2027	21	0.21499999999999997	mayo
-Factor Producción	ZARZAMORA	2027	22	0.21499999999999997	mayo
-Factor Producción	ZARZAMORA	2027	23	0.21499999999999997	mayo
-Factor Producción	ZARZAMORA	2027	24	0.21499999999999997	junio
-Factor Producción	ZARZAMORA	2027	25	0.21499999999999997	junio
-Factor Producción	ZARZAMORA	2027	26	0.21499999999999997	junio
-Factor Producción	ZARZAMORA	2027	27	0.21499999999999997	junio
+Factor Producción	ZARZAMORA	2026	42	0.8123628811395793	octubre
+Factor Producción	ZARZAMORA	2026	43	0.06236288113957933	octubre
+Factor Producción	ZARZAMORA	2026	44	0.06236288113957933	octubre
+Factor Producción	ZARZAMORA	2026	45	0.06236288113957933	octubre
+Factor Producción	ZARZAMORA	2026	46	0.06236288113957933	noviembre
+Factor Producción	ZARZAMORA	2026	47	0.06236288113957933	noviembre
+Factor Producción	ZARZAMORA	2026	48	0.06236288113957933	noviembre
+Factor Producción	ZARZAMORA	2026	49	0.06236288113957933	noviembre
+Factor Producción	ZARZAMORA	2026	50	0.06236288113957933	diciembre
+Factor Producción	ZARZAMORA	2026	51	0.06236288113957933	diciembre
+Factor Producción	ZARZAMORA	2026	52	0.06236288113957933	diciembre
+Factor Producción	ZARZAMORA	2027	1	0.8123628811395793	diciembre
+Factor Producción	ZARZAMORA	2027	2	0.8123628811395793	enero
+Factor Producción	ZARZAMORA	2027	3	0.8123628811395793	enero
+Factor Producción	ZARZAMORA	2027	4	0.8123628811395793	enero
+Factor Producción	ZARZAMORA	2027	5	0.8123628811395793	enero
+Factor Producción	ZARZAMORA	2027	6	0.06236288113957933	enero
+Factor Producción	ZARZAMORA	2027	7	0.06236288113957933	febrero
+Factor Producción	ZARZAMORA	2027	8	0.06236288113957933	febrero
+Factor Producción	ZARZAMORA	2027	9	0.06236288113957933	febrero
+Factor Producción	ZARZAMORA	2027	10	0.06236288113957933	febrero
+Factor Producción	ZARZAMORA	2027	11	0.06236288113957933	marzo
+Factor Producción	ZARZAMORA	2027	12	0.06236288113957933	marzo
+Factor Producción	ZARZAMORA	2027	13	0.06236288113957933	marzo
+Factor Producción	ZARZAMORA	2027	14	0.06236288113957933	marzo
+Factor Producción	ZARZAMORA	2027	15	0.06236288113957933	abril
+Factor Producción	ZARZAMORA	2027	16	0.06236288113957933	abril
+Factor Producción	ZARZAMORA	2027	17	0.06236288113957933	abril
+Factor Producción	ZARZAMORA	2027	18	0.06236288113957933	abril
+Factor Producción	ZARZAMORA	2027	19	0.06236288113957933	mayo
+Factor Producción	ZARZAMORA	2027	20	0.06236288113957933	mayo
+Factor Producción	ZARZAMORA	2027	21	0.06236288113957933	mayo
+Factor Producción	ZARZAMORA	2027	22	0.06236288113957933	mayo
+Factor Producción	ZARZAMORA	2027	23	0.06236288113957933	mayo
+Factor Producción	ZARZAMORA	2027	24	0.06236288113957933	junio
+Factor Producción	ZARZAMORA	2027	25	0.06236288113957933	junio
+Factor Producción	ZARZAMORA	2027	26	0.06236288113957933	junio
+Factor Producción	ZARZAMORA	2027	27	0.06236288113957933	junio
 Factor Producción	AGUACATE	2026	27	1.9943621436474863	junio
 Factor Producción	AGUACATE	2026	28	1.864049086173303	julio
 Factor Producción	AGUACATE	2026	29	2.3721947722705643	julio
@@ -5068,43 +5116,43 @@ Factor Producción	AGUACATE	2026	39	0.5130245822188496	septiembre
 Factor Producción	AGUACATE	2026	40	0.44725703178309906	septiembre
 Factor Producción	AGUACATE	2026	41	0.34432077333594746	octubre
 Factor Producción	AGUACATE	2026	42	0.3278981030048197	octubre
-Factor Producción	AGUACATE	2026	43	0.27518064276694787	octubre
-Factor Producción	AGUACATE	2026	44	-0.560309913634496	octubre
-Factor Producción	AGUACATE	2026	45	-0.560309913634496	octubre
-Factor Producción	AGUACATE	2026	46	-0.560309913634496	noviembre
-Factor Producción	AGUACATE	2026	47	-0.560309913634496	noviembre
-Factor Producción	AGUACATE	2026	48	-0.560309913634496	noviembre
-Factor Producción	AGUACATE	2026	49	-0.560309913634496	noviembre
-Factor Producción	AGUACATE	2026	50	-0.560309913634496	diciembre
-Factor Producción	AGUACATE	2026	51	-0.560309913634496	diciembre
-Factor Producción	AGUACATE	2026	52	-0.560309913634496	diciembre
-Factor Producción	AGUACATE	2027	1	-0.560309913634496	diciembre
-Factor Producción	AGUACATE	2027	2	-0.560309913634496	enero
-Factor Producción	AGUACATE	2027	3	-0.560309913634496	enero
-Factor Producción	AGUACATE	2027	4	-0.560309913634496	enero
-Factor Producción	AGUACATE	2027	5	-0.560309913634496	enero
-Factor Producción	AGUACATE	2027	6	-0.560309913634496	enero
-Factor Producción	AGUACATE	2027	7	-0.560309913634496	febrero
-Factor Producción	AGUACATE	2027	8	-0.560309913634496	febrero
-Factor Producción	AGUACATE	2027	9	-0.560309913634496	febrero
-Factor Producción	AGUACATE	2027	10	-0.560309913634496	febrero
-Factor Producción	AGUACATE	2027	11	-0.560309913634496	marzo
-Factor Producción	AGUACATE	2027	12	-0.560309913634496	marzo
-Factor Producción	AGUACATE	2027	13	-0.560309913634496	marzo
-Factor Producción	AGUACATE	2027	14	-0.560309913634496	marzo
-Factor Producción	AGUACATE	2027	15	-0.560309913634496	abril
-Factor Producción	AGUACATE	2027	16	-0.560309913634496	abril
-Factor Producción	AGUACATE	2027	17	-0.560309913634496	abril
-Factor Producción	AGUACATE	2027	18	-0.560309913634496	abril
-Factor Producción	AGUACATE	2027	19	-0.560309913634496	mayo
-Factor Producción	AGUACATE	2027	20	-0.560309913634496	mayo
-Factor Producción	AGUACATE	2027	21	-0.560309913634496	mayo
-Factor Producción	AGUACATE	2027	22	-0.560309913634496	mayo
-Factor Producción	AGUACATE	2027	23	-0.560309913634496	mayo
-Factor Producción	AGUACATE	2027	24	-0.560309913634496	junio
-Factor Producción	AGUACATE	2027	25	-0.560309913634496	junio
-Factor Producción	AGUACATE	2027	26	-0.560309913634496	junio
-Factor Producción	AGUACATE	2027	27	-0.560309913634496	junio
+Factor Producción	AGUACATE	2026	43	0.3278981030048197	octubre
+Factor Producción	AGUACATE	2026	44	-0.2721018969951803	octubre
+Factor Producción	AGUACATE	2026	45	-0.2721018969951803	octubre
+Factor Producción	AGUACATE	2026	46	-0.2721018969951803	noviembre
+Factor Producción	AGUACATE	2026	47	-0.2721018969951803	noviembre
+Factor Producción	AGUACATE	2026	48	-0.2721018969951803	noviembre
+Factor Producción	AGUACATE	2026	49	-0.2721018969951803	noviembre
+Factor Producción	AGUACATE	2026	50	-0.2721018969951803	diciembre
+Factor Producción	AGUACATE	2026	51	-0.2721018969951803	diciembre
+Factor Producción	AGUACATE	2026	52	-0.2721018969951803	diciembre
+Factor Producción	AGUACATE	2027	1	-0.2721018969951803	diciembre
+Factor Producción	AGUACATE	2027	2	-0.2721018969951803	enero
+Factor Producción	AGUACATE	2027	3	-0.2721018969951803	enero
+Factor Producción	AGUACATE	2027	4	-0.2721018969951803	enero
+Factor Producción	AGUACATE	2027	5	-0.2721018969951803	enero
+Factor Producción	AGUACATE	2027	6	-0.2721018969951803	enero
+Factor Producción	AGUACATE	2027	7	-0.2721018969951803	febrero
+Factor Producción	AGUACATE	2027	8	-0.2721018969951803	febrero
+Factor Producción	AGUACATE	2027	9	-0.2721018969951803	febrero
+Factor Producción	AGUACATE	2027	10	-0.2721018969951803	febrero
+Factor Producción	AGUACATE	2027	11	-0.2721018969951803	marzo
+Factor Producción	AGUACATE	2027	12	-0.2721018969951803	marzo
+Factor Producción	AGUACATE	2027	13	-0.2721018969951803	marzo
+Factor Producción	AGUACATE	2027	14	-0.2721018969951803	marzo
+Factor Producción	AGUACATE	2027	15	-0.2721018969951803	abril
+Factor Producción	AGUACATE	2027	16	-0.2721018969951803	abril
+Factor Producción	AGUACATE	2027	17	-0.2721018969951803	abril
+Factor Producción	AGUACATE	2027	18	-0.2721018969951803	abril
+Factor Producción	AGUACATE	2027	19	-0.2721018969951803	mayo
+Factor Producción	AGUACATE	2027	20	-0.2721018969951803	mayo
+Factor Producción	AGUACATE	2027	21	-0.2721018969951803	mayo
+Factor Producción	AGUACATE	2027	22	-0.2721018969951803	mayo
+Factor Producción	AGUACATE	2027	23	-0.2721018969951803	mayo
+Factor Producción	AGUACATE	2027	24	-0.2721018969951803	junio
+Factor Producción	AGUACATE	2027	25	-0.2721018969951803	junio
+Factor Producción	AGUACATE	2027	26	-0.2721018969951803	junio
+Factor Producción	AGUACATE	2027	27	-0.2721018969951803	junio
 Factor Producción	PAPA	2026	27	0	junio
 Factor Producción	PAPA	2026	28	0	julio
 Factor Producción	PAPA	2026	29	0	julio
@@ -5172,44 +5220,44 @@ Factor Producción	ESPARRAGO	2026	38	-0.26937878596043896	septiembre
 Factor Producción	ESPARRAGO	2026	39	-0.20554047454545	septiembre
 Factor Producción	ESPARRAGO	2026	40	-0.2583797321321901	septiembre
 Factor Producción	ESPARRAGO	2026	41	-0.2559193272185433	septiembre
-Factor Producción	ESPARRAGO	2026	42	-0.29048576992312275	octubre
-Factor Producción	ESPARRAGO	2026	43	-0.28855469162111913	octubre
-Factor Producción	ESPARRAGO	2026	44	-0.28855469162111913	octubre
-Factor Producción	ESPARRAGO	2026	45	0.06144530837888085	octubre
-Factor Producción	ESPARRAGO	2026	46	0.06144530837888085	octubre
-Factor Producción	ESPARRAGO	2026	47	0.06144530837888085	noviembre
-Factor Producción	ESPARRAGO	2026	48	0.06144530837888085	noviembre
-Factor Producción	ESPARRAGO	2026	49	0.06144530837888085	noviembre
-Factor Producción	ESPARRAGO	2026	50	0.06144530837888085	noviembre
-Factor Producción	ESPARRAGO	2026	51	0.06144530837888085	diciembre
-Factor Producción	ESPARRAGO	2026	52	0.06144530837888085	diciembre
-Factor Producción	ESPARRAGO	2027	1	0.06144530837888085	diciembre
-Factor Producción	ESPARRAGO	2027	2	0.06144530837888085	diciembre
-Factor Producción	ESPARRAGO	2027	3	0.06144530837888085	enero
-Factor Producción	ESPARRAGO	2027	4	0.06144530837888085	enero
-Factor Producción	ESPARRAGO	2027	5	0.06144530837888085	enero
-Factor Producción	ESPARRAGO	2027	6	0.06144530837888085	enero
-Factor Producción	ESPARRAGO	2027	7	0.06144530837888085	enero
-Factor Producción	ESPARRAGO	2027	8	0.06144530837888085	febrero
-Factor Producción	ESPARRAGO	2027	9	0.06144530837888085	febrero
-Factor Producción	ESPARRAGO	2027	10	0.06144530837888085	febrero
-Factor Producción	ESPARRAGO	2027	11	0.06144530837888085	febrero
-Factor Producción	ESPARRAGO	2027	12	0.06144530837888085	marzo
-Factor Producción	ESPARRAGO	2027	13	0.06144530837888085	marzo
-Factor Producción	ESPARRAGO	2027	14	0.06144530837888085	marzo
-Factor Producción	ESPARRAGO	2027	15	0.06144530837888085	marzo
-Factor Producción	ESPARRAGO	2027	16	0.06144530837888085	abril
-Factor Producción	ESPARRAGO	2027	17	0.06144530837888085	abril
-Factor Producción	ESPARRAGO	2027	18	0.06144530837888085	abril
-Factor Producción	ESPARRAGO	2027	19	0.06144530837888085	abril
-Factor Producción	ESPARRAGO	2027	20	0.06144530837888085	mayo
-Factor Producción	ESPARRAGO	2027	21	0.06144530837888085	mayo
-Factor Producción	ESPARRAGO	2027	22	0.06144530837888085	mayo
-Factor Producción	ESPARRAGO	2027	23	0.06144530837888085	mayo
-Factor Producción	ESPARRAGO	2027	24	0.06144530837888085	mayo
-Factor Producción	ESPARRAGO	2027	25	0.06144530837888085	junio
-Factor Producción	ESPARRAGO	2027	26	0.06144530837888085	junio
-Factor Producción	ESPARRAGO	2027	27	0.06144530837888085	junio`
+Factor Producción	ESPARRAGO	2026	42	-0.28118572217077076	octubre
+Factor Producción	ESPARRAGO	2026	43	-0.28118572217077076	octubre
+Factor Producción	ESPARRAGO	2026	44	-0.28118572217077076	octubre
+Factor Producción	ESPARRAGO	2026	45	0.06881427782922922	octubre
+Factor Producción	ESPARRAGO	2026	46	0.06881427782922922	octubre
+Factor Producción	ESPARRAGO	2026	47	0.06881427782922922	noviembre
+Factor Producción	ESPARRAGO	2026	48	0.06881427782922922	noviembre
+Factor Producción	ESPARRAGO	2026	49	0.06881427782922922	noviembre
+Factor Producción	ESPARRAGO	2026	50	0.06881427782922922	noviembre
+Factor Producción	ESPARRAGO	2026	51	0.06881427782922922	diciembre
+Factor Producción	ESPARRAGO	2026	52	0.06881427782922922	diciembre
+Factor Producción	ESPARRAGO	2027	1	0.06881427782922922	diciembre
+Factor Producción	ESPARRAGO	2027	2	0.06881427782922922	diciembre
+Factor Producción	ESPARRAGO	2027	3	0.06881427782922922	enero
+Factor Producción	ESPARRAGO	2027	4	0.06881427782922922	enero
+Factor Producción	ESPARRAGO	2027	5	0.06881427782922922	enero
+Factor Producción	ESPARRAGO	2027	6	0.06881427782922922	enero
+Factor Producción	ESPARRAGO	2027	7	0.06881427782922922	enero
+Factor Producción	ESPARRAGO	2027	8	0.06881427782922922	febrero
+Factor Producción	ESPARRAGO	2027	9	0.06881427782922922	febrero
+Factor Producción	ESPARRAGO	2027	10	0.06881427782922922	febrero
+Factor Producción	ESPARRAGO	2027	11	0.06881427782922922	febrero
+Factor Producción	ESPARRAGO	2027	12	0.06881427782922922	marzo
+Factor Producción	ESPARRAGO	2027	13	0.06881427782922922	marzo
+Factor Producción	ESPARRAGO	2027	14	0.06881427782922922	marzo
+Factor Producción	ESPARRAGO	2027	15	0.06881427782922922	marzo
+Factor Producción	ESPARRAGO	2027	16	0.06881427782922922	abril
+Factor Producción	ESPARRAGO	2027	17	0.06881427782922922	abril
+Factor Producción	ESPARRAGO	2027	18	0.06881427782922922	abril
+Factor Producción	ESPARRAGO	2027	19	0.06881427782922922	abril
+Factor Producción	ESPARRAGO	2027	20	0.06881427782922922	mayo
+Factor Producción	ESPARRAGO	2027	21	0.06881427782922922	mayo
+Factor Producción	ESPARRAGO	2027	22	0.06881427782922922	mayo
+Factor Producción	ESPARRAGO	2027	23	0.06881427782922922	mayo
+Factor Producción	ESPARRAGO	2027	24	0.06881427782922922	mayo
+Factor Producción	ESPARRAGO	2027	25	0.06881427782922922	junio
+Factor Producción	ESPARRAGO	2027	26	0.06881427782922922	junio
+Factor Producción	ESPARRAGO	2027	27	0.06881427782922922	junio`
  }
 };
 
