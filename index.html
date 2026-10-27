@@ -86,6 +86,11 @@
   .field label{ font-size:12px; font-weight:600; color:var(--text-secondary); }
   select, .textinput{ width:100%; padding:8px 10px; border-radius:7px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary); font-size:13px; }
   /* Nombre del cultivo mostrado en el título de las tablas (el único selector es "Cultivo enfocado" del panel). */
+  .registro-head{ display:flex; align-items:baseline; gap:10px; margin:22px 0 6px; flex-wrap:wrap; }
+  .registro-head h5{ margin:0; font-size:13.5px; font-weight:700; color:var(--text-primary); }
+  td.foto-fecha{ color:var(--text-muted); font-size:11.5px; white-space:nowrap; }
+  td .en-curso{ color:var(--text-muted); font-style:italic; font-size:11.5px; }
+  #tablaRegistro{ min-width:980px; }
   .tablecrop-label{ font-weight:700; color:var(--accent); white-space:nowrap; }
   select.tablecrop-select{ width:auto; padding:4px 8px; font-size:12.5px; font-weight:700; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary); }
   .chipgrid{ display:flex; flex-wrap:wrap; gap:6px; }
@@ -423,6 +428,18 @@
           </div>
           <div class="tablewrap">
             <table id="tablaHistorico"><thead></thead><tbody></tbody></table>
+          </div>
+
+          <div class="registro-head">
+            <h5>Registro mensual — forecast congelado vs real</h5>
+            <div class="title-row info-row" style="margin:0">
+              <button type="button" class="info-tip" aria-label="Cómo funciona el registro" aria-describedby="registroInfo">i</button>
+              <div class="info-pop wide" id="registroInfo" role="tooltip"></div>
+              <span class="info-label">Cómo funciona</span>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table id="tablaRegistro"><thead></thead><tbody></tbody></table>
           </div>
         </div>
 
@@ -1827,7 +1844,103 @@ function renderForecastTab(){
 // Pestaña "Detalle mensual": las mismas tablas que antes estaban en Forecast por cultivo (sin cambios de cálculo).
 function renderDetalleTab(){
   renderHistoricoTable();
+  renderRegistroTable();
   renderKgHa();
+}
+
+/* ---------- Registro mensual: forecast congelado (foto) vs real ----------
+   Para cada mes M, la foto FOTOS_FORECAST[M] guarda los DATOS del Sheet tal como estaban el último día del
+   mes anterior (la escribe el Apps Script). Aquí se cargan esos datos en un "state" temporal, se calculan los
+   3 métodos con el mismo código de siempre (kindSeries) y se regresa el state actual intacto.
+   Presupuesto y Real se leen de los datos actuales; el Real solo se muestra cuando el mes ya cerró. */
+const fotoCache = {};
+function conDatosDeFoto(foto, fn){
+  const savedState = Object.assign({}, state);
+  const savedGlobals = [CURRENT_MONTH_KEY, FORECAST_MONTHS, HORIZON_MK, DISPLAY_MONTHS, PROJECTION_MONTHS];
+  const savedVH = Object.assign({}, VAR_HORIZON);
+  const savedCache = Object.assign({}, projCache);
+  try{
+    state.cierre = {};   // la foto no usa el "Cierre de temporada" de este navegador
+    const texts = {};
+    SLOT_DEFS.forEach(({tipo,variable})=>{ texts[variable+'|'+tipo] = (foto.datos && foto.datos[variable] && foto.datos[variable][tipo]) || ''; });
+    const [y,mo,d] = String(foto.fecha).split('-').map(Number);
+    cargarDatosEnEstado(texts, new Date(Date.UTC(y, mo-1, d)), false);
+    return fn();
+  } finally {
+    Object.keys(state).forEach(k=>{ if(!(k in savedState)) delete state[k]; });
+    Object.assign(state, savedState);
+    [CURRENT_MONTH_KEY, FORECAST_MONTHS, HORIZON_MK, DISPLAY_MONTHS, PROJECTION_MONTHS] = savedGlobals;
+    Object.keys(VAR_HORIZON).forEach(k=> delete VAR_HORIZON[k]); Object.assign(VAR_HORIZON, savedVH);
+    clearForecastCache(); Object.assign(projCache, savedCache);
+  }
+}
+// Forecast congelado del mes `mk` para la variable/cultivos/escenario: { fecha, polinomial, movil, estacional } o null.
+function fotoValores(mk, v, crops, sc){
+  const foto = FOTOS_FORECAST[mk];
+  if(!foto) return null;
+  const key = [mk, foto.fecha, v, crops.join(','), sc, JSON.stringify(state.scenarios)].join('|');
+  if(fotoCache[key]) return fotoCache[key];
+  const out = { fecha: foto.fecha };
+  conDatosDeFoto(foto, ()=>{
+    TABLE_METHODS.forEach(m=>{ out[m.key] = kindSeries(v, m.key, sc, crops, [mk], 'mensual').full[mk] || 0; });
+  });
+  return (fotoCache[key] = out);
+}
+function fmtFechaCorta(iso){
+  const [y,m,d] = String(iso).split('-').map(Number);
+  return `${d} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][m-1]} ${String(y).slice(2)}`;
+}
+function renderRegistroTable(){
+  const tbl = document.getElementById('tablaRegistro');
+  if(!tbl) return;
+  const crops = currentCropsSelection();
+  const sc = state.filters.escenario, activeMethod = state.filters.metodo;
+  const v = state.filters.tablaVariable;
+  const meta = TABLE_VAR_META[v];
+  const H = v==='produccion' ? horizonFor('produccion') : { currentMk:CURRENT_MONTH_KEY };
+  const hasPres = v==='ebitda' ? (hasTipo('ingreso','presupuesto')||hasTipo('egreso','presupuesto')) : hasTipo(v,'presupuesto');
+
+  // Meses: desde el primero que muestra la tabla de arriba hasta el mes siguiente al actual, más cualquier mes con foto.
+  const set = new Set(monthsForKind(v).filter(mk=> mk<=addMonths(H.currentMk,1)));
+  Object.keys(FOTOS_FORECAST).forEach(mk=> set.add(mk));
+  const months = [...set].sort();
+  const actual = kindSeries(v, 'estacional', sc, crops, months, 'mensual');   // Real y Presupuesto (datos actuales)
+
+  const mcls = k => k===activeMethod ? ' class="active-method"' : '';
+  const activeLabel = (TABLE_METHODS.find(m=>m.key===activeMethod)||TABLE_METHODS[2]).label;
+  tbl.querySelector('thead').innerHTML = `<tr><th>Mes</th><th>Foto del</th><th>Presupuesto</th>` +
+    TABLE_METHODS.map(m=>`<th${mcls(m.key)}>${m.label} (foto)</th>`).join('') +
+    `<th>${meta.label} real (al cierre)</th><th>Real vs forecast</th><th>Real vs presupuesto</th></tr>`;
+  const tbody = tbl.querySelector('tbody');
+  tbody.innerHTML = '';
+  months.forEach(mk=>{
+    const foto = fotoValores(mk, v, crops, sc);
+    const presV = hasPres ? actual.pres[mk] : null;
+    const cerrado = mk < H.currentMk;
+    const realV = cerrado && actual.hasReal[mk] ? actual.real[mk] : null;
+    const realCell = cerrado ? (realV==null ? '—' : meta.fmt(realV)) : (mk===H.currentMk ? '<span class="en-curso">en curso</span>' : '—');
+    let dF=null, pF=null, dP=null, pP=null;
+    if(realV!=null && foto){ const f = foto[activeMethod]; dF = realV - f; pF = f!==0 ? dF/f*100 : null; }
+    if(realV!=null && presV!=null){ dP = realV - presV; pP = presV!==0 ? dP/presV*100 : null; }
+    const tr = document.createElement('tr');
+    if(mk===H.currentMk) tr.className = 'now';
+    tr.innerHTML = `<td>${monthLabel(mk)}</td>
+      <td class="foto-fecha">${foto ? fmtFechaCorta(foto.fecha) : 'sin foto'}</td>
+      <td>${presV==null?'—':meta.fmt(presV)}</td>` +
+      TABLE_METHODS.map(m=>`<td${mcls(m.key)}>${foto ? meta.fmt(foto[m.key]) : '—'}</td>`).join('') +
+      `<td>${realCell}</td>
+      <td>${varianceCellHTML(dF, pF, meta).replace('s/presupuesto','s/forecast')}</td>
+      <td>${varianceCellHTML(dP, pP, meta)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const nFotos = Object.keys(FOTOS_FORECAST).length;
+  document.getElementById('registroInfo').innerHTML =
+    `Las 3 columnas <b>(foto)</b> son el forecast de cada método <b>congelado el último día del mes anterior</b> (columna "Foto del"): ` +
+    `después ya no cambian aunque actualices el Sheet. Las toma automáticamente el Apps Script en los últimos días de cada mes. ` +
+    `El <b>Presupuesto</b> sale de tu hoja PPTO y el <b>Real</b> se muestra cuando el mes ya cerró. ` +
+    `"Real vs forecast" compara contra el método seleccionado en el panel (${activeLabel}). Escenario <b>${sc}</b>; siempre cifras del mes (no acumulado). ` +
+    (nFotos ? `Fotos guardadas: ${nFotos}.` : `<b>Todavía no hay fotos</b>: la primera se toma el último día de este mes.`);
 }
 
 /* ============================================================
@@ -5283,6 +5396,11 @@ Factor Producción	ESPARRAGO	2027	26	0.06881427782922922	junio
 Factor Producción	ESPARRAGO	2027	27	0.06881427782922922	junio`
  }
 };
+// INICIO FOTOS_FORECAST
+// Fotos congeladas del forecast: las escribe el Apps Script en los últimos días de cada mes (no editar a mano).
+// { 'AAAA-MM' (mes pronosticado): { fecha:'AAAA-MM-DD' (día de la foto), datos:{ egreso:{real,presupuesto,...}, ingreso:{...}, produccion:{...} } } }
+const FOTOS_FORECAST = {};
+// FIN FOTOS_FORECAST
 
 
 function slotId(tipo,variable){ return `slot_${tipo}_${variable}`; }
@@ -5346,16 +5464,29 @@ function loadBakedDefaults(){
 //  · Proyección: siempre se conserva con origTipo:'proyeccion'.
 //  · Variación Egreso: % semanal por cultivo que usa el método "Forecast estacional".
 function processAllSlots(){
+  const texts = {};
+  SLOT_DEFS.forEach(({tipo,variable})=>{ texts[variable+'|'+tipo] = document.getElementById(slotId(tipo,variable)+'_text').value; });
+  cargarDatosEnEstado(texts, NOW_UTC, true);
+  renderStatus();
+  renderAll();
+}
+
+// Carga los textos de las hojas al "state" (misma lógica de siempre). Se separó de processAllSlots para
+// poder cargar también los datos de una FOTO del forecast (ver FOTOS_FORECAST) sin dibujar la página.
+//   texts: { 'egreso|real': tsv, ... } · nowRef: fecha "de hoy" para esos datos · ui: actualizar contadores de la pestaña Datos
+function cargarDatosEnEstado(texts, nowRef, ui){
   const parsed = {};
   const errors = [], notes = [];
   SLOT_DEFS.forEach(({tipo,variable})=>{
     const id = slotId(tipo,variable);
-    const { records, errors: errs, notes: nts } = parseSlot(document.getElementById(id+'_text').value, tipo);
+    const { records, errors: errs, notes: nts } = parseSlot(texts[variable+'|'+tipo]||'', tipo);
     parsed[variable+'|'+tipo] = records;
     errs.forEach(e=> errors.push(`[${VAR_LABEL[variable]} · ${slotLabel(tipo,variable)}] ${e}`));
     (nts||[]).forEach(n=> notes.push(`[${VAR_LABEL[variable]} · ${slotLabel(tipo,variable)}] ${n}`));
-    document.getElementById(id+'_count').textContent = records.length+' filas';
-    document.getElementById(id+'_count').classList.toggle('has', records.length>0);
+    if(ui){
+      document.getElementById(id+'_count').textContent = records.length+' filas';
+      document.getElementById(id+'_count').classList.toggle('has', records.length>0);
+    }
   });
 
   // Mapa semana → Mes con la columna Mes de Real/Presupuesto/Proyección (en ese orden de prioridad);
@@ -5385,7 +5516,7 @@ function processAllSlots(){
     state.realFromSheet[variable] = useReal;
     const candidates = useReal
       ? real.slice()
-      : proy.filter(r=>r.date<=NOW_UTC && r.importe>0).map(r=>Object.assign({}, r, {tipo:'real'}));
+      : proy.filter(r=>r.date<=nowRef && r.importe>0).map(r=>Object.assign({}, r, {tipo:'real'}));
 
     const totals = {}; let first = null;
     candidates.forEach(r=>{ const wk = weekKey(r.date); totals[wk] = (totals[wk]||0) + r.importe; });
@@ -5397,7 +5528,7 @@ function processAllSlots(){
         if(!(totals[weekKey(d)]>0)){ cutoff = d; break; }
       }
     } else if(proy.length || pres.length){
-      const {y,w} = dateToWeekYear(NOW_UTC); cutoff = isoWeekToDate(y,w);
+      const {y,w} = dateToWeekYear(nowRef); cutoff = isoWeekToDate(y,w);
     }
     state.cutoff[variable] = cutoff;
     newRaw[variable].push(...candidates.filter(r=> totals[weekKey(r.date)]>0 && (!cutoff || r.date<cutoff))
@@ -5451,18 +5582,16 @@ function processAllSlots(){
 
   // ---- Horizonte: mes en curso = mes de la semana de corte de Egreso ----
   const cutRef = state.cutoff.egreso || state.cutoff.ingreso || state.cutoff.produccion;
-  setHorizon(cutRef ? monthKeyForWeek(cutRef, null) : monthKeyFromDate(NOW_UTC), cutRef ? getSeasonLabel(cutRef) : CURRENT_SEASON);
+  setHorizon(cutRef ? monthKeyForWeek(cutRef, null) : monthKeyFromDate(nowRef), cutRef ? getSeasonLabel(cutRef) : CURRENT_SEASON);
   // Producción: horizonte propio a partir de SU semana de corte (real consolidado = 0).
   setVarHorizon('produccion', state.cutoff.produccion);
-  refreshHorizonUI();
+  if(ui) refreshHorizonUI();
 
   state.raw = newRaw;
   state.errors = errors;
   state.notes = notes;
   clearForecastCache();
   state.monthly = buildMonthlyIndex();
-  renderStatus();
-  renderAll();
 }
 
 function clearAllSlots(){
