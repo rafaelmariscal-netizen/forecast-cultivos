@@ -1183,6 +1183,7 @@ function estacionalSourceFor(variable, crop){
 }
 
 function projectedWeeks(variable, crop, method){
+  method = metodoEfectivo(variable, method);   // producción: Promedio móvil → Forecast estacional
   const cierre = state.cierre[crop] || '';
   const key = [variable, crop, method, method==='movil' ? castigoMovilPct() : '', cierre].join('|');
   if(projCache[key]) return projCache[key];
@@ -1519,7 +1520,7 @@ function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
   const pesArr  = months.map((mk,i)=> i>=projStart ? pes.full[mk] : null);
   const presArr = months.map(mk=> act.pres[mk]);
   const lineColor = scenarioLineColor(sc);
-  const projLabel = `Proyección · ${METODO_LABEL[method]} (${sc})`;
+  const projLabel = `Proyección · ${METODO_LABEL[metodoEfectivo(kind, method)]} (${sc})` + (kind==='produccion' && method==='movil' ? ' — producción no usa Promedio móvil' : '');
 
   const ctx = document.getElementById(canvasId).getContext('2d');
   charts[canvasId] = new Chart(ctx, {
@@ -1562,6 +1563,10 @@ const TABLE_METHODS = [
   { key:'movil',      label:'Promedio móvil' },
   { key:'estacional', label:'Forecast estacional' }
 ];
+// Producción NO usa Promedio móvil (decisión 29-oct): si está elegido en el panel, producción se proyecta
+// con Forecast estacional; ingreso, egreso y EBITDA sí siguen usando Promedio móvil.
+function metodoEfectivo(variable, method){ return (variable==='produccion' && method==='movil') ? 'estacional' : method; }
+function tableMethodsFor(v){ return v==='produccion' ? TABLE_METHODS.filter(m=>m.key!=='movil') : TABLE_METHODS; }
 function hasTipo(variable, tipo){ return state.raw[variable].some(r=>r.tipo===tipo); }
 
 function varianceCellHTML(diff, pct, meta){
@@ -1579,20 +1584,21 @@ function renderHistoricoTable(){
 
   const v = state.filters.tablaVariable;
   const meta = TABLE_VAR_META[v];
+  const MT = tableMethodsFor(v), activeM = metodoEfectivo(v, activeMethod);
   document.querySelectorAll('#tableVariableSeg button').forEach(btn=> btn.classList.toggle('on', btn.dataset.var===v));
 
   const months = monthsForKind(v);
   const H = v==='produccion' ? horizonFor('produccion') : { forecastMonths:FORECAST_MONTHS, currentMk:CURRENT_MONTH_KEY, horizonMk:HORIZON_MK };
   const S = {};
-  TABLE_METHODS.forEach(m=> S[m.key] = kindSeries(v, m.key, sc, crops, months, vista));
+  MT.forEach(m=> S[m.key] = kindSeries(v, m.key, sc, crops, months, vista));
   const base = S.estacional; // Real y Presupuesto no dependen del método
   const hasPres = v==='ebitda' ? (hasTipo('ingreso','presupuesto')||hasTipo('egreso','presupuesto')) : hasTipo(v,'presupuesto');
 
   const thead = document.getElementById('tablaHistorico').querySelector('thead');
   const tbody = document.getElementById('tablaHistorico').querySelector('tbody');
-  const mcls = k => k===activeMethod ? ' class="active-method"' : '';
+  const mcls = k => k===activeM ? ' class="active-method"' : '';
   thead.innerHTML = `<tr><th>Mes</th><th>${meta.label} real</th><th>Presupuesto</th><th>Variación vs presupuesto</th>` +
-    TABLE_METHODS.map(m=>`<th${mcls(m.key)}>${m.label}</th>`).join('') + '</tr>';
+    MT.map(m=>`<th${mcls(m.key)}>${m.label}</th>`).join('') + '</tr>';
   tbody.innerHTML = '';
 
   let totReal=0, totPresReal=0, totPres=0; const totM = {polinomial:0, movil:0, estacional:0}; let anyReal=false;
@@ -1605,7 +1611,7 @@ function renderHistoricoTable(){
     if(vista==='mensual'){
       if(realV!=null){ totReal += realV; anyReal = true; if(presV!=null) totPresReal += presV; }
       if(presV!=null) totPres += presV;
-      TABLE_METHODS.forEach(m=> totM[m.key] += S[m.key].full[mk]||0);
+      MT.forEach(m=> totM[m.key] += S[m.key].full[mk]||0);
     }
     const tr = document.createElement('tr');
     if(mk===H.currentMk) tr.className='now';
@@ -1613,7 +1619,7 @@ function renderHistoricoTable(){
       <td>${realV==null?'—':meta.fmt(realV)}</td>
       <td>${presV==null?'—':meta.fmt(presV)}</td>
       <td>${varianceCellHTML(diff, pct, meta)}</td>` +
-      TABLE_METHODS.map(m=>`<td${mcls(m.key)}>${meta.fmt(S[m.key].full[mk]||0)}</td>`).join('');
+      MT.map(m=>`<td${mcls(m.key)}>${meta.fmt(S[m.key].full[mk]||0)}</td>`).join('');
     tbody.appendChild(tr);
   });
 
@@ -1626,7 +1632,7 @@ function renderHistoricoTable(){
       <td>${anyReal?meta.fmt(totReal):'—'}</td>
       <td>${hasPres?meta.fmt(totPres):'—'}</td>
       <td>${varianceCellHTML(totDiff, totPct, meta)}</td>` +
-      TABLE_METHODS.map(m=>`<td${mcls(m.key)}>${meta.fmt(totM[m.key])}</td>`).join('');
+      MT.map(m=>`<td${mcls(m.key)}>${meta.fmt(totM[m.key])}</td>`).join('');
     tbody.appendChild(totalRow);
   }
 
@@ -1730,7 +1736,7 @@ function renderKgHaChart(ctx){
   const pesArr  = months.map((mk,i)=> i>=projStart ? d(pes.full[mk]) : null);
   const presArr = hasTipo('produccion','presupuesto') ? months.map(mk=> d(act.pres[mk])) : months.map(()=>null);
   const lineColor = scenarioLineColor(sc);
-  const projLabel = `Proyección · ${METODO_LABEL[method]} (${sc})`;
+  const projLabel = `Proyección · ${METODO_LABEL[metodoEfectivo('produccion', method)]} (${sc})` + (method==='movil' ? ' — producción no usa Promedio móvil' : '');
   const fmtU = ctx.fmtU;
   charts.chartKgHa = new Chart(document.getElementById('chartKgHa').getContext('2d'), {
     type:'line',
@@ -1767,19 +1773,20 @@ function renderKgHaTable(ctx){
   const sc = state.filters.escenario, vista = state.filters.vista, activeMethod = state.filters.metodo;
   const months = DISPLAY_MONTHS;
   const thead = tbl.querySelector('thead'), tbody = tbl.querySelector('tbody');
-  const mcls = k => k===activeMethod ? ' class="active-method"' : '';
+  const MT = tableMethodsFor('produccion'), activeM = metodoEfectivo('produccion', activeMethod);
+  const mcls = k => k===activeM ? ' class="active-method"' : '';
   const U = ctx.unit;
   thead.innerHTML = `<tr><th>Mes</th><th>${U} real</th><th>${U} presupuesto</th><th>Variación vs presupuesto</th>` +
-    TABLE_METHODS.map(m=>`<th${mcls(m.key)}>${m.label}</th>`).join('') + '</tr>';
+    MT.map(m=>`<th${mcls(m.key)}>${m.label}</th>`).join('') + '</tr>';
   tbody.innerHTML = '';
   const sub = document.getElementById('kghaSub');
   if(state.filters.focalCrop===OTHER_LABEL){
-    tbody.innerHTML = `<tr><td colspan="${4+TABLE_METHODS.length}">📦 Empaque no produce kg — elige un cultivo o Consolidado.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${4+MT.length}">📦 Empaque no produce kg — elige un cultivo o Consolidado.</td></tr>`;
     sub.textContent = ''; return;
   }
 
   const S = {};
-  TABLE_METHODS.forEach(m=> S[m.key] = kindSeries('produccion', m.key, sc, ctx.crops, months, vista));
+  MT.forEach(m=> S[m.key] = kindSeries('produccion', m.key, sc, ctx.crops, months, vista));
   const base = S.estacional; // Real y Presupuesto no dependen del método
   const hasPres = hasTipo('produccion','presupuesto');
   const meta = { fmt:ctx.fmtU, favorableWhenAbove:true };
@@ -1787,7 +1794,7 @@ function renderKgHaTable(ctx){
     ? `<td${extra||''}>${fmtKgHa(kg/ctx.ha)}<span class="subkg">${fmtKg(kg)}</span></td>`
     : `<td${extra||''}>${fmtKg(kg)}</td>`;
 
-  let totReal=0, totPresReal=0, totPres=0, anyReal=false; const totM = {}; TABLE_METHODS.forEach(m=>totM[m.key]=0);
+  let totReal=0, totPresReal=0, totPres=0, anyReal=false; const totM = {}; MT.forEach(m=>totM[m.key]=0);
   months.forEach(mk=>{
     const isForecast = FORECAST_MONTHS.includes(mk);
     const realKg = base.hasReal[mk] ? base.real[mk] : null;
@@ -1797,7 +1804,7 @@ function renderKgHaTable(ctx){
     if(vista==='mensual'){
       if(realKg!=null){ totReal += realKg; anyReal = true; if(presKg!=null) totPresReal += presKg; }
       if(presKg!=null) totPres += presKg;
-      TABLE_METHODS.forEach(m=> totM[m.key] += S[m.key].full[mk]||0);
+      MT.forEach(m=> totM[m.key] += S[m.key].full[mk]||0);
     }
     const tr = document.createElement('tr');
     if(mk===CURRENT_MONTH_KEY) tr.className='now';
@@ -1805,7 +1812,7 @@ function renderKgHaTable(ctx){
       (realKg==null ? '<td>—</td>' : cell(realKg)) +
       (presKg==null ? '<td>—</td>' : cell(presKg)) +
       `<td>${varianceCellHTML(diff, pct, meta)}</td>` +
-      TABLE_METHODS.map(m=> cell(S[m.key].full[mk]||0, mcls(m.key))).join('');
+      MT.map(m=> cell(S[m.key].full[mk]||0, mcls(m.key))).join('');
     tbody.appendChild(tr);
   });
 
@@ -1818,7 +1825,7 @@ function renderKgHaTable(ctx){
       (anyReal ? cell(totReal) : '<td>—</td>') +
       (hasPres ? cell(totPres) : '<td>—</td>') +
       `<td>${varianceCellHTML(totDiff, totPct, meta)}</td>` +
-      TABLE_METHODS.map(m=> cell(totM[m.key], mcls(m.key))).join('');
+      MT.map(m=> cell(totM[m.key], mcls(m.key))).join('');
     tbody.appendChild(totalRow);
   }
 
@@ -1906,10 +1913,11 @@ function renderRegistroTable(){
   const months = [...set].sort();
   const actual = kindSeries(v, 'estacional', sc, crops, months, 'mensual');   // Real y Presupuesto (datos actuales)
 
-  const mcls = k => k===activeMethod ? ' class="active-method"' : '';
-  const activeLabel = (TABLE_METHODS.find(m=>m.key===activeMethod)||TABLE_METHODS[2]).label;
+  const MT = tableMethodsFor(v), activeM = metodoEfectivo(v, activeMethod);
+  const mcls = k => k===activeM ? ' class="active-method"' : '';
+  const activeLabel = (MT.find(m=>m.key===activeM)||TABLE_METHODS[2]).label;
   tbl.querySelector('thead').innerHTML = `<tr><th>Mes</th><th>Foto del</th><th>Presupuesto</th>` +
-    TABLE_METHODS.map(m=>`<th${mcls(m.key)}>${m.label} (foto)</th>`).join('') +
+    MT.map(m=>`<th${mcls(m.key)}>${m.label} (foto)</th>`).join('') +
     `<th>${meta.label} real (al cierre)</th><th>Real vs forecast</th><th>Real vs presupuesto</th></tr>`;
   const tbody = tbl.querySelector('tbody');
   tbody.innerHTML = '';
@@ -1920,14 +1928,14 @@ function renderRegistroTable(){
     const realV = cerrado && actual.hasReal[mk] ? actual.real[mk] : null;
     const realCell = cerrado ? (realV==null ? '—' : meta.fmt(realV)) : (mk===H.currentMk ? '<span class="en-curso">en curso</span>' : '—');
     let dF=null, pF=null, dP=null, pP=null;
-    if(realV!=null && foto){ const f = foto[activeMethod]; dF = realV - f; pF = f!==0 ? dF/f*100 : null; }
+    if(realV!=null && foto){ const f = foto[activeM]; dF = realV - f; pF = f!==0 ? dF/f*100 : null; }
     if(realV!=null && presV!=null){ dP = realV - presV; pP = presV!==0 ? dP/presV*100 : null; }
     const tr = document.createElement('tr');
     if(mk===H.currentMk) tr.className = 'now';
     tr.innerHTML = `<td>${monthLabel(mk)}</td>
       <td class="foto-fecha">${foto ? fmtFechaCorta(foto.fecha) : 'sin foto'}</td>
       <td>${presV==null?'—':meta.fmt(presV)}</td>` +
-      TABLE_METHODS.map(m=>`<td${mcls(m.key)}>${foto ? meta.fmt(foto[m.key]) : '—'}</td>`).join('') +
+      MT.map(m=>`<td${mcls(m.key)}>${foto ? meta.fmt(foto[m.key]) : '—'}</td>`).join('') +
       `<td>${realCell}</td>
       <td>${varianceCellHTML(dF, pF, meta).replace('s/presupuesto','s/forecast')}</td>
       <td>${varianceCellHTML(dP, pP, meta)}</td>`;
@@ -5680,7 +5688,7 @@ function renderMetodoHint(){
     el.innerHTML = base + (sinVar.length ? ` ⚠️ Sin % en la hoja de Variación: ${sinVar.map(c=>DISPLAY[c]).join(', ')} — se usa el presupuesto tal cual (0%).` : '') + prodTxt + cierreTxt;
   } else if(method==='movil'){
     const c = castigoMovilPct();
-    el.innerHTML = `Promedio de las últimas 12 semanas reales${c ? ` × ${(100-c).toLocaleString('es-MX',{maximumFractionDigits:2})}% (castigo ${c.toLocaleString('es-MX',{maximumFractionDigits:2})}%)` : ' (sin castigo)'}; proyecta desde la ${cutTxt}. Horizonte: ${horTxt}.` + cierreTxt;
+    el.innerHTML = `🌱 <b>Producción no usa Promedio móvil</b>: se proyecta con Forecast estacional (PPTO Producción × (1 + Factor Producción)). Ingreso y egreso: ` + `Promedio de las últimas 12 semanas reales${c ? ` × ${(100-c).toLocaleString('es-MX',{maximumFractionDigits:2})}% (castigo ${c.toLocaleString('es-MX',{maximumFractionDigits:2})}%)` : ' (sin castigo)'}; proyecta desde la ${cutTxt}. Horizonte: ${horTxt}.` + cierreTxt;
   } else {
     el.innerHTML = `Recta ajustada sobre las semanas reales (sin la semana 27); proyecta desde la ${cutTxt}. Horizonte: ${horTxt}.` + cierreTxt;
   }
