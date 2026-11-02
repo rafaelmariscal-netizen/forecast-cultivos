@@ -2211,14 +2211,17 @@ const SLOT_DEFS = [
   { tipo:'real', variable:'egreso' }, { tipo:'real', variable:'ingreso' }, { tipo:'real', variable:'produccion' },
   { tipo:'presupuesto', variable:'egreso' }, { tipo:'presupuesto', variable:'ingreso' }, { tipo:'presupuesto', variable:'produccion' },
   { tipo:'proyeccion', variable:'egreso' }, { tipo:'proyeccion', variable:'ingreso' }, { tipo:'proyeccion', variable:'produccion' },
-  { tipo:'variacion', variable:'egreso' }, { tipo:'variacion', variable:'produccion' }
+  { tipo:'variacion', variable:'egreso' }, { tipo:'variacion', variable:'produccion' },
+  // Egreso SIN destajo (pestañas "PPTO Egreso - Dest" y "REAL Egreso - Dest"): las usa el Forecast estacional
+  { tipo:'presupuesto_sd', variable:'egreso' }, { tipo:'real_sd', variable:'egreso' }
 ];
 // Nombre de la casilla de variación según la variable (Egreso: "Variación Egreso"; Producción: "Factor Producción").
 function slotLabel(tipo, variable){
   if(tipo==='variacion') return variable==='produccion' ? 'Factor Producción (método estacional)' : 'Variación Egreso (método estacional)';
   return TIPO_LABEL[tipo];
 }
-const TIPO_LABEL = { real:'Real', presupuesto:'Presupuesto', proyeccion:'Proyección equipo', variacion:'Variación % (método estacional)' };
+const TIPO_LABEL = { real:'Real', presupuesto:'Presupuesto', proyeccion:'Proyección equipo', variacion:'Variación % (método estacional)',
+  presupuesto_sd:'PPTO sin destajo (pestaña "PPTO Egreso - Dest")', real_sd:'Real sin destajo (pestaña "REAL Egreso - Dest")' };
 const VAR_LABEL = { egreso:'Egreso', ingreso:'Ingreso', produccion:'Producción' };
 
 const BAKED_DATA = {
@@ -5605,7 +5608,10 @@ function cargarDatosEnEstado(texts, nowRef, ui){
   ['presupuesto','real'].forEach(t=>{
     const sep = separarBloqueDestajo(texts['egreso|'+t]);
     texts['egreso|'+t] = sep.principal;
-    sinDestajoRec[t] = sep.destajo ? parseSlot(sep.destajo, t).records : [];
+    // Fuente principal: las pestañas "… Egreso - Dest" (casillas presupuesto_sd / real_sd).
+    // Respaldo: el bloque H–M dentro de PPTO Egreso / REAL Egreso (si alguien lo usa así).
+    const propio = String(texts['egreso|'+t+'_sd']||'').trim();
+    sinDestajoRec[t] = propio ? parseSlot(propio, t).records : (sep.destajo ? parseSlot(sep.destajo, t).records : []);
   });
   SLOT_DEFS.forEach(({tipo,variable})=>{
     const id = slotId(tipo,variable);
@@ -5819,7 +5825,7 @@ function renderMetodoHint(){
     const sinVar = [];
     const tieneSD = state.sinDestajo && state.sinDestajo.presupuesto && Object.keys(state.sinDestajo.presupuesto).length>0;
     const base = `Egreso = PPTO Sin Destajo × cumplimiento sin destajo + costo/kg PPTO acumulado × producción, de cada semana, desde la ${cutTxt}. 📦 Empaque = costo/kg PPTO acumulado (egreso Empaque ÷ kg Espárrago) × producción de Espárrago. Horizonte: ${horTxt}. Ingreso usa su hoja de Proyección.`
-      + (tieneSD ? '' : ' ⚠️ Todavía no llegan las columnas "Egreso - Destajo": todo el egreso se toma como sin destajo.');
+      + (tieneSD ? '' : ' ⚠️ Todavía no llegan las pestañas "PPTO Egreso - Dest" / "REAL Egreso - Dest": todo el egreso se toma como sin destajo.');
     if(!tieneSD) el.classList.add('warn');
     // Producción: mismo método con su propio corte y horizonte.
     const Hp = horizonFor('produccion'), cutP = state.cutoff.produccion;
