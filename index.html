@@ -750,7 +750,15 @@ function computeHorizon(currentMk, seasonLabel){
 }
 function setVarHorizon(variable, cutoff){
   if(!cutoff){ delete VAR_HORIZON[variable]; return; }
-  VAR_HORIZON[variable] = computeHorizon(monthKeyForWeek(cutoff, null), getSeasonLabel(cutoff));
+  VAR_HORIZON[variable] = computeHorizon(mesUltimoReal(variable, cutoff), getSeasonLabel(cutoff));
+}
+// Horizonte (regla 4-nov): mes en curso = último mes calendario con al menos una semana REAL (la semana anterior
+// al corte). Ej.: último real = sem 44 (Mes Octubre) → horizonte oct + nov, dic, ene; febrero = 0.
+// En cuanto llega la primera semana real de noviembre, el horizonte pasa solo a nov + dic, ene, feb.
+function mesUltimoReal(variable, cutoff){
+  const hayReal = state.realFromSheetAny && state.realFromSheetAny[variable];
+  const ref = hayReal ? new Date(cutoff.getTime() - 7*DAY_MS) : cutoff;
+  return monthKeyForWeek(ref, null);
 }
 function horizonFor(variable){
   return VAR_HORIZON[variable] || { currentMk:CURRENT_MONTH_KEY, forecastMonths:FORECAST_MONTHS, horizonMk:HORIZON_MK, displayMonths:DISPLAY_MONTHS };
@@ -1158,8 +1166,8 @@ const projCache = {};
 function clearForecastCache(){ Object.keys(projCache).forEach(k=>delete projCache[k]); }
 
 // Semanas del horizonte para una variable: [{date, wk, mk}]
-function horizonWeeks(variable){
-  const start = state.cutoff[variable];
+function horizonWeeks(variable, desde){
+  const start = desde || state.cutoff[variable];
   if(!start) return [];
   const horizonMk = horizonFor(variable).horizonMk;   // producción: su propio horizonte
   const out = [];
@@ -1207,6 +1215,44 @@ function sumaSemanas(map, desde, hasta){   // semanas [desde, hasta)
   return s;
 }
 function ratioCumplimiento(real, ppto){ return (ppto > 0 && real > 0) ? real/ppto : 1; }
+/* ---------- Reglas 4-nov-2026 (empatan con el Excel de validación de Rafael) ----------
+   • Inicio FIJO de la columna "Forecast estacional": egreso desde la semana 40/2026, producción desde la 42/2026.
+     Antes de ese inicio la columna toma el REAL; desde ahí se calcula con la fórmula aunque la semana ya tenga real
+     (así octubre muestra lo que el método pronosticaba, no el real). Columna "Real" sin cambios.
+     Si el corte real es anterior a esa semana, o es otra temporada, se usa el corte.
+   • Cumplimiento RODANTE: semana t usa Σ Real / Σ PPTO desde el inicio de temporada hasta t-1 mientras t-1 tenga
+     real; después del último real se congela con el acumulado a la última semana real.
+   • Producción_t = PPTO_t × (1 + Factor_t)  (t ≥ inicio de producción; antes = real). SIN cumplimiento: así lo
+     calcula el Excel de validación de Rafael (empata al kilo oct–ene con datos del 4-nov).
+   • Egreso_t = PPTO Sin Destajo_t × CumplSD_t + Costo/kg PPTO_t × Kg_t   (Kg_t = la columna de producción de arriba)
+   • Empaque_t = Costo/kg Empaque_t × Kg Espárrago_t, con Costo/kg acumulado HASTA LA SEMANA t (incluida), igual que el Excel
+   • Sin presupuesto o sin real acumulado → cumplimiento 1.0. Sin kg presupuestados acumulados (Papa) → destajo = PPTO destajo. */
+const INICIO_FORECAST_ESTACIONAL = { egreso:{ y:2026, w:40 }, produccion:{ y:2026, w:42 } };
+function inicioForecastEstacional(variable){
+  const cut = state.cutoff[variable];
+  const def = INICIO_FORECAST_ESTACIONAL[variable];
+  if(!cut || !def) return cut || null;
+  const fijo = isoWeekToDate(def.y, def.w);
+  if(getSeasonLabel(fijo) !== getSeasonLabel(cut)) return cut;   // otra temporada: inicia en el corte
+  return fijo < cut ? fijo : cut;
+}
+function finHorizonte(){
+  let fin = 0;
+  ['egreso','produccion'].forEach(v=>{ const hw = horizonWeeks(v); if(hw.length) fin = Math.max(fin, hw[hw.length-1].date.getTime()); });
+  return fin;
+}
+// Cumplimiento rodante por semana: { 'AAAA-S': ratio } para cada semana desde el inicio de temporada hasta `fin`.
+function cumplimientoRodante(real, ppto, ini, cut, fin){
+  const out = {};
+  if(!ini) return out;
+  let sr = 0, sp = 0;
+  for(let t = ini.getTime(); t <= fin; t += 7*DAY_MS){
+    const wk = weekKey(new Date(t));
+    out[wk] = ratioCumplimiento(sr, sp);          // acumulado hasta t-1 (congelado después del último real)
+    if(cut && t < cut.getTime()){ sr += real[wk]||0; sp += ppto[wk]||0; }
+  }
+  return out;
+}
 function paramsEstacional(crop){
   state.estParams = state.estParams || {};
   if(state.estParams[crop]) return state.estParams[crop];
@@ -1216,44 +1262,46 @@ function paramsEstacional(crop){
   const pptoE = state.weekVal.presupuesto.egreso[crop] || {};
   const realE = (state.realWeek && state.realWeek.egreso && state.realWeek.egreso[crop]) || {};
   const SD = state.sinDestajo || {};
-  const pptoSD = (SD.presupuesto && SD.presupuesto[crop]) || pptoE;   // sin bloque → todo es sin destajo
+  const pptoSD = (SD.presupuesto && SD.presupuesto[crop]) || pptoE;   // sin datos → todo es sin destajo
   const realSD = (SD.real && SD.real[crop]) || realE;
   const cutP = state.cutoff.produccion, cutE = state.cutoff.egreso;
   const iniP = cutP ? inicioTemporadaSemana(cutP) : null;
   const iniE = cutE ? inicioTemporadaSemana(cutE) : null;
-  const sumRealP = sumaSemanas(realP, iniP, cutP), sumPptoP = sumaSemanas(pptoP, iniP, cutP);
-  const sumRealSD = sumaSemanas(realSD, iniE, cutE), sumPptoSD = sumaSemanas(pptoSD, iniE, cutE);
-  const cumplP  = ratioCumplimiento(sumRealP, sumPptoP);
-  const cumplSD = ratioCumplimiento(sumRealSD, sumPptoSD);
-  // Costo por kilo PPTO acumulado hasta t-1 (desde el inicio de temporada), para cada semana del horizonte
-  const costoKg = {};
-  const hw = horizonWeeks('egreso');
-  if(iniE && hw.length){
-    const fin = hw[hw.length-1].date.getTime();
+  const fin = finHorizonte();
+  const cumP  = cumplimientoRodante(realP, pptoP, iniP, cutP, fin);
+  const cumSD = cumplimientoRodante(realSD, pptoSD, iniE, cutE, fin);
+  // Costo por kilo PPTO acumulado hasta t-1 (desde el inicio de temporada)
+  const costoKg = {}, sinKg = {};
+  if(iniE){
     let cd = 0, cp = 0;
     for(let t = iniE.getTime(); t <= fin; t += 7*DAY_MS){
       const wk = weekKey(new Date(t));
       costoKg[wk] = cp > 0 ? cd/cp : 0;
+      sinKg[wk] = !(cp > 0);           // sin kg presupuestados acumulados (p. ej. Papa): el destajo va tal cual del PPTO
       cd += (pptoE[wk]||0) - (pptoSD[wk]||0);
       cp += pptoP[wk]||0;
     }
   }
-  return (state.estParams[crop] = { pptoP, realP, facP, pptoSD, cumplP, cumplSD, costoKg, cutP,
-    sumRealP, sumPptoP, sumRealSD, sumPptoSD });
+  const startP = inicioForecastEstacional('produccion');
+  const wkCut = d => d ? weekKey(new Date(d.getTime()-7*DAY_MS)) : null;
+  return (state.estParams[crop] = { pptoP, realP, facP, pptoE, pptoSD, cumP, cumSD, costoKg, sinKg, startP,
+    cumplP: cumP[weekKey(cutP||new Date(0))] ?? 1, cumplSD: cumSD[weekKey(cutE||new Date(0))] ?? 1, ultimoRealP: wkCut(cutP), ultimoRealE: wkCut(cutE) });
 }
-function produccionEstacionalSemana(P, wk){
-  return (P.pptoP[wk]||0) * P.cumplP * (1 + (P.facP[wk]||0));
+// Kg de la columna "Forecast estacional" de producción para la semana w (antes del inicio fijo = real).
+function kgEstacional(P, w){
+  if(P.startP && w.date < P.startP) return P.realP[w.wk]||0;
+  return (P.pptoP[w.wk]||0) * (1 + (P.facP[w.wk]||0));
 }
+function produccionEstacionalSemana(P, w){ return kgEstacional(P, w); }
 function egresoEstacionalSemana(P, w){
-  const kg = (P.cutP && w.date < P.cutP) ? (P.realP[w.wk]||0) : produccionEstacionalSemana(P, w.wk);
-  return (P.pptoSD[w.wk]||0) * P.cumplSD + (P.costoKg[w.wk]||0) * kg;
+  const sd = (P.pptoSD[w.wk]||0) * (P.cumSD[w.wk] ?? 1);
+  // Sin kg presupuestados acumulados no hay costo por kilo: el destajo se toma tal cual del presupuesto (como el Excel).
+  const destajo = P.sinKg[w.wk] ? ((P.pptoE[w.wk]||0) - (P.pptoSD[w.wk]||0)) : (P.costoKg[w.wk]||0) * kgEstacional(P, w);
+  return sd + destajo;
 }
 
-/* EMPAQUE (Forecast estacional, 30-oct): su egreso se liga a la producción de ESPÁRRAGO.
-     Costo/kg Empaque_t = Σ_{inicio..t-1} PPTO Egreso Empaque / Σ_{inicio..t-1} PPTO Producción Espárrago  (sin kg → 0)
-     Egreso Empaque_t   = Costo/kg Empaque_t × Producción Espárrago_t
-     Producción Espárrago_t = real si esa semana ya es real; si no, PPTO × cumplimiento × (1 + factor) del espárrago.
-     Si el Espárrago tiene "Cierre de temporada", desde ese mes su producción (y por lo tanto este egreso) es 0. */
+/* EMPAQUE: Egreso_t = (Σ_{inicio..t-1} PPTO Egreso Empaque / Σ_{inicio..t-1} PPTO Producción Espárrago) × Kg Espárrago_t
+   (Kg Espárrago_t = la misma columna de producción del espárrago). Cierre del Espárrago → 0 desde ese mes. */
 const CULTIVO_EMPAQUE = 'ESPARRAGO';
 function paramsEmpaque(){
   state.estParams = state.estParams || {};
@@ -1261,15 +1309,14 @@ function paramsEmpaque(){
   const P = paramsEstacional(CULTIVO_EMPAQUE);
   const pptoEmp = state.weekVal.presupuesto.egreso[OTHER_LABEL] || {};
   const costoKg = {};
-  const cutE = state.cutoff.egreso, hw = horizonWeeks('egreso');
-  if(cutE && hw.length){
-    const fin = hw[hw.length-1].date.getTime();
+  const cutE = state.cutoff.egreso, fin = finHorizonte();
+  if(cutE){
     let ce = 0, cp = 0;
     for(let t = inicioTemporadaSemana(cutE).getTime(); t <= fin; t += 7*DAY_MS){
       const wk = weekKey(new Date(t));
-      costoKg[wk] = cp > 0 ? ce/cp : 0;
-      ce += pptoEmp[wk]||0;
+      ce += pptoEmp[wk]||0;            // Empaque: acumulado HASTA la semana t (incluida)
       cp += P.pptoP[wk]||0;
+      costoKg[wk] = cp > 0 ? ce/cp : 0;
     }
   }
   return (state.estParams.__empaque = { P, costoKg });
@@ -1277,8 +1324,20 @@ function paramsEmpaque(){
 function egresoEmpaqueSemana(E, w){
   const cierreEsp = state.cierre[CULTIVO_EMPAQUE];
   if(cierreEsp && w.mk >= cierreEsp) return 0;
-  const kg = (E.P.cutP && w.date < E.P.cutP) ? (E.P.realP[w.wk]||0) : produccionEstacionalSemana(E.P, w.wk);
-  return (E.costoKg[w.wk]||0) * kg;
+  return (E.costoKg[w.wk]||0) * kgEstacional(E.P, w);
+}
+// ¿Esta variable/método usa el inicio fijo del Forecast estacional?
+function usaInicioFijo(variable, method){
+  return metodoEfectivo(variable, method)==='estacional' && (variable==='egreso' || variable==='produccion');
+}
+// Real de las semanas ANTES del inicio fijo, por mes (lo que la columna Forecast estacional toma como real).
+function realAntesDelInicio(variable, crop){
+  state.estParams = state.estParams || {};
+  const key = '__realAntes|'+variable+'|'+crop;
+  if(state.estParams[key]) return state.estParams[key];
+  const ini = inicioForecastEstacional(variable), out = {};
+  state.raw[variable].forEach(r=>{ if(r.tipo==='real' && r.cultivo===crop && (!ini || r.date < ini)) out[r.mk] = (out[r.mk]||0) + r.importe; });
+  return (state.estParams[key] = out);
 }
 
 function projectedWeeks(variable, crop, method){
@@ -1286,7 +1345,7 @@ function projectedWeeks(variable, crop, method){
   const cierre = (state.cierre[crop] || '') + (crop===OTHER_LABEL ? '|esp:'+(state.cierre[CULTIVO_EMPAQUE]||'') : '');
   const key = [variable, crop, method, method==='movil' ? castigoMovilPct() : '', cierre].join('|');
   if(projCache[key]) return projCache[key];
-  const weeks = horizonWeeks(variable);
+  const weeks = usaInicioFijo(variable, method) ? horizonWeeks(variable, inicioForecastEstacional(variable)) : horizonWeeks(variable);
   let valueAt;
 
   if(method==='estacional'){
@@ -1301,7 +1360,7 @@ function projectedWeeks(variable, crop, method){
     } else if(variable==='produccion'){
       // Producción_t = PPTO Producción_t × Cumplimiento Producción × (1 + Factor Producción_t)
       const P = paramsEstacional(crop);
-      valueAt = w => produccionEstacionalSemana(P, w.wk);
+      valueAt = w => produccionEstacionalSemana(P, w);
     } else {
       const proy = (state.weekVal.proyeccion[variable][crop]) || {};
       valueAt = w => proy[w.wk]||0;
@@ -1332,15 +1391,18 @@ function scenarioFactor(variable, crop, scenario){
 function monthlyParts(variable, crops, method, scenario, months){
   const real = {}, proj = {}, full = {}, hasReal = {};
   months.forEach(mk=>{ real[mk]=0; proj[mk]=0; hasReal[mk]=false; });
+  const fijo = usaInicioFijo(variable, method);
+  const base = {}; months.forEach(mk=> base[mk]=0);   // parte "real" de la columna del método
   crops.forEach(c=>{
     months.forEach(mk=>{
       const bucket = state.monthly[variable].real[c];
       if(bucket && mk in bucket){ real[mk] += bucket[mk]; hasReal[mk] = true; }
     });
+    if(fijo){ const ra = realAntesDelInicio(variable, c); months.forEach(mk=>{ base[mk] += ra[mk]||0; }); }
     const f = scenarioFactor(variable, c, scenario);
     projectedWeeks(variable, c, method).forEach(p=>{ if(p.mk in proj) proj[p.mk] += p.v*f; });
   });
-  months.forEach(mk=> full[mk] = real[mk] + proj[mk]);
+  months.forEach(mk=> full[mk] = (fijo ? base[mk] : real[mk]) + proj[mk]);
   return { real, proj, full, hasReal };
 }
 
@@ -6590,7 +6652,10 @@ function cargarDatosEnEstado(texts, nowRef, ui){
 
   // ---- Horizonte: mes en curso = mes de la semana de corte de Egreso ----
   const cutRef = state.cutoff.egreso || state.cutoff.ingreso || state.cutoff.produccion;
-  setHorizon(cutRef ? monthKeyForWeek(cutRef, null) : monthKeyFromDate(nowRef), cutRef ? getSeasonLabel(cutRef) : CURRENT_SEASON);
+  state.realFromSheetAny = {};
+  VARIABLES.forEach(v=>{ state.realFromSheetAny[v] = newRaw[v].some(r=>r.tipo==='real'); });
+  const cutVar = state.cutoff.egreso ? 'egreso' : (state.cutoff.ingreso ? 'ingreso' : 'produccion');
+  setHorizon(cutRef ? mesUltimoReal(cutVar, cutRef) : monthKeyFromDate(nowRef), cutRef ? getSeasonLabel(cutRef) : CURRENT_SEASON);
   // Producción: horizonte propio a partir de SU semana de corte (real consolidado = 0).
   setVarHorizon('produccion', state.cutoff.produccion);
   if(ui) refreshHorizonUI();
@@ -6696,14 +6761,14 @@ function renderMetodoHint(){
   if(method==='estacional'){
     const sinVar = [];
     const tieneSD = state.sinDestajo && state.sinDestajo.presupuesto && Object.keys(state.sinDestajo.presupuesto).length>0;
-    const base = `Egreso = PPTO Sin Destajo × cumplimiento sin destajo + costo/kg PPTO acumulado × producción, de cada semana, desde la ${cutTxt}. 📦 Empaque = costo/kg PPTO acumulado (egreso Empaque ÷ kg Espárrago) × producción de Espárrago. Horizonte: ${horTxt}. Ingreso usa su hoja de Proyección.`
+    const base = `Egreso = PPTO Sin Destajo × cumplimiento rodante sin destajo + costo/kg PPTO acumulado × producción, de cada semana, desde la semana ${INICIO_FORECAST_ESTACIONAL.egreso.w}/${INICIO_FORECAST_ESTACIONAL.egreso.y} (antes, real). Último real: ${cutTxt.replace('semana','antes de la semana')}. 📦 Empaque = costo/kg PPTO acumulado hasta la misma semana (egreso Empaque ÷ kg Espárrago) × producción de Espárrago. Horizonte: ${horTxt}. Ingreso usa su hoja de Proyección.`
       + (tieneSD ? '' : ' ⚠️ Todavía no llegan las pestañas "PPTO Egreso - Dest" / "REAL Egreso - Dest": todo el egreso se toma como sin destajo.');
     if(!tieneSD) el.classList.add('warn');
     // Producción: mismo método con su propio corte y horizonte.
     const Hp = horizonFor('produccion'), cutP = state.cutoff.produccion;
     const cutPTxt = cutP ? `semana ${dateToWeekYear(cutP).w}/${dateToWeekYear(cutP).y}` : 'sin semanas reales';
     const sinFacP = crops.filter(c=> estacionalSourceFor('produccion', c)!=='variacion' && state.weekVal.presupuesto.produccion && state.weekVal.presupuesto.produccion[c]);
-    const prodTxt = `<br>🌱 Producción = PPTO Producción × cumplimiento (real ÷ PPTO acumulado desde inicio de temporada) × (1 + Factor Producción) de cada semana, desde la ${cutPTxt}. Horizonte: resto de ${monthLabel(Hp.currentMk)} + ${Hp.forecastMonths.map(monthLabel).join(', ')}; después, 0 kg.`
+    const prodTxt = `<br>🌱 Producción = PPTO Producción × (1 + Factor Producción), desde la semana ${INICIO_FORECAST_ESTACIONAL.produccion.w}/${INICIO_FORECAST_ESTACIONAL.produccion.y} (antes, real). Corte real: ${cutPTxt}. Horizonte: resto de ${monthLabel(Hp.currentMk)} + ${Hp.forecastMonths.map(monthLabel).join(', ')}; después, 0 kg.`
       + (sinFacP.length ? ` ⚠️ Sin factor: ${sinFacP.map(c=>DISPLAY[c]).join(', ')} — se usa el presupuesto tal cual (0%).` : '');
     if(sinVar.length || sinFacP.length) el.classList.add('warn');
     el.innerHTML = base + (sinVar.length ? ` ⚠️ Sin % en la hoja de Variación: ${sinVar.map(c=>DISPLAY[c]).join(', ')} — se usa el presupuesto tal cual (0%).` : '') + prodTxt + cierreTxt;
