@@ -102,6 +102,9 @@
   .chip{ display:flex; align-items:center; gap:5px; padding:5px 10px 5px 8px; border-radius:999px; border:1px solid var(--border-strong); background:var(--surface); font-size:12px; font-weight:600; color:var(--text-secondary); cursor:pointer; user-select:none; }
   .chip input{ accent-color:var(--accent); }
   .chip.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent-strong); }
+  .chip.locked{ cursor:not-allowed; }
+  .chip-min-hint{ font-size:11px; font-weight:600; color:var(--text-muted); margin-top:4px; }
+  .chip-min-hint.warn{ color:var(--critical); }
   .segmented{ display:flex; border:1px solid var(--border-strong); border-radius:8px; overflow:hidden; }
   .segmented button{ flex:1; appearance:none; border:none; background:var(--surface); color:var(--text-secondary); font-size:12.5px; font-weight:700; padding:8px 4px; cursor:pointer; border-left:1px solid var(--border-strong); }
   .segmented button:first-child{ border-left:none; }
@@ -289,6 +292,7 @@
           <button type="button" id="btnIncludedAll">Todos</button><span class="dotsep">·</span><button type="button" id="btnIncludedNone">Ninguno</button>
         </div>
         <div class="chipgrid" id="includedChips"></div>
+        <div class="chip-min-hint" id="includedMinHint">Selecciona mínimo 2 opciones.</div>
       </div>
       <div class="field" id="mesField">
         <h3>Mes de referencia</h3>
@@ -6837,24 +6841,52 @@ function buildFilterUI(){
     const on = state.filters.included.has(c);
     return `<label class="chip ${on?'on':''}" data-crop="${c}"><input type="checkbox" ${on?'checked':''} value="${c}">${ICONS[c]} ${DISPLAY[c]}</label>`;
   }).join('');
+  // Restricción: mínimo 2 casillas seleccionadas (con una sola no tiene caso el desglose del consolidado).
+  const MIN_INCLUDED = 2;
+  const minHint = document.getElementById('includedMinHint');
+  let minHintTimer = null;
+  const avisarMinimo = ()=>{
+    minHint.classList.add('warn');
+    minHint.textContent = `⚠️ Debes dejar mínimo ${MIN_INCLUDED} opciones seleccionadas.`;
+    clearTimeout(minHintTimer);
+    minHintTimer = setTimeout(()=>{ minHint.classList.remove('warn'); minHint.textContent = `Selecciona mínimo ${MIN_INCLUDED} opciones.`; }, 2500);
+  };
+  const syncChipLocks = ()=>{
+    const enMinimo = state.filters.included.size <= MIN_INCLUDED;
+    chipwrap.querySelectorAll('.chip').forEach(chip=>{
+      const lock = enMinimo && chip.querySelector('input').checked;
+      chip.classList.toggle('locked', lock);
+      chip.title = lock ? `Mínimo ${MIN_INCLUDED} opciones seleccionadas` : '';
+    });
+  };
   chipwrap.querySelectorAll('.chip').forEach(chip=>{
     const cb = chip.querySelector('input');
     cb.addEventListener('change', ()=>{
+      if(!cb.checked && state.filters.included.size <= MIN_INCLUDED){
+        cb.checked = true; avisarMinimo(); return;   // no se permite bajar de 2
+      }
       if(cb.checked){ state.filters.included.add(cb.value); chip.classList.add('on'); }
       else { state.filters.included.delete(cb.value); chip.classList.remove('on'); }
+      syncChipLocks();
       renderAll();
     });
   });
   document.getElementById('btnIncludedAll').addEventListener('click', ()=>{
     chipItems.forEach(c=>state.filters.included.add(c));
     chipwrap.querySelectorAll('.chip').forEach(chip=>{ chip.classList.add('on'); chip.querySelector('input').checked = true; });
+    syncChipLocks();
     renderAll();
   });
   document.getElementById('btnIncludedNone').addEventListener('click', ()=>{
-    chipItems.forEach(c=>state.filters.included.delete(c));
-    chipwrap.querySelectorAll('.chip').forEach(chip=>{ chip.classList.remove('on'); chip.querySelector('input').checked = false; });
+    // "Ninguno" deja solo las 2 primeras opciones (mínimo permitido).
+    const keep = chipItems.slice(0, MIN_INCLUDED);
+    chipItems.forEach(c=>{ if(keep.includes(c)) state.filters.included.add(c); else state.filters.included.delete(c); });
+    chipwrap.querySelectorAll('.chip').forEach(chip=>{ const on = keep.includes(chip.dataset.crop); chip.classList.toggle('on', on); chip.querySelector('input').checked = on; });
+    syncChipLocks();
+    avisarMinimo();
     renderAll();
   });
+  syncChipLocks();
 
   const mes = document.getElementById('mesFiltro');
   buildMesOptions();
