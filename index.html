@@ -548,9 +548,7 @@
             Un cultivo que no sea uno de los 7 (por ejemplo "Empaque") se agrupa aparte como Empaque.
           </p>
           <div class="actionrow">
-            <button class="btn primary" id="btnDemo">✨ Cargar datos de ejemplo</button>
             <button class="btn" id="btnProcesar">⚙️ Procesar y actualizar tablero</button>
-            <button class="btn" id="btnLimpiar">🗑️ Limpiar todo</button>
             <button class="btn" id="btnEgresoReal">↺ Recargar datos base</button>
           </div>
         </div>
@@ -6971,9 +6969,7 @@ function init(){
   buildFilterUI();
   buildTabs();
   buildLoaderGrid();
-  document.getElementById('btnDemo').addEventListener('click', loadDemoIntoSlots);
   document.getElementById('btnProcesar').addEventListener('click', ()=>{ state.isDemo=false; document.getElementById('dataTag').textContent='tus datos'; processAllSlots(); });
-  document.getElementById('btnLimpiar').addEventListener('click', clearAllSlots);
   document.getElementById('btnEgresoReal').addEventListener('click', loadBakedDefaults);
   loadBakedDefaults();
   if(window.matchMedia){
