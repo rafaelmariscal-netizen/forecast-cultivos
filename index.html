@@ -8804,6 +8804,7 @@ function cargarDatosEnEstado(texts, nowRef, ui){
     const id = slotId(tipo,variable);
     
     if(variable==='tc' && tipo==='real') {
+       const records = [];
        const rows = parseDelimited(texts['tc|real']||'');
        rows.slice(1).forEach(r=>{
           if(r.length < 4) return;
@@ -8812,8 +8813,10 @@ function cargarDatosEnEstado(texts, nowRef, ui){
           let val = parseFloat(v); if(isNaN(val)) return;
           let dt = resolveRowDate(y, parseInt(w)); if(!dt) return;
           let targetTipo = t==='TC Real' ? 'real' : (t==='TC Oficial' ? 'presupuesto' : 'proyeccion');
-          newRaw.tc.push({ tipo: targetTipo, wk: weekKey(dt), importe: val, date: dt });
+          records.push({ tipo: targetTipo, wk: weekKey(dt), importe: val, date: dt });
        });
+       parsed['tc|real'] = records;
+       if(ui){ document.getElementById(id+'_count').textContent = records.length+' filas'; document.getElementById(id+'_count').classList.toggle('has', records.length>0); }
        return;
     }
 
@@ -8843,7 +8846,7 @@ function cargarDatosEnEstado(texts, nowRef, ui){
   // transcurridas de Proyección (comportamiento anterior). Una semana es Real si el TOTAL de todos los
   // cultivos (Empaque incluido) es > 0 — un cultivo puede estar en $0 y seguir siendo real. La
   // proyección arranca en la primera semana, después de la primera semana real, cuyo total = 0.
-  const newRaw = { egreso:[], ingreso:[], produccion:[] };
+  const newRaw = { egreso:[], ingreso:[], produccion:[], precio:[], tc:[] };
   state.realFromSheet = {};
   state.cutoff = {};
   VARIABLES.forEach(variable=>{
