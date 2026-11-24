@@ -9054,12 +9054,13 @@ function cargarDatosEnEstado(texts, nowRef, ui){
   // la hoja de Variación solo se usa si ninguna otra hoja trae esa semana.
   state.weekMes = {};
   ['real','presupuesto','proyeccion','variacion'].forEach(t=> VARIABLES.forEach(v=> (parsed[v+'|'+t]||[]).forEach(r=>{
+    if(!r.date) return;
     const k = mesToMonthKey(r.mes, r.date);
     if(!k) return;
     const wk = weekKey(r.date);
     if(!(wk in state.weekMes)) state.weekMes[wk] = k;
   })));
-  Object.values(parsed).forEach(list=> list.forEach(r=>{ r.mk = monthKeyForWeek(r.date, r.mes); }));
+  Object.values(parsed).forEach(list=> list.forEach(r=>{ if(r.date) r.mk = monthKeyForWeek(r.date, r.mes); }));
 
   // ---- Real vs Proyección: corte dinámico por variable ----
   // Candidatos a real: la hoja Real si trae algún importe ≠ 0; si viene vacía, las semanas ya
@@ -9115,6 +9116,7 @@ function cargarDatosEnEstado(texts, nowRef, ui){
   function weekMap(records, label, sumarGrupo){
     const out = {}, seen = new Set(); let dup = 0;
     records.forEach(r=>{
+      if(!r.date) return;
       const wk = weekKey(r.date);
       const id = r.cultivoRaw+'|'+wk;
       if(seen.has(id)){ dup++; return; }
@@ -9161,7 +9163,7 @@ function cargarDatosEnEstado(texts, nowRef, ui){
   state.realWeek = {};
   VARIABLES.forEach(v=>{
     const m = {};
-    newRaw[v].filter(r=>r.tipo==='real').forEach(r=>{ const c = m[r.cultivo] = m[r.cultivo]||{}; const wk = weekKey(r.date); c[wk] = (c[wk]||0) + r.importe; });
+    newRaw[v].filter(r=>r.tipo==='real' && r.date).forEach(r=>{ const c = m[r.cultivo] = m[r.cultivo]||{}; const wk = weekKey(r.date); c[wk] = (c[wk]||0) + r.importe; });
     state.realWeek[v] = m;
   });
   state.sinDestajo = {};
