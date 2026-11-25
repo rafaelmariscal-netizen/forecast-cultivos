@@ -2604,6 +2604,7 @@ function renderDetalleTab(){
    mes anterior (la escribe el Apps Script). Aquí se cargan esos datos en un "state" temporal, se calculan los
    3 métodos con el mismo código de siempre (kindSeries) y se regresa el state actual intacto.
    Presupuesto y Real se leen de los datos actuales; el Real solo se muestra cuando el mes ya cerró. */
+const FOTOS_FORECAST = (typeof window !== "undefined" && window.FOTOS_FORECAST) ? window.FOTOS_FORECAST : {};
 const fotoCache = {};
 function conDatosDeFoto(foto, fn){
   const savedState = Object.assign({}, state);
