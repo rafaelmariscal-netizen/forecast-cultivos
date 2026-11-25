@@ -1593,10 +1593,19 @@ function projectedWeeks(variable, crop, method, customHorizonMk){
         valueAt = () => 0;
       } else {
         const startI = inicioForecastEstacional('ingreso');
-        const proy = (state.weekVal.proyeccion[variable][crop]) || {};
+        const prodList = projectedWeeks('produccion', crop, 'estacional', customHorizonMk);
+        const prodMap = {};
+        prodList.forEach(p=>{ prodMap[p.wk] = p.v; });
+        const tcMap = state.tcForecastMap || {};
+        const prMap = (state.precioForecastMap && state.precioForecastMap[crop]) || {};
+        const pnac = pctNacMap[crop] != null ? pctNacMap[crop] : 0;
+        const pexp = 1 - pnac;
         valueAt = w => {
           if(startI && w.date < startI) return (state.realWeek.ingreso[crop]||{})[w.wk]||0;
-          return proy[w.wk]||0;
+          const kg = prodMap[w.wk] || 0;
+          const pr = prMap[w.wk] || { pExp:0, pNac:0 };
+          const tc = tcMap[w.wk] || state.tcBase || 18.40;
+          return (kg * pexp) * (pr.pExp * tc) + (kg * pnac) * pr.pNac;
         };
       }
     } else if(variable==='produccion'){
@@ -1932,7 +1941,7 @@ function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
 
   let lastRealIdx = -1;
   months.forEach((mk,i)=>{ if(act.hasReal[mk]) lastRealIdx = i; });
-  const projStart = Math.max(0, lastRealIdx);
+  const projStart = (vista === 'acumulado') ? 0 : Math.max(0, lastRealIdx);
   const realArr = months.map(mk=> act.hasReal[mk] ? act.real[mk] : null);
   const projArr = months.map((mk,i)=> i>=projStart ? act.full[mk] : null);
   const optArr  = months.map((mk,i)=> i>=projStart ? opt.full[mk] : null);
