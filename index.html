@@ -2154,8 +2154,15 @@ function renderHistoricoTable(){
 // En Consolidado: suma de kg de los cultivos que tienen hectáreas ÷ suma de esas hectáreas.
 // Empaque no aplica (no produce kg). Las hectáreas se guardan en el navegador (localStorage).
 const HECTAREAS_KEY = 'forecast_hectareas_v1';
+const DEFAULT_HECTAREAS = { FRESA:710.7, FRAMBUESA:443.4, ZARZAMORA:146.6, ARANDANO:275.6, ESPARRAGO:1066.3, AGUACATE:1028.5, PAPA:505.6 };
 function loadHectareas(){
-  try { const o = JSON.parse(localStorage.getItem(HECTAREAS_KEY)||'{}'); if(o && typeof o==='object') state.hectareas = o; } catch(e){}
+  state.hectareas = Object.assign({}, DEFAULT_HECTAREAS);
+  try {
+    const o = JSON.parse(localStorage.getItem(HECTAREAS_KEY)||'{}');
+    if(o && typeof o==='object'){
+      Object.keys(o).forEach(k=>{ if(o[k]!=='' && o[k]!=null) state.hectareas[k] = o[k]; });
+    }
+  } catch(e){}
 }
 function saveHectareas(){
   try { localStorage.setItem(HECTAREAS_KEY, JSON.stringify(state.hectareas)); } catch(e){}
@@ -2163,6 +2170,20 @@ function saveHectareas(){
 function hectareasDe(crop){ const v = Number(state.hectareas[crop]); return isFinite(v) && v>0 ? v : 0; }
 const fmtKgHa = v => formatScaled(v, false, 'kg/ha');
 
+function updateHectareasTotalUI(){
+  const totHaAll = CROPS.reduce((a,c)=>a+hectareasDe(c),0);
+  const totEl = document.getElementById('kghaTotal');
+  if(totEl) totEl.textContent = new Intl.NumberFormat('es-MX',{maximumFractionDigits:2}).format(totHaAll)+' ha';
+}
+function syncHectareasFromInputs(){
+  const wrap = document.getElementById('kghaInputs');
+  if(!wrap) return;
+  wrap.querySelectorAll('input').forEach(inp=>{
+    const raw = inp.value.trim();
+    if(raw!=='') state.hectareas[inp.dataset.crop] = raw;
+  });
+  updateHectareasTotalUI();
+}
 function buildHectareasBox(){
   const wrap = document.getElementById('kghaInputs');
   if(!wrap) return;
@@ -2171,17 +2192,18 @@ function buildHectareasBox(){
     return `<label class="kgha-row" data-crop="${c}"><span>${ICONS[c]} ${DISPLAY[c]}</span>
       <input type="number" min="0" step="any" inputmode="decimal" placeholder="ha" data-crop="${c}" value="${v!=null && v!=='' ? v : ''}"></label>`;
   }).join('');
+  updateHectareasTotalUI();
   wrap.querySelectorAll('input').forEach(inp=>{
-    inp.addEventListener('input', ()=>{
+    const onEdit = ()=>{
       const raw = inp.value.trim();
       if(raw==='') delete state.hectareas[inp.dataset.crop]; else state.hectareas[inp.dataset.crop] = raw;
       saveHectareas();
-      const totHaAll = CROPS.reduce((a,c)=>a+hectareasDe(c),0);
-      const totEl = document.getElementById('kghaTotal');
-      if(totEl) totEl.textContent = new Intl.NumberFormat('es-MX',{maximumFractionDigits:2}).format(totHaAll)+' ha';
+      updateHectareasTotalUI();
       refreshThemeColors();
       renderKgHa();
-    });
+    };
+    inp.addEventListener('input', onEdit);
+    inp.addEventListener('change', onEdit);
   });
 }
 
@@ -10129,6 +10151,7 @@ if(typeof window!=='undefined' && window.__FORECAST_TEST__){
 }
 
 document.addEventListener('DOMContentLoaded', init);
+window.addEventListener('pageshow', ()=>{ syncHectareasFromInputs(); renderAll(); });
 })();
 </script>
 </body></html>
