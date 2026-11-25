@@ -78,11 +78,16 @@
   .tabnav .tag{ font-size:10px; font-weight:700; padding:1px 6px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); }
 
   .layout{ display:grid; grid-template-columns:260px minmax(0,1fr); gap:20px; align-items:start; }
-  @media (max-width:920px){ .layout{ grid-template-columns:minmax(0,1fr); } }
+  @media (min-width:921px){
+    .app{ padding-bottom:20px; }
+    .layout{ height:calc(100vh - 150px); min-height:540px; overflow:hidden; align-items:stretch; }
+    .filters{ height:100%; overflow-y:auto; overscroll-behavior:contain; position:static; scrollbar-width:thin; }
+    .layout > main{ height:100%; overflow-y:auto; overscroll-behavior:contain; padding-right:4px; scrollbar-width:thin; }
+  }
+  @media (max-width:920px){ .layout{ grid-template-columns:minmax(0,1fr); } .filters{ position:static; } }
 
   .panel{ background:var(--surface-raised); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-1); }
-  .filters{ padding:16px; display:flex; flex-direction:column; gap:16px; position:sticky; top:16px; }
-  @media (max-width:920px){ .filters{ position:static; } }
+  .filters{ padding:16px; display:flex; flex-direction:column; gap:16px; }
   .filters h3{ font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; margin:0; color:var(--text-muted); font-family:'Public Sans'; }
   .field{ display:flex; flex-direction:column; gap:6px; }
   .field[hidden]{ display:none; }
@@ -279,8 +284,8 @@
     <button class="tabbtn" data-tab="detalle">📋 Detalle mensual</button>
     <button class="tabbtn" data-tab="escenarios">🧭 Escenarios</button>
     <button class="tabbtn" data-tab="comparativo">🏢 Comparativo de cultivos</button>
-    <button class="tabbtn" data-tab="tc">💱 Tipo de Cambio</button>
-    <button class="tabbtn" data-tab="datos">📥 Datos <span class="tag" id="dataTag">demo</span></button>
+    <button class="tabbtn" data-tab="tc">💱 Precios y TC</button>
+    <button class="tabbtn" data-tab="datos">📥 Datos</button>
   </div>
 
   <div class="layout">
@@ -375,11 +380,11 @@
           <button class="btn-inline" onclick="document.querySelector('[data-tab=datos]').click()">Ir a cargar datos →</button>
         </div>
         <div class="kpirow">
+          <div class="kpi"><span class="label">Producción proyectada · 3 meses</span><span class="value" id="kpiProduccion">—</span><span class="delta" id="kpiProduccionDelta"></span></div>
           <div class="kpi"><span class="label">Ingreso proyectado · 3 meses</span><span class="value" id="kpiIngreso">—</span><span class="delta" id="kpiIngresoDelta"></span></div>
           <div class="kpi"><span class="label">Egreso proyectado · 3 meses</span><span class="value" id="kpiEgreso">—</span><span class="delta" id="kpiEgresoDelta"></span></div>
           <div class="kpi"><span class="label">EBITDA proyectado · 3 meses</span><span class="value" id="kpiEbitda">—</span><span class="delta" id="kpiEbitdaDelta"></span></div>
-          <div class="kpi"><span class="label">Margen EBITDA</span><span class="value" id="kpiMargen">—</span><span class="delta" id="kpiMargenPill"></span></div>
-          <div class="kpi"><span class="label">Producción proyectada · 3 meses</span><span class="value" id="kpiProduccion">—</span><span class="delta" id="kpiProduccionDelta"></span></div>
+          <div class="kpi"><span class="label">EBITDA (%)</span><span class="value" id="kpiMargen">—</span><span class="delta" id="kpiMargenPill"></span></div>
         </div>
 
         <div class="title-row info-row">
@@ -390,39 +395,38 @@
 
         <div class="cardgrid">
           <div class="card">
-            <h4>EBITDA por mes <span class="hint" data-vista-label></span></h4>
-            <div class="chartbox tall"><canvas id="chartEbitda"></canvas></div>
-            <div class="legend-inline" id="legendEbitda"></div>
-          </div>
-          <div class="card">
-            <h4>Margen EBITDA por mes (%) <span class="hint" data-vista-label></span></h4>
-            <div class="chartbox tall"><canvas id="chartMargen"></canvas></div>
-            <div class="legend-inline" id="legendMargen"></div>
-          </div>
-        </div>
-
-        <div class="cardgrid">
-          <div class="card">
-            <h4>Ingreso por mes <span class="hint" data-vista-label></span></h4>
+            <h4>Ingreso <span class="hint" data-vista-label></span></h4>
             <div class="chartbox tall"><canvas id="chartIngreso"></canvas></div>
             <div class="legend-inline" id="legendIngreso"></div>
           </div>
           <div class="card">
-            <h4>Egreso por mes <span class="hint" data-vista-label></span></h4>
+            <h4>Egreso <span class="hint" data-vista-label></span></h4>
             <div class="chartbox tall"><canvas id="chartEgreso"></canvas></div>
             <div class="legend-inline" id="legendEgreso"></div>
           </div>
         </div>
 
         <div class="card">
-          <h4>Producción por mes (kg) <span class="hint" data-vista-label></span></h4>
+          <h4>Producción <span class="hint" data-vista-label></span></h4>
           <div class="chartbox wide"><canvas id="chartProduccion"></canvas></div>
           <div class="legend-inline" id="legendProduccion"></div>
+        </div>
+
+        <div class="cardgrid">
+          <div class="card">
+            <h4>Margen $ <span class="hint" data-vista-label></span></h4>
+            <div class="chartbox tall"><canvas id="chartMargen"></canvas></div>
+            <div class="legend-inline" id="legendMargen"></div>
+          </div>
+          <div class="card">
+            <h4>EBITDA $ <span class="hint" data-vista-label></span></h4>
+            <div class="chartbox tall"><canvas id="chartEbitda"></canvas></div>
+            <div class="legend-inline" id="legendEbitda"></div>
+          </div>
         </div>
       </section>
 
       <!-- ===================== TAB: DETALLE MENSUAL ===================== -->
-      <!-- Tablas movidas tal cual desde Forecast por cultivo: Histórico y forecast mensual + Kg por hectárea. -->
       <section class="view" id="view-detalle" hidden>
         <div class="card">
           <h4>Histórico y forecast mensual — <span id="tableCropLabel" class="tablecrop-label"></span></h4>
@@ -456,44 +460,14 @@
         </div>
 
         <div class="card">
-          <h4>Kg por hectárea — <span id="kghaCropLabel" class="tablecrop-label"></span> <span class="hint" id="kghaCropHa"></span></h4>
-          <div class="kgha-layout">
-            <div class="kgha-chartcol">
-              <div class="chartbox tall"><canvas id="chartKgHa"></canvas></div>
-              <div class="legend-inline" id="legendKgHa"></div>
-            </div>
-            <div class="kgha-box">
-              <div class="title-row">
-                <h5>Hectáreas por cultivo</h5>
-                <button type="button" class="info-tip" aria-label="Información sobre las hectáreas" aria-describedby="kghaBoxInfo">i</button>
-                <div class="info-pop" id="kghaBoxInfo" role="tooltip">Escribe las hectáreas de cada cultivo. Se guardan en este navegador y no se borran al recargar la página ni al actualizar los datos. Mientras un cultivo no tenga hectáreas, la gráfica y la tabla muestran sus kg.</div>
-              </div>
-              <div id="kghaInputs"></div>
-              <p class="hint" id="kghaEmpaqueMsg" hidden>📦 Empaque no lleva hectáreas.</p>
-              <div class="kgha-total" id="kghaTotalRow"><span>Total</span><b id="kghaTotal">0 ha</b></div>
-            </div>
-          </div>
+          <h4>Histórico y forecast por hectárea — <span id="kghaCropLabel" class="tablecrop-label"></span> <span class="hint" id="kghaCropHa"></span></h4>
           <div class="title-row info-row">
-            <button type="button" class="info-tip" aria-label="Cómo leer la tabla de kg por hectárea" aria-describedby="kghaSub">i</button>
+            <button type="button" class="info-tip" aria-label="Cómo leer la tabla por hectárea" aria-describedby="kghaSub">i</button>
             <div class="info-pop wide" id="kghaSub" role="tooltip"></div>
             <span class="info-label">Cómo leer la tabla</span>
           </div>
           <div class="tablewrap">
             <table id="tablaKgHa"><thead></thead><tbody></tbody></table>
-          </div>
-        </div>
-
-        <div class="card">
-          <h4>Precios Mensuales y Promedio de Temporada (JUL-JUL) — <span id="preciosCropLabel" class="tablecrop-label"></span></h4>
-          <p class="cardsub">Precios reales y presupuestados mensuales vs. precio forecast ponderado calculado (Ingreso mensual ÷ Kg del mes). Al final se muestra el promedio ponderado de toda la temporada (JUL-JUL).</p>
-          <div class="segmented seg-accent tablevar-seg" id="preciosSeg">
-            <button type="button" data-mercado="exp" class="on">🌎 Exportación (USD/kg)</button>
-            <button type="button" data-mercado="nac">🇲🇽 Nacional (MXN/kg)</button>
-          </div>
-          <div class="chartbox tall"><canvas id="chartPrecios"></canvas></div>
-          <div class="legend-inline" id="legendPrecios"></div>
-          <div class="tablewrap" style="margin-top:8px;">
-            <table id="tablaPrecios"><thead></thead><tbody></tbody></table>
           </div>
         </div>
       </section>
@@ -549,17 +523,29 @@
         </div>
       </section>
 
-      <!-- ===================== TAB: TIPO DE CAMBIO ===================== -->
+      <!-- ===================== TAB: PRECIOS Y TC ===================== -->
       <section class="view" id="view-tc" hidden>
+        <div class="card">
+          <h4>Precios Mensuales y Promedio de Temporada (JUL-JUL) — <span id="preciosCropLabel" class="tablecrop-label"></span></h4>
+          <p class="cardsub">Precios reales y presupuestados mensuales vs. precio forecast ponderado calculado (Ingreso mensual ÷ Kg del mes). Al final se muestra el promedio ponderado de toda la temporada (JUL-JUL).</p>
+          <div class="segmented seg-accent tablevar-seg" id="preciosSeg">
+            <button type="button" data-mercado="exp" class="on">🌎 Exportación (USD/kg)</button>
+            <button type="button" data-mercado="nac">🇲🇽 Nacional (MXN/kg)</button>
+          </div>
+          <div class="chartbox tall"><canvas id="chartPrecios"></canvas></div>
+          <div class="legend-inline" id="legendPrecios"></div>
+          <div class="tablewrap" style="margin-top:8px;">
+            <table id="tablaPrecios"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+
         <div class="card">
           <h4>Tipo de Cambio Semanal — TC Real (Cerezo), TC Forecast (Banxico) y TC Oficial</h4>
           <p class="cardsub">Evolución semanal del tipo de cambio MXN/USD. El TC Forecast se utiliza para convertir los ingresos de exportación proyectados a pesos.</p>
           <div class="chartbox tall"><canvas id="chartTC"></canvas></div>
           <div class="legend-inline" id="legendTC"></div>
-        </div>
-        <div class="card">
-          <h4>Detalle Semanal de Tipo de Cambio</h4>
-          <div class="tablewrap">
+          <h4 style="margin-top:8px;">Detalle Semanal de Tipo de Cambio</h4>
+          <div class="tablewrap" style="max-height:260px; overflow-y:auto;">
             <table id="tablaTC"><thead></thead><tbody></tbody></table>
           </div>
         </div>
@@ -585,14 +571,25 @@
           </div>
         </div>
 
-        <div class="card">
-          <h4>Configuración de % Venta Nacional vs. Exportación</h4>
-          <p class="cardsub">Edita el porcentaje de producción destinado a mercado nacional por cultivo (el complemento es % Exportación). Los cambios se guardan en este navegador y recalculan el ingreso proyectado al instante.</p>
-          <div class="tablewrap" style="max-width:460px;">
-            <table class="scenariotable" id="tablaVentaNac">
-              <thead><tr><th style="text-align:left">Cultivo</th><th style="text-align:right">% Venta Nacional</th><th style="text-align:right">% Exportación</th></tr></thead>
-              <tbody></tbody>
-            </table>
+        <div class="cardgrid">
+          <div class="card">
+            <h4>Configuración de % Venta Nacional vs. Exportación</h4>
+            <p class="cardsub">Edita el porcentaje de producción destinado a mercado nacional por cultivo (el complemento es % Exportación). Los cambios se guardan en este navegador y recalculan el ingreso proyectado al instante.</p>
+            <div class="tablewrap">
+              <table class="scenariotable" id="tablaVentaNac">
+                <thead><tr><th style="text-align:left">Cultivo</th><th style="text-align:right">% Venta Nacional</th><th style="text-align:right">% Exportación</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>Hectáreas por cultivo</h4>
+            <p class="cardsub">Escribe las hectáreas de cada cultivo. Se guardan en este navegador y dividen los valores de la segunda tabla de "Detalle mensual" (Ingreso/ha, Egreso/ha, Producción/ha y EBITDA/ha).</p>
+            <div class="kgha-box" style="border:none; padding:0; background:transparent;">
+              <div id="kghaInputs"></div>
+              <div class="kgha-total" id="kghaTotalRow"><span>Total</span><b id="kghaTotal">0 ha</b></div>
+            </div>
           </div>
         </div>
 
@@ -821,15 +818,43 @@ function monthsForKind(kind){ return kind==='produccion' ? horizonFor('produccio
    3. FORMATTERS
    ============================================================ */
 const fmtMXN = v => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(v||0);
-const fmtKg = v => new Intl.NumberFormat('es-MX',{maximumFractionDigits:0}).format(v||0)+' kg';
+function formatScaled(v, isMoney, suffix){
+  const val = Number(v)||0;
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '';
+  const pre = isMoney ? '$' : '';
+  const suf = suffix ? ' ' + suffix : '';
+  if(abs >= 1e6){
+    const n = abs / 1e6;
+    const s = new Intl.NumberFormat('es-MX',{minimumFractionDigits:1, maximumFractionDigits:1}).format(n);
+    return (s==='0.0' ? '' : sign) + pre + s + ' M' + suf;
+  }
+  if(abs >= 1e3){
+    const n = abs / 1e3;
+    const dec = n >= 100 ? 0 : 1;
+    const s = new Intl.NumberFormat('es-MX',{minimumFractionDigits:dec, maximumFractionDigits:dec}).format(n);
+    return (s==='0' || s==='0.0' ? '' : sign) + pre + s + ' K' + suf;
+  }
+  const s = new Intl.NumberFormat('es-MX',{maximumFractionDigits:0}).format(abs);
+  return (s==='0' ? '' : sign) + pre + s + suf;
+}
+const fmtKg = v => formatScaled(v, false, 'kg');
 const fmtPct = v => (v>=0?'+':'')+(v||0).toFixed(1)+'%';
 const fmtNum = v => new Intl.NumberFormat('es-MX',{maximumFractionDigits:0}).format(v||0);
-// Millones con un decimal: 386,147,702 → "$386.1 M"
-const fmtM = v => {
-  const n = (v||0)/1e6;
-  const s = new Intl.NumberFormat('es-MX',{minimumFractionDigits:1, maximumFractionDigits:1}).format(Math.abs(n));
-  return (n<0 && s!=='0.0' ? '-' : '')+'$'+s+' M';
+// Escala automática según magnitud: >= 1M -> "$#.# M", >= 1K -> "$### K", < 1K -> "$###"
+const fmtM = v => formatScaled(v, true, '');
+const fmtMDP = v => {
+  const val = Number(v)||0;
+  const abs = Math.abs(val);
+  const sign = val < 0 ? '-' : '';
+  if(abs >= 1e6){
+    const n = Math.round(abs/1e6);
+    const s = new Intl.NumberFormat('es-MX',{maximumFractionDigits:0}).format(n);
+    return (s==='0' ? '' : sign)+'$'+s+' MDP';
+  }
+  return formatScaled(val, true, '');
 };
+const fmtKgShort = v => formatScaled(v, false, 'kg');
 const fmtSigned = (fmt, v) => (v>0?'+':'')+fmt(v);
 
 function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -1724,8 +1749,9 @@ function kindSeries(kind, method, scenario, crops, months, vista, customHorizonM
   months.forEach(mk=>{
     out.hasReal[mk] = I.hasReal[mk] || E.hasReal[mk];
     ['real','full','pres'].forEach(k=>{
-      const eb = (I[k][mk]||0) - (E[k][mk]||0) + (D[k][mk]||0);
-      out[k][mk] = kind==='ebitda' ? eb : ((I[k][mk]||0)>0 ? eb/I[k][mk]*100 : 0);
+      const mg$ = (I[k][mk]||0) - (E[k][mk]||0);
+      const eb = mg$ + (D[k][mk]||0);
+      out[k][mk] = kind==='ebitda' ? eb : (kind==='margen_dinero' ? mg$ : ((I[k][mk]||0)>0 ? eb/I[k][mk]*100 : 0));
     });
   });
   return out;
@@ -1888,9 +1914,9 @@ function renderKpis(){
   const presuEbitdaTotal = presuIngresoTotal - presuEgresoTotal + presuDeprecTotal;
   const hasIngreso = true;
 
-  document.getElementById('kpiIngreso').textContent = hasIngreso ? fmtMXN(ingresoTotal) : '—';
-  document.getElementById('kpiEgreso').textContent = fmtMXN(egresoTotal);
-  document.getElementById('kpiEbitda').textContent = hasIngreso ? fmtMXN(ebitdaTotal) : '—';
+  document.getElementById('kpiIngreso').textContent = hasIngreso ? fmtMDP(ingresoTotal) : '—';
+  document.getElementById('kpiEgreso').textContent = fmtMDP(egresoTotal);
+  document.getElementById('kpiEbitda').textContent = hasIngreso ? fmtMDP(ebitdaTotal) : '—';
   document.getElementById('kpiMargen').textContent = hasIngreso ? margen.toFixed(1)+'%' : '—';
 
   // Flecha = dirección real vs presupuesto (▲ arriba / ▼ abajo).
@@ -1916,7 +1942,7 @@ function renderKpis(){
   const produccionTotal = sum3(scenarioForecastConsolidated('produccion', method, sc, crops));
   const presuProduccionTotal = sum3(historicalMonthly('produccion','presupuesto', crops, FORECAST_MONTHS));
   const hasProd = (state.raw.produccion||[]).length>0 && (produccionTotal>0 || presuProduccionTotal>0);
-  document.getElementById('kpiProduccion').textContent = hasProd ? fmtKg(produccionTotal) : '—';
+  document.getElementById('kpiProduccion').textContent = hasProd ? fmtKgShort(produccionTotal) : '—';
   document.getElementById('kpiProduccionDelta').innerHTML = hasProd ? deltaHtml(produccionTotal, presuProduccionTotal, true) : '';
 }
 
@@ -1941,7 +1967,7 @@ function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
 
   let lastRealIdx = -1;
   months.forEach((mk,i)=>{ if(act.hasReal[mk]) lastRealIdx = i; });
-  const projStart = (vista === 'acumulado') ? 0 : Math.max(0, lastRealIdx);
+  const projStart = 0;
   const realArr = months.map(mk=> act.hasReal[mk] ? act.real[mk] : null);
   const projArr = months.map((mk,i)=> i>=projStart ? act.full[mk] : null);
   const optArr  = months.map((mk,i)=> i>=projStart ? opt.full[mk] : null);
@@ -2135,7 +2161,7 @@ function saveHectareas(){
   try { localStorage.setItem(HECTAREAS_KEY, JSON.stringify(state.hectareas)); } catch(e){}
 }
 function hectareasDe(crop){ const v = Number(state.hectareas[crop]); return isFinite(v) && v>0 ? v : 0; }
-const fmtKgHa = v => new Intl.NumberFormat('es-MX',{maximumFractionDigits: Math.abs(v||0)<100 ? 1 : 0}).format(v||0)+' kg/ha';
+const fmtKgHa = v => formatScaled(v, false, 'kg/ha');
 
 function buildHectareasBox(){
   const wrap = document.getElementById('kghaInputs');
@@ -2150,15 +2176,15 @@ function buildHectareasBox(){
       const raw = inp.value.trim();
       if(raw==='') delete state.hectareas[inp.dataset.crop]; else state.hectareas[inp.dataset.crop] = raw;
       saveHectareas();
+      const totHaAll = CROPS.reduce((a,c)=>a+hectareasDe(c),0);
+      const totEl = document.getElementById('kghaTotal');
+      if(totEl) totEl.textContent = new Intl.NumberFormat('es-MX',{maximumFractionDigits:2}).format(totHaAll)+' ha';
       refreshThemeColors();
       renderKgHa();
     });
   });
 }
 
-// Datos de la sección Kg por hectárea para el cultivo / consolidado seleccionado.
-//  · Con hectáreas: kg de los cultivos que tienen hectáreas ÷ suma de esas hectáreas (unidad kg/ha).
-//  · Sin hectáreas: se muestran los kg tal cual (unidad kg) — la tabla y la gráfica nunca quedan vacías.
 function kgHaContext(){
   const sel = currentCropsSelection();
   const isCons = state.filters.focalCrop==='CONSOLIDADO';
@@ -2168,136 +2194,103 @@ function kgHaContext(){
   const useHa = ha>0;
   return {
     isCons, cropsSel, ha, useHa,
-    crops: useHa ? cropsHa : cropsSel,
+    crops: sel,
     sinHa: cropsSel.filter(c=>hectareasDe(c)===0),
     div: useHa ? ha : 1,
-    fmtU: useHa ? fmtKgHa : fmtKg,
-    unit: useHa ? 'Kg/ha' : 'Kg',
     haTxt: new Intl.NumberFormat('es-MX',{maximumFractionDigits:2}).format(ha)+' ha'
   };
+}
+
+function fmtPerHa(v, variable, useHa){
+  if(variable==='produccion'){
+    return useHa ? fmtKgHa(v) : fmtKg(v);
+  }
+  return formatScaled(v, true, useHa ? '/ha' : '');
 }
 
 function renderKgHa(){
   const lbl = document.getElementById('kghaCropLabel');
   if(lbl) lbl.textContent = focalCropLabel();
-  // Recuadro de hectáreas: en Consolidado se ven los 7 cultivos; con un cultivo enfocado, solo ese.
-  const focal = state.filters.focalCrop;
-  document.querySelectorAll('#kghaInputs .kgha-row').forEach(row=>{
-    row.hidden = !(focal==='CONSOLIDADO' || row.dataset.crop===focal);
-  });
-  document.getElementById('kghaTotalRow').hidden = focal!=='CONSOLIDADO';
-  document.getElementById('kghaEmpaqueMsg').hidden = focal!==OTHER_LABEL;
   const totHaAll = CROPS.reduce((a,c)=>a+hectareasDe(c),0);
-  document.getElementById('kghaTotal').textContent = new Intl.NumberFormat('es-MX',{maximumFractionDigits:2}).format(totHaAll)+' ha';
+  const totEl = document.getElementById('kghaTotal');
+  if(totEl) totEl.textContent = new Intl.NumberFormat('es-MX',{maximumFractionDigits:2}).format(totHaAll)+' ha';
   const ctx = kgHaContext();
-  document.getElementById('kghaCropHa').textContent = state.filters.focalCrop===OTHER_LABEL ? '' :
-    ctx.useHa ? (ctx.isCons ? `${ctx.haTxt} de ${ctx.crops.length} cultivo${ctx.crops.length===1?'':'s'}` : ctx.haTxt) : 'sin hectáreas · mostrando kg';
-  renderKgHaChart(ctx);
+  const cropHaEl = document.getElementById('kghaCropHa');
+  if(cropHaEl){
+    cropHaEl.textContent = state.filters.focalCrop===OTHER_LABEL ? '' :
+      ctx.useHa ? (ctx.isCons ? `${ctx.haTxt} de ${ctx.crops.length} cultivo${ctx.crops.length===1?'':'s'}` : ctx.haTxt) : 'sin hectáreas · captura ha en Datos';
+  }
   renderKgHaTable(ctx);
-}
-
-function renderKgHaChart(ctx){
-  destroyChart('chartKgHa');
-  const legend = document.getElementById('legendKgHa');
-  if(state.filters.focalCrop===OTHER_LABEL || !ctx.crops.length){ legend.innerHTML = ''; return; }
-  if(!chartsAvailable()){ chartFallback('chartKgHa'); return; }
-  const method = state.filters.metodo, sc = state.filters.escenario, vista = state.filters.vista;
-  const months = DISPLAY_MONTHS;
-  const act = kindSeries('produccion', method, sc, ctx.crops, months, vista);
-  const opt = kindSeries('produccion', method, 'optimista', ctx.crops, months, vista);
-  const pes = kindSeries('produccion', method, 'pesimista', ctx.crops, months, vista);
-  let lastRealIdx = -1;
-  months.forEach((mk,i)=>{ if(act.hasReal[mk]) lastRealIdx = i; });
-  const projStart = Math.max(0, lastRealIdx);
-  const d = v => v/ctx.div;
-  const realArr = months.map(mk=> act.hasReal[mk] ? d(act.real[mk]) : null);
-  const projArr = months.map((mk,i)=> i>=projStart ? d(act.full[mk]) : null);
-  const optArr  = months.map((mk,i)=> i>=projStart ? d(opt.full[mk]) : null);
-  const pesArr  = months.map((mk,i)=> i>=projStart ? d(pes.full[mk]) : null);
-  const presArr = hasTipo('produccion','presupuesto') ? months.map(mk=> d(act.pres[mk])) : months.map(()=>null);
-  const lineColor = scenarioLineColor(sc);
-  const projLabel = `Proyección · ${METODO_LABEL[metodoEfectivo('produccion', method)]} (${sc})` + (method==='movil' ? ' — producción no usa Promedio móvil' : '');
-  const fmtU = ctx.fmtU;
-  charts.chartKgHa = new Chart(document.getElementById('chartKgHa').getContext('2d'), {
-    type:'line',
-    data:{
-      labels: months.map(monthLabel),
-      datasets:[
-        { label:'Presupuesto', data:presArr, borderColor:CH.muted, backgroundColor:CH.muted, pointBackgroundColor:CH.muted, pointBorderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:3, fill:false, tension:0.25 },
-        { label:'Pesimista', data:pesArr, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.12), pointRadius:0, fill:false, tension:0.25 },
-        { label:'Optimista', data:optArr, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
-        { label:'Real', data:realArr, borderColor:CH.primary, backgroundColor:CH.primary, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
-        { label:projLabel, data:projArr, borderColor:lineColor, backgroundColor:lineColor, borderWidth:2.5, pointRadius:3, pointBackgroundColor:lineColor, tension:0.25, fill:false }
-      ]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      interaction:{ mode:'index', intersect:false },
-      plugins:{ legend:{ display:false },
-        tooltip:{ backgroundColor:CH.surface, titleColor:CH.primary, bodyColor:CH.text, borderColor:CH.grid, borderWidth:1, padding:10,
-          callbacks:{ label: c => c.dataset.label+': '+(c.raw==null?'—':fmtU(c.raw)) } } },
-      scales: baseScales({ y: { grid:{color:CH.grid}, ticks:{ color:CH.muted, callback:v=> fmtU(v) } } })
-    }
-  });
-  legend.innerHTML = `
-    <span class="sw" style="color:${CH.muted}"><span class="dashed"></span>Presupuesto</span>
-    <span class="sw" style="color:${CH.primary}"><span class="line" style="background:${CH.primary}"></span>Real</span>
-    <span class="sw" style="color:${lineColor}"><span class="line" style="background:${lineColor}"></span>${projLabel}</span>
-    <span class="sw" style="color:${CH.good}"><span class="dot" style="background:${hexA(CH.good,0.5)}"></span>Rango Pesimista–Optimista</span>
-    <span class="sw">Unidad: ${ctx.useHa ? 'kg por hectárea' : 'kg (sin hectáreas capturadas)'}</span>`;
 }
 
 function renderKgHaTable(ctx){
   ctx = ctx || kgHaContext();
   const tbl = document.getElementById('tablaKgHa');
+  if(!tbl) return;
+  const v = state.filters.tablaVariable || 'egreso';
+  if(v === 'depreciacion'){
+    const thead = tbl.querySelector('thead'), tbody = tbl.querySelector('tbody');
+    thead.innerHTML = '<tr><th>Mes</th><th>Depreciación por hectárea</th></tr>';
+    tbody.innerHTML = '<tr><td colspan="2">📉 Depreciación no aplica en el cálculo por hectárea — selecciona Ingreso, Egreso, Producción o EBITDA arriba.</td></tr>';
+    const sub = document.getElementById('kghaSub');
+    if(sub) sub.textContent = '';
+    return;
+  }
+
   const sc = state.filters.escenario, vista = state.filters.vista, activeMethod = state.filters.metodo;
-  const months = DISPLAY_MONTHS;
+  const meta = TABLE_VAR_META[v];
+  const MT = tableMethodsFor(v), activeM = metodoEfectivo(v, activeMethod);
+  const months = monthsForKind(v);
+  const H = v==='produccion' ? horizonFor('produccion') : { forecastMonths:FORECAST_MONTHS, currentMk:CURRENT_MONTH_KEY, horizonMk:HORIZON_MK };
+
   const thead = tbl.querySelector('thead'), tbody = tbl.querySelector('tbody');
-  const MT = tableMethodsFor('produccion'), activeM = metodoEfectivo('produccion', activeMethod);
   const mcls = k => k===activeM ? ' class="active-method"' : '';
-  const U = ctx.unit;
-  thead.innerHTML = `<tr><th>Mes</th><th>${U} real</th><th>${U} presupuesto</th><th>Variación vs presupuesto</th>` +
+  const unitSuffix = ctx.useHa ? ' / ha' : '';
+  thead.innerHTML = `<tr><th>Mes</th><th>${meta.label}${unitSuffix} real</th><th>Presupuesto${unitSuffix}</th><th>Variación vs presupuesto</th>` +
     MT.map(m=>`<th${mcls(m.key)}>${m.label}</th>`).join('') +
     `<th>Variación forecast vs presupuesto</th></tr>`;
   tbody.innerHTML = '';
+
   const sub = document.getElementById('kghaSub');
-  if(state.filters.focalCrop===OTHER_LABEL){
-    tbody.innerHTML = `<tr><td colspan="${5+MT.length}">📦 Empaque no produce kg — elige un cultivo o Consolidado.</td></tr>`;
-    sub.textContent = ''; return;
+  if(state.filters.focalCrop===OTHER_LABEL || !ctx.crops.length){
+    tbody.innerHTML = `<tr><td colspan="${5+MT.length}">📦 Empaque no lleva hectáreas — elige un cultivo o Consolidado.</td></tr>`;
+    if(sub) sub.textContent = '';
+    return;
   }
 
   const S = {};
-  MT.forEach(m=> S[m.key] = kindSeries('produccion', m.key, sc, ctx.crops, months, vista));
-  const base = S.estacional; // Real y Presupuesto no dependen del método
-  const hasPres = hasTipo('produccion','presupuesto');
-  const meta = { fmt:ctx.fmtU, favorableWhenAbove:true };
-  const cell = (kg, extra) => ctx.useHa
-    ? `<td${extra||''}>${fmtKgHa(kg/ctx.ha)}<span class="subkg">${fmtKg(kg)}</span></td>`
-    : `<td${extra||''}>${fmtKg(kg)}</td>`;
+  MT.forEach(m=> S[m.key] = kindSeries(v, m.key, sc, ctx.crops, months, vista));
+  const base = S.estacional;
+  const hasPres = v==='ebitda' ? (hasTipo('ingreso','presupuesto')||hasTipo('egreso','presupuesto')) : hasTipo(v,'presupuesto');
+  const perHaMeta = { fmt: val => fmtPerHa(val, v, ctx.useHa), favorableWhenAbove: meta.favorableWhenAbove };
+  const cell = (rawVal, extra) => {
+    const valHa = rawVal / ctx.div;
+    return `<td${extra||''}>${fmtPerHa(valHa, v, ctx.useHa)}</td>`;
+  };
 
-  let totReal=0, totPresReal=0, totPres=0, anyReal=false; const totM = {}; MT.forEach(m=>totM[m.key]=0);
+  let totReal=0, totPresReal=0, totPres=0, anyReal=false; const totM = {polinomial:0, movil:0, estacional:0};
   months.forEach(mk=>{
-    const isForecast = FORECAST_MONTHS.includes(mk);
-    const realKg = base.hasReal[mk] ? base.real[mk] : null;
-    const presKg = hasPres ? base.pres[mk] : null;
-    const fcstKg = S[activeM].full[mk];
+    const isForecast = H.forecastMonths.includes(mk);
+    const realV = base.hasReal[mk] ? base.real[mk] : null;
+    const presV = hasPres ? base.pres[mk] : null;
+    const fcstV = S[activeM].full[mk];
     let diff=null, pct=null;
-    if(realKg!=null && presKg!=null){ diff = (realKg - presKg)/ctx.div; pct = presKg!==0 ? (realKg-presKg)/presKg*100 : null; }
+    if(realV!=null && presV!=null){ diff = (realV - presV)/ctx.div; pct = presV!==0 ? (realV-presV)/presV*100 : null; }
     let fDiff=null, fPct=null;
-    if(fcstKg!=null && presKg!=null && !(fcstKg===0 && presKg===0)){ fDiff = (fcstKg - presKg)/ctx.div; fPct = presKg!==0 ? (fcstKg-presKg)/presKg*100 : null; }
+    if(fcstV!=null && presV!=null && !(fcstV===0 && presV===0)){ fDiff = (fcstV - presV)/ctx.div; fPct = presV!==0 ? (fcstV-presV)/presV*100 : null; }
     if(vista==='mensual'){
-      if(realKg!=null){ totReal += realKg; anyReal = true; if(presKg!=null) totPresReal += presKg; }
-      if(presKg!=null) totPres += presKg;
+      if(realV!=null){ totReal += realV; anyReal = true; if(presV!=null) totPresReal += presV; }
+      if(presV!=null) totPres += presV;
       MT.forEach(m=> totM[m.key] += S[m.key].full[mk]||0);
     }
     const tr = document.createElement('tr');
-    if(mk===CURRENT_MONTH_KEY) tr.className='now';
+    if(mk===H.currentMk) tr.className='now';
     tr.innerHTML = `<td>${monthLabel(mk)}${isForecast?' 🔮':''}</td>` +
-      (realKg==null ? '<td>—</td>' : cell(realKg)) +
-      (presKg==null ? '<td>—</td>' : cell(presKg)) +
-      `<td>${varianceCellHTML(diff, pct, meta)}</td>` +
+      (realV==null ? '<td>—</td>' : cell(realV)) +
+      (presV==null ? '<td>—</td>' : cell(presV)) +
+      `<td>${varianceCellHTML(diff, pct, perHaMeta)}</td>` +
       MT.map(m=> cell(S[m.key].full[mk]||0, mcls(m.key))).join('') +
-      `<td>${varianceCellHTML(fDiff, fPct, meta)}</td>`;
+      `<td>${varianceCellHTML(fDiff, fPct, perHaMeta)}</td>`;
     tbody.appendChild(tr);
   });
 
@@ -2311,57 +2304,57 @@ function renderKgHaTable(ctx){
     totalRow.innerHTML = `<td>Total ${monthLabel(months[0])} – ${monthLabel(months[months.length-1])}</td>` +
       (anyReal ? cell(totReal) : '<td>—</td>') +
       (hasPres ? cell(totPres) : '<td>—</td>') +
-      `<td>${varianceCellHTML(totDiff, totPct, meta)}</td>` +
+      `<td>${varianceCellHTML(totDiff, totPct, perHaMeta)}</td>` +
       MT.map(m=> cell(totM[m.key], mcls(m.key))).join('') +
-      `<td>${varianceCellHTML(totDiffF, totPctF, meta)}</td>`;
+      `<td>${varianceCellHTML(totDiffF, totPctF, perHaMeta)}</td>`;
     tbody.appendChild(totalRow);
 
-    // Fila adicional: Total Temporada Completa en Kg/ha
     const seasonMks = fullSeasonMonthsList();
     const maxSeasonMk = seasonMks[seasonMks.length-1] || HORIZON_MK;
     const SFull = {};
-    MT.forEach(m=> SFull[m.key] = kindSeries('produccion', m.key, sc, ctx.crops, seasonMks, 'mensual', maxSeasonMk));
+    MT.forEach(m=> SFull[m.key] = kindSeries(v, m.key, sc, ctx.crops, seasonMks, 'mensual', maxSeasonMk));
     const baseFull = SFull.estacional;
-    let sRealKg=0, sPresRealKg=0, sPresKg=0, sAnyReal=false;
-    const sTotM = {}; MT.forEach(m=> sTotM[m.key]=0);
+    let sReal=0, sPresReal=0, sPres=0, sAnyReal=false;
+    const sTotM = {polinomial:0, movil:0, estacional:0};
     seasonMks.forEach(mk=>{
-      const rK = baseFull.hasReal[mk] ? baseFull.real[mk] : null;
-      const pK = hasPres ? baseFull.pres[mk] : null;
-      if(rK!=null){ sRealKg += rK; sAnyReal = true; if(pK!=null) sPresRealKg += pK; }
-      if(pK!=null) sPresKg += pK;
+      const rV = baseFull.hasReal[mk] ? baseFull.real[mk] : null;
+      const pV = hasPres ? baseFull.pres[mk] : null;
+      if(rV!=null){ sReal += rV; sAnyReal = true; if(pV!=null) sPresReal += pV; }
+      if(pV!=null) sPres += pV;
       MT.forEach(m=> sTotM[m.key] += SFull[m.key].full[mk]||0);
     });
     let sDiff=null, sPct=null;
-    if(sAnyReal && hasPres){ sDiff = (sRealKg - sPresRealKg)/ctx.div; sPct = sPresRealKg!==0 ? (sRealKg-sPresRealKg)/sPresRealKg*100 : null; }
+    if(sAnyReal && hasPres){ sDiff = (sReal - sPresReal)/ctx.div; sPct = sPresReal!==0 ? (sReal-sPresReal)/sPresReal*100 : null; }
     let sDiffF=null, sPctF=null;
-    if(hasPres){ sDiffF = (sTotM[activeM] - sPresKg)/ctx.div; sPctF = sPresKg!==0 ? (sTotM[activeM]-sPresKg)/sPresKg*100 : null; }
+    if(hasPres){ sDiffF = (sTotM[activeM] - sPres)/ctx.div; sPctF = sPres!==0 ? (sTotM[activeM]-sPres)/sPres*100 : null; }
     const seasonRow = document.createElement('tr');
     seasonRow.className = 'total-row';
     seasonRow.innerHTML = `<td>Total Temporada Completa (${monthLabel(seasonMks[0])} – ${monthLabel(maxSeasonMk)})</td>` +
-      (sAnyReal ? cell(sRealKg) : '<td>—</td>') +
-      (hasPres ? cell(sPresKg) : '<td>—</td>') +
-      `<td>${varianceCellHTML(sDiff, sPct, meta)}</td>` +
+      (sAnyReal ? cell(sReal) : '<td>—</td>') +
+      (hasPres ? cell(sPres) : '<td>—</td>') +
+      `<td>${varianceCellHTML(sDiff, sPct, perHaMeta)}</td>` +
       MT.map(m=> cell(sTotM[m.key], mcls(m.key))).join('') +
-      `<td>${varianceCellHTML(sDiffF, sPctF, meta)}</td>`;
+      `<td>${varianceCellHTML(sDiffF, sPctF, perHaMeta)}</td>`;
     tbody.appendChild(seasonRow);
   }
 
-  const vistaTxt = vista==='acumulado' ? 'Cifras <b>acumuladas</b> desde el inicio de la temporada.' : 'Cifras del mes.';
-  const unidadTxt = ctx.useHa
-    ? `Cada celda = kg ÷ ${ctx.haTxt}; abajo, en gris, los kg.`
-    : `<span class="hint warn">Sin hectáreas capturadas${ctx.isCons?'':' para '+DISPLAY[state.filters.focalCrop]}: se muestran los kg. Escribe las hectáreas en el recuadro para ver kg/ha.</span>`;
-  sub.innerHTML = `${vistaTxt} ${unidadTxt} Las 3 columnas de método usan los kg proyectados con ese método (real capturado + semanas proyectadas), escenario <b>${sc}</b>. La columna resaltada es el método seleccionado en el panel.` +
-    (ctx.isCons && ctx.useHa && ctx.sinHa.length ? ` <span class="hint warn">Sin hectáreas (no entran al kg/ha): ${ctx.sinHa.map(c=>DISPLAY[c]).join(', ')}.</span>` : '');
+  if(sub){
+    const vistaTxt = vista==='acumulado' ? 'Cifras <b>acumuladas</b> desde el inicio de la temporada.' : 'Cifras del mes.';
+    const unidadTxt = ctx.useHa
+      ? `Cada celda = ${meta.label} total ÷ ${ctx.haTxt}.`
+      : `<span class="hint warn">Sin hectáreas capturadas${ctx.isCons?'':' para '+DISPLAY[state.filters.focalCrop]}: captura las hectáreas en la pestaña <b>Datos</b> para ver el valor por hectárea.</span>`;
+    sub.innerHTML = `${vistaTxt} ${unidadTxt} Escenario <b>${sc}</b>.`;
+  }
 }
 
 function renderForecastTab(){
   renderKpis();
   const money = v=>fmtM(v);
-  renderLineWithBand('chartEbitda','legendEbitda', 'ebitda', money, false);
-  renderLineWithBand('chartMargen','legendMargen', 'margen', v=>(+v).toFixed(1)+'%', true);
   renderLineWithBand('chartIngreso','legendIngreso', 'ingreso', money, false);
   renderLineWithBand('chartEgreso','legendEgreso', 'egreso', money, false);
   renderLineWithBand('chartProduccion','legendProduccion', 'produccion', fmtKg, false);
+  renderLineWithBand('chartMargen','legendMargen', 'margen_dinero', money, false);
+  renderLineWithBand('chartEbitda','legendEbitda', 'ebitda', money, false);
   document.querySelectorAll('[data-vista-label]').forEach(el=> el.textContent = state.filters.vista==='acumulado' ? '· acumulado' : '· mensual');
 }
 
@@ -2582,7 +2575,6 @@ function renderDetalleTab(){
   renderHistoricoTable();
   renderRegistroTable();
   renderKgHa();
-  renderPrecios();
 }
 
 /* ---------- Registro mensual: forecast congelado (foto) vs real ----------
@@ -2771,6 +2763,7 @@ function perCropTotals(){
 }
 
 function renderTcTab(){
+  renderPrecios();
   destroyChart('chartTC');
   if(!chartsAvailable()) return;
   const allTc = state.raw.tc || [];
@@ -9576,7 +9569,7 @@ function loadDemoIntoSlots(){
     document.getElementById(slotId(tipo,variable)+'_text').value = rowsToCsv(rows[variable], tipo);
   });
   state.isDemo = true;
-  document.getElementById('dataTag').textContent = 'demo';
+  if(document.getElementById('dataTag')) document.getElementById('dataTag').textContent = 'demo';
   processAllSlots();
 }
 
@@ -9596,7 +9589,7 @@ function loadBakedDefaults(){
   const tag = loadedVars.length
     ? loadedVars.map(v=>VAR_LABEL[v]).join(' + ') + (missingVars.length ? ' · falta '+missingVars.map(v=>VAR_LABEL[v].toLowerCase()).join('/') : '')
     : 'vacío';
-  document.getElementById('dataTag').textContent = tag;
+  if(document.getElementById('dataTag')) document.getElementById('dataTag').textContent = tag;
   processAllSlots();
 }
 
@@ -9808,7 +9801,7 @@ function cargarDatosEnEstado(texts, nowRef, ui){
 function clearAllSlots(){
   SLOT_DEFS.forEach(({tipo,variable})=>{ document.getElementById(slotId(tipo,variable)+'_text').value=''; });
   state.isDemo = false;
-  document.getElementById('dataTag').textContent = 'vacío';
+  if(document.getElementById('dataTag')) document.getElementById('dataTag').textContent = 'vacío';
   processAllSlots();
 }
 
@@ -9889,7 +9882,7 @@ function syncFilterVisibility(){
   document.getElementById('mesField').hidden = !enComparativo;
   document.getElementById('escenarioField').hidden = (tab==='escenarios' || tab==='tc');
   // Mensual/Acumulado afecta las gráficas de Forecast y las tablas de Detalle mensual.
-  document.getElementById('vistaField').hidden = (tab!=='forecast' && tab!=='detalle');
+  document.getElementById('vistaField').hidden = (tab!=='forecast' && tab!=='detalle' && tab!=='tc');
 }
 
 // Aviso bajo "Método de proyección": de dónde sale el cálculo del método elegido.
@@ -9975,6 +9968,7 @@ function buildFilterUI(){
   document.getElementById('tableVariableSeg').querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click', ()=>{ state.filters.tablaVariable = btn.dataset.var; renderAll(); });
   });
+
 
   const chipwrap = document.getElementById('includedChips');
   const chipItems = CROPS.concat([OTHER_LABEL]);
