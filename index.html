@@ -94,11 +94,6 @@
   .field label{ font-size:12px; font-weight:600; color:var(--text-secondary); }
   select, .textinput{ width:100%; padding:8px 10px; border-radius:7px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary); font-size:13px; }
   /* Nombre del cultivo mostrado en el título de las tablas (el único selector es "Cultivo enfocado" del panel). */
-  .registro-head{ display:flex; align-items:baseline; gap:10px; margin:22px 0 6px; flex-wrap:wrap; }
-  .registro-head h5{ margin:0; font-size:13.5px; font-weight:700; color:var(--text-primary); }
-  td.foto-fecha{ color:var(--text-muted); font-size:11.5px; white-space:nowrap; }
-  td .en-curso{ color:var(--text-muted); font-style:italic; font-size:11.5px; }
-  #tablaRegistro{ min-width:980px; }
   .tablecrop-label{ font-weight:700; color:var(--accent); white-space:nowrap; }
   select.tablecrop-select{ width:auto; padding:4px 8px; font-size:12.5px; font-weight:700; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text-primary); }
   .chipgrid{ display:flex; flex-wrap:wrap; gap:6px; }
@@ -446,17 +441,6 @@
             <table id="tablaHistorico"><thead></thead><tbody></tbody></table>
           </div>
 
-          <div class="registro-head">
-            <h5>Registro mensual — forecast congelado vs real</h5>
-            <div class="title-row info-row" style="margin:0">
-              <button type="button" class="info-tip" aria-label="Cómo funciona el registro" aria-describedby="registroInfo">i</button>
-              <div class="info-pop wide" id="registroInfo" role="tooltip"></div>
-              <span class="info-label">Cómo funciona</span>
-            </div>
-          </div>
-          <div class="tablewrap">
-            <table id="tablaRegistro"><thead></thead><tbody></tbody></table>
-          </div>
         </div>
 
         <div class="card">
@@ -2595,105 +2579,7 @@ function renderPrecios(){
 }
 function renderDetalleTab(){
   renderHistoricoTable();
-  renderRegistroTable();
   renderKgHa();
-}
-
-/* ---------- Registro mensual: forecast congelado (foto) vs real ----------
-   Para cada mes M, la foto FOTOS_FORECAST[M] guarda los DATOS del Sheet tal como estaban el último día del
-   mes anterior (la escribe el Apps Script). Aquí se cargan esos datos en un "state" temporal, se calculan los
-   3 métodos con el mismo código de siempre (kindSeries) y se regresa el state actual intacto.
-   Presupuesto y Real se leen de los datos actuales; el Real solo se muestra cuando el mes ya cerró. */
-const FOTOS_FORECAST = (typeof window !== "undefined" && window.FOTOS_FORECAST) ? window.FOTOS_FORECAST : {};
-const fotoCache = {};
-function conDatosDeFoto(foto, fn){
-  const savedState = Object.assign({}, state);
-  const savedGlobals = [CURRENT_MONTH_KEY, FORECAST_MONTHS, HORIZON_MK, DISPLAY_MONTHS, PROJECTION_MONTHS];
-  const savedVH = Object.assign({}, VAR_HORIZON);
-  const savedCache = Object.assign({}, projCache);
-  try{
-    state.cierre = {};   // la foto no usa el "Cierre de temporada" de este navegador
-    const texts = {};
-    SLOT_DEFS.forEach(({tipo,variable})=>{ texts[variable+'|'+tipo] = (foto.datos && foto.datos[variable] && foto.datos[variable][tipo]) || ''; });
-    const [y,mo,d] = String(foto.fecha).split('-').map(Number);
-    cargarDatosEnEstado(texts, new Date(Date.UTC(y, mo-1, d)), false);
-    return fn();
-  } finally {
-    Object.keys(state).forEach(k=>{ if(!(k in savedState)) delete state[k]; });
-    Object.assign(state, savedState);
-    [CURRENT_MONTH_KEY, FORECAST_MONTHS, HORIZON_MK, DISPLAY_MONTHS, PROJECTION_MONTHS] = savedGlobals;
-    Object.keys(VAR_HORIZON).forEach(k=> delete VAR_HORIZON[k]); Object.assign(VAR_HORIZON, savedVH);
-    clearForecastCache(); Object.assign(projCache, savedCache);
-  }
-}
-// Forecast congelado del mes `mk` para la variable/cultivos/escenario: { fecha, polinomial, movil, estacional } o null.
-function fotoValores(mk, v, crops, sc){
-  const foto = FOTOS_FORECAST[mk];
-  if(!foto) return null;
-  const key = [mk, foto.fecha, v, crops.join(','), sc, JSON.stringify(state.scenarios)].join('|');
-  if(fotoCache[key]) return fotoCache[key];
-  const out = { fecha: foto.fecha };
-  conDatosDeFoto(foto, ()=>{
-    TABLE_METHODS.forEach(m=>{ out[m.key] = kindSeries(v, m.key, sc, crops, [mk], 'mensual').full[mk] || 0; });
-  });
-  return (fotoCache[key] = out);
-}
-function fmtFechaCorta(iso){
-  const [y,m,d] = String(iso).split('-').map(Number);
-  return `${d} ${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][m-1]} ${String(y).slice(2)}`;
-}
-function renderRegistroTable(){
-  const tbl = document.getElementById('tablaRegistro');
-  if(!tbl) return;
-  const crops = currentCropsSelection();
-  const sc = state.filters.escenario, activeMethod = state.filters.metodo;
-  const v = state.filters.tablaVariable;
-  const meta = TABLE_VAR_META[v];
-  const H = v==='produccion' ? horizonFor('produccion') : { currentMk:CURRENT_MONTH_KEY };
-  const hasPres = v==='ebitda' ? (hasTipo('ingreso','presupuesto')||hasTipo('egreso','presupuesto')) : hasTipo(v,'presupuesto');
-
-  // Meses: desde el primero que muestra la tabla de arriba hasta el mes siguiente al actual, más cualquier mes con foto.
-  const set = new Set(monthsForKind(v).filter(mk=> mk<=addMonths(H.currentMk,1)));
-  Object.keys(FOTOS_FORECAST).forEach(mk=> set.add(mk));
-  const months = [...set].sort();
-  const actual = kindSeries(v, 'estacional', sc, crops, months, 'mensual');   // Real y Presupuesto (datos actuales)
-
-  const MT = tableMethodsFor(v), activeM = metodoEfectivo(v, activeMethod);
-  const mcls = k => k===activeM ? ' class="active-method"' : '';
-  const activeLabel = (MT.find(m=>m.key===activeM)||TABLE_METHODS[2]).label;
-  tbl.querySelector('thead').innerHTML = `<tr><th>Mes</th><th>Foto del</th><th>Presupuesto</th>` +
-    MT.map(m=>`<th${mcls(m.key)}>${m.label} (foto)</th>`).join('') +
-    `<th>${meta.label} real (al cierre)</th><th>Real vs forecast</th><th>Real vs presupuesto</th></tr>`;
-  const tbody = tbl.querySelector('tbody');
-  tbody.innerHTML = '';
-  months.forEach(mk=>{
-    const foto = fotoValores(mk, v, crops, sc);
-    const presV = hasPres ? actual.pres[mk] : null;
-    const cerrado = mk < H.currentMk;
-    const realV = cerrado && actual.hasReal[mk] ? actual.real[mk] : null;
-    const realCell = cerrado ? (realV==null ? '—' : meta.fmt(realV)) : (mk===H.currentMk ? '<span class="en-curso">en curso</span>' : '—');
-    let dF=null, pF=null, dP=null, pP=null;
-    if(realV!=null && foto){ const f = foto[activeM]; dF = realV - f; pF = f!==0 ? dF/f*100 : null; }
-    if(realV!=null && presV!=null){ dP = realV - presV; pP = presV!==0 ? dP/presV*100 : null; }
-    const tr = document.createElement('tr');
-    if(mk===H.currentMk) tr.className = 'now';
-    tr.innerHTML = `<td>${monthLabel(mk)}</td>
-      <td class="foto-fecha">${foto ? fmtFechaCorta(foto.fecha) : 'sin foto'}</td>
-      <td>${presV==null?'—':meta.fmt(presV)}</td>` +
-      MT.map(m=>`<td${mcls(m.key)}>${foto ? meta.fmt(foto[m.key]) : '—'}</td>`).join('') +
-      `<td>${realCell}</td>
-      <td>${varianceCellHTML(dF, pF, meta).replace('s/presupuesto','s/forecast')}</td>
-      <td>${varianceCellHTML(dP, pP, meta)}</td>`;
-    tbody.appendChild(tr);
-  });
-
-  const nFotos = Object.keys(FOTOS_FORECAST).length;
-  document.getElementById('registroInfo').innerHTML =
-    `Las 3 columnas <b>(foto)</b> son el forecast de cada método <b>congelado el último día del mes anterior</b> (columna "Foto del"): ` +
-    `después ya no cambian aunque actualices el Sheet. Las toma automáticamente el Apps Script en los últimos días de cada mes. ` +
-    `El <b>Presupuesto</b> sale de tu hoja PPTO y el <b>Real</b> se muestra cuando el mes ya cerró. ` +
-    `"Real vs forecast" compara contra el método seleccionado en el panel (${activeLabel}). Escenario <b>${sc}</b>; siempre cifras del mes (no acumulado). ` +
-    (nFotos ? `Fotos guardadas: ${nFotos}.` : `<b>Todavía no hay fotos</b>: la primera se toma el último día de este mes.`);
 }
 
 /* ============================================================
