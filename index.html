@@ -1939,6 +1939,17 @@ function scenarioLineColor(sc){
 // 3 líneas principales: Presupuesto, Real y Proyección del método seleccionado (+ banda de escenarios).
 // La línea de Proyección arranca en el último mes con real (para que se vea la continuación) y
 // muestra el total estimado del mes: real capturado + semanas proyectadas por el método.
+function trimTrailingZeros(arr){
+  let lastNonZero = -1;
+  for(let i = arr.length - 1; i >= 0; i--){
+    if(arr[i] != null && Math.abs(arr[i]) > 1e-6){
+      lastNonZero = i;
+      break;
+    }
+  }
+  if(lastNonZero === -1) return arr.map(() => null);
+  return arr.map((v, i) => (i > lastNonZero && v === 0) ? null : v);
+}
 function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
   destroyChart(canvasId);
   if(!chartsAvailable()){ chartFallback(canvasId); return; }
@@ -1952,11 +1963,11 @@ function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
   let lastRealIdx = -1;
   months.forEach((mk,i)=>{ if(act.hasReal[mk]) lastRealIdx = i; });
   const projStart = 0;
-  const realArr = months.map(mk=> act.hasReal[mk] ? act.real[mk] : null);
-  const projArr = months.map((mk,i)=> i>=projStart ? act.full[mk] : null);
-  const optArr  = months.map((mk,i)=> i>=projStart ? opt.full[mk] : null);
-  const pesArr  = months.map((mk,i)=> i>=projStart ? pes.full[mk] : null);
-  const presArr = months.map(mk=> act.pres[mk]);
+  const realArr = trimTrailingZeros(months.map(mk=> act.hasReal[mk] ? act.real[mk] : null));
+  const projArr = trimTrailingZeros(months.map((mk,i)=> i>=projStart ? act.full[mk] : null));
+  const optArr  = trimTrailingZeros(months.map((mk,i)=> i>=projStart ? opt.full[mk] : null));
+  const pesArr  = trimTrailingZeros(months.map((mk,i)=> i>=projStart ? pes.full[mk] : null));
+  const presArr = trimTrailingZeros(months.map(mk=> act.pres[mk]));
   const lineColor = scenarioLineColor(sc);
   const projLabel = `Proyección · ${METODO_LABEL[metodoEfectivo(kind, method)]} (${sc})` + (kind==='produccion' && method==='movil' ? ' — producción no usa Promedio móvil' : '');
 
@@ -1969,8 +1980,8 @@ function renderLineWithBand(canvasId, legendId, kind, unitFmt, isPercent){
         { label:'Presupuesto', data:presArr, borderColor:CH.muted, backgroundColor:CH.muted, pointBackgroundColor:CH.muted, pointBorderColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:3, fill:false, tension:0.25 },
         { label:'Pesimista', data:pesArr, borderColor:'transparent', backgroundColor:hexA(CH.critical,0.12), pointRadius:0, fill:false, tension:0.25 },
         { label:'Optimista', data:optArr, borderColor:'transparent', backgroundColor:hexA(CH.good,0.14), pointRadius:0, fill:'-1', tension:0.25 },
-        { label:'Real', data:realArr, borderColor:CH.primary, backgroundColor:CH.primary, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
-        { label:projLabel, data:projArr, borderColor:lineColor, backgroundColor:lineColor, borderWidth:2.5, pointRadius:3, pointBackgroundColor:lineColor, tension:0.25, fill:false }
+        { label:projLabel, data:projArr, borderColor:lineColor, backgroundColor:lineColor, borderWidth:2.5, pointRadius:3, pointBackgroundColor:lineColor, tension:0.25, fill:false },
+        { label:'Real', data:realArr, borderColor:CH.primary, backgroundColor:CH.primary, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false }
       ]
     },
     options:{
@@ -2209,9 +2220,9 @@ function kgHaContext(){
 
 function fmtPerHa(v, variable, useHa){
   if(variable==='produccion'){
-    return useHa ? fmtKgHa(v) : fmtKg(v);
+    return fmtKg(v);
   }
-  return formatScaled(v, true, useHa ? '/ha' : '');
+  return formatScaled(v, true, '');
 }
 
 function renderKgHa(){
@@ -2251,7 +2262,7 @@ function renderKgHaTable(ctx){
 
   const thead = tbl.querySelector('thead'), tbody = tbl.querySelector('tbody');
   const mcls = k => k===activeM ? ' class="active-method"' : '';
-  const unitSuffix = ctx.useHa ? ' / ha' : '';
+  const unitSuffix = '';
   thead.innerHTML = `<tr><th>Mes</th><th>${meta.label}${unitSuffix} real</th><th>Presupuesto${unitSuffix}</th><th>Variación vs presupuesto</th>` +
     MT.map(m=>`<th${mcls(m.key)}>${m.label}</th>`).join('') +
     `<th>Variación forecast vs presupuesto</th></tr>`;
@@ -2484,9 +2495,9 @@ function renderPrecios(){
       data:{
         labels: months.map(monthLabel),
         datasets:[
-          { label:'Precio PPTO', data: pPpto, borderColor:CH.muted, backgroundColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:3, tension:0.25, fill:false },
-          { label:'Precio Real', data: pReal, borderColor:CH.primary, backgroundColor:CH.primary, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
-          { label:'Precio Forecast (ponderado)', data: pFcst, borderColor:CH.accent, backgroundColor:CH.accent, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false }
+          { label:'Precio PPTO', data: trimTrailingZeros(pPpto), borderColor:CH.muted, backgroundColor:CH.muted, borderDash:[5,4], borderWidth:1.5, pointRadius:3, tension:0.25, fill:false },
+          { label:'Precio Real', data: trimTrailingZeros(pReal), borderColor:CH.primary, backgroundColor:CH.primary, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
+          { label:'Precio Forecast (ponderado)', data: trimTrailingZeros(pFcst), borderColor:CH.accent, backgroundColor:CH.accent, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false }
         ]
       },
       options:{
@@ -2691,9 +2702,9 @@ function renderTcTab(){
     data:{
       labels: rows.map(r => r.label),
       datasets:[
-        { label:'TC Real (Cerezo)', data: rows.map(r => r.real), borderColor:CH.good, backgroundColor:CH.good, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
-        { label:'TC Forecast (Banxico)', data: rows.map(r => r.forecast), borderColor:CH.accent, backgroundColor:CH.accent, borderDash:[5,4], borderWidth:2, pointRadius:2.5, tension:0.25, fill:false },
-        { label:'TC Oficial', data: rows.map(r => r.oficial), borderColor:CH.muted, backgroundColor:CH.muted, borderWidth:1.8, pointRadius:2.5, tension:0.25, fill:false }
+        { label:'TC Real (Cerezo)', data: trimTrailingZeros(rows.map(r => r.real)), borderColor:CH.good, backgroundColor:CH.good, borderWidth:2.5, pointRadius:3, tension:0.25, fill:false },
+        { label:'TC Forecast (Banxico)', data: trimTrailingZeros(rows.map(r => r.forecast)), borderColor:CH.accent, backgroundColor:CH.accent, borderDash:[5,4], borderWidth:2, pointRadius:2.5, tension:0.25, fill:false },
+        { label:'TC Oficial', data: trimTrailingZeros(rows.map(r => r.oficial)), borderColor:CH.muted, backgroundColor:CH.muted, borderWidth:1.8, pointRadius:2.5, tension:0.25, fill:false }
       ]
     },
     options:{
